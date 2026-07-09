@@ -1,7 +1,8 @@
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
 import { IconApple, IconGooglePlay } from "./Icons";
-import { KSE_100, TICKER_QUOTES } from "../data/marketData";
+import { useMarketSnapshot, useTickerQuotes } from "../hooks/useMarketData";
+import type { MarketIndex, StockQuote } from "../types";
 
 const FEATURES = [
   "Real-time PSX quotes and full market depth",
@@ -36,7 +37,13 @@ function Sparkline() {
  * A crafted placeholder screen — replace with real app captures by
  * dropping an <img> into the phone frame.
  */
-function PhoneScreen() {
+function PhoneScreen({
+  index,
+  quotes,
+}: {
+  index: MarketIndex;
+  quotes: StockQuote[];
+}) {
   return (
     <div className="flex h-full flex-col bg-black/85 px-5 pb-6 pt-4">
       {/* Status bar */}
@@ -48,15 +55,15 @@ function PhoneScreen() {
 
       {/* Index header */}
       <div className="mt-6">
-        <p className="text-[11px] text-gray-300">KSE-100 Index</p>
+        <p className="text-[11px] text-gray-300">{index.name}</p>
         <div className="mt-1 flex items-baseline gap-2">
           <p className="text-2xl font-semibold tracking-tight text-white tabular-nums">
-            {KSE_100.value.toLocaleString("en-US", {
+            {index.value.toLocaleString("en-US", {
               minimumFractionDigits: 2,
             })}
           </p>
           <p className="text-xs font-semibold text-emerald-400 tabular-nums">
-            ▲ +{KSE_100.changePercent.toFixed(2)}%
+            ▲ +{index.changePercent.toFixed(2)}%
           </p>
         </div>
       </div>
@@ -67,7 +74,7 @@ function PhoneScreen() {
 
       {/* Watchlist */}
       <div className="mt-4 border-t border-white/10">
-        {TICKER_QUOTES.slice(0, 5).map((quote) => {
+        {quotes.slice(0, 5).map((quote) => {
           const up = quote.changePercent >= 0;
           return (
             <div
@@ -136,6 +143,9 @@ function StoreBadge({
 }
 
 export function AppShowcase() {
+  const { data: snapshot } = useMarketSnapshot();
+  const { data: quotes } = useTickerQuotes();
+
   return (
     <section id="trading" className="relative overflow-hidden py-24 lg:py-32">
       {/* Soft spotlight behind the phone */}
@@ -193,7 +203,9 @@ export function AppShowcase() {
               />
               <div className="liquid-glass-strong relative rounded-[3rem] p-3 shadow-[0_40px_80px_rgba(0,0,0,0.6)]">
                 <div className="h-[540px] overflow-hidden rounded-[2.4rem] border border-white/10">
-                  <PhoneScreen />
+                  {snapshot && quotes && (
+                    <PhoneScreen index={snapshot.index} quotes={quotes} />
+                  )}
                 </div>
                 {/* Speaker notch */}
                 <div

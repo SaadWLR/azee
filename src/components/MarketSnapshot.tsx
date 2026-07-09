@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
 import { FadeIn } from "./FadeIn";
-import {
-  KSE_100,
-  MARKET_STATS,
-  MARKET_TIMESTAMP,
-  RECENT_RESEARCH,
-  type Direction,
-} from "../data/marketData";
+import { useMarketSnapshot } from "../hooks/useMarketData";
+import { useRecentResearchTitles } from "../hooks/useResearch";
+import type { Direction } from "../types";
 
 /** Eases a number from 0 to `target` once, for the index counter. */
 function useCountUp(target: number, duration = 1400, delay = 0) {
@@ -65,8 +61,14 @@ function DirectionArrow({ direction }: { direction: Direction }) {
 }
 
 export function MarketSnapshot() {
-  const indexValue = useCountUp(KSE_100.value, 1400, 1500);
+  const { data: snapshot } = useMarketSnapshot();
+  const { data: recentResearch } = useRecentResearchTitles();
+  const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
   const { delta, flash } = useLiveDrift();
+
+  if (!snapshot) return null;
+
+  const open = snapshot.status === "OPEN";
 
   return (
     <FadeIn delay={1500}>
@@ -78,18 +80,30 @@ export function MarketSnapshot() {
           </p>
           <span className="flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              {open && (
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              )}
+              <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${
+                  open ? "bg-emerald-400" : "bg-rose-400"
+                }`}
+              />
             </span>
-            <span className="text-[10px] font-bold tracking-[0.2em] text-emerald-300">
-              LIVE
+            <span
+              className={`text-[10px] font-bold tracking-[0.2em] ${
+                open ? "text-emerald-300" : "text-rose-300"
+              }`}
+            >
+              {open ? "LIVE" : "CLOSED"}
             </span>
           </span>
         </div>
 
         {/* KSE-100 */}
         <div className="mt-6">
-          <p className="text-xs font-medium text-gray-400">{KSE_100.name}</p>
+          <p className="text-xs font-medium text-gray-400">
+            {snapshot.index.name}
+          </p>
           <div className="mt-1.5 flex items-baseline gap-3">
             <p
               key={flash ? `${flash}-${delta}` : "steady"}
@@ -103,11 +117,11 @@ export function MarketSnapshot() {
               })}
             </p>
             <p className="text-sm font-semibold text-emerald-400 tabular-nums">
-              ▲ +{KSE_100.changePercent.toFixed(2)}%
+              ▲ +{snapshot.index.changePercent.toFixed(2)}%
             </p>
           </div>
           <p className="mt-1.5 text-xs text-gray-400 tabular-nums">
-            +{KSE_100.changePoints.toLocaleString("en-US", {
+            +{snapshot.index.changePoints.toLocaleString("en-US", {
               minimumFractionDigits: 2,
             })}{" "}
             pts
@@ -116,7 +130,7 @@ export function MarketSnapshot() {
 
         {/* Session stats */}
         <div className="mt-6 border-t border-blue-200/15">
-          {MARKET_STATS.map((stat) => (
+          {snapshot.stats.map((stat) => (
             <div
               key={stat.label}
               className="flex items-center justify-between border-b border-blue-200/10 py-2.5 last:border-b-0"
@@ -136,7 +150,7 @@ export function MarketSnapshot() {
             Recent Research
           </p>
           <ul className="mt-3 space-y-1.5">
-            {RECENT_RESEARCH.map((title) => (
+            {(recentResearch ?? []).map((title) => (
               <li key={title}>
                 <a
                   href="#research"
@@ -153,7 +167,7 @@ export function MarketSnapshot() {
         </div>
 
         <p className="mt-5 text-[10px] tracking-wide text-gray-400/80">
-          Data: Pakistan Stock Exchange · {MARKET_TIMESTAMP}
+          Data: Pakistan Stock Exchange · {snapshot.timestamp}
         </p>
       </div>
     </FadeIn>

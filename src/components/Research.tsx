@@ -1,8 +1,9 @@
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
-import { RESEARCH_ARTICLES, type ResearchArticle } from "../data/marketData";
+import { useResearchReports } from "../hooks/useResearch";
+import type { ResearchCategory, ResearchReport } from "../types";
 
-function CategoryTag({ category }: { category: ResearchArticle["category"] }) {
+function CategoryTag({ category }: { category: ResearchCategory }) {
   return (
     <span className="liquid-glass inline-block rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide text-white/90">
       {category}
@@ -10,7 +11,7 @@ function CategoryTag({ category }: { category: ResearchArticle["category"] }) {
   );
 }
 
-function ArticleMeta({ article }: { article: ResearchArticle }) {
+function ArticleMeta({ article }: { article: ResearchReport }) {
   return (
     <p className="text-xs text-gray-300/80 tabular-nums">
       {article.date} · {article.readMinutes} min read
@@ -19,8 +20,9 @@ function ArticleMeta({ article }: { article: ResearchArticle }) {
 }
 
 export function Research() {
-  const featured = RESEARCH_ARTICLES.find((a) => a.featured)!;
-  const rest = RESEARCH_ARTICLES.filter((a) => !a.featured);
+  const { data: reports } = useResearchReports();
+  const featured = reports?.find((report) => report.featured);
+  const rest = reports?.filter((report) => !report.featured) ?? [];
 
   return (
     <section id="research" className="relative overflow-hidden py-24 lg:py-32">
@@ -40,7 +42,8 @@ export function Research() {
 
         <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3">
           {/* Featured report */}
-          <Reveal className="lg:col-span-2">
+          {featured && (
+            <Reveal className="lg:col-span-2">
             <a
               href="#"
               className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
@@ -66,7 +69,8 @@ export function Research() {
                 </span>
               </div>
             </a>
-          </Reveal>
+            </Reveal>
+          )}
 
           {/* Report list */}
           <div className="flex flex-col gap-5">

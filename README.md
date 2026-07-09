@@ -49,8 +49,22 @@ muted, looped, `playsInline`, with no overlay, gradient, or tint.
 | `src/components/SectionHeading.tsx` | Shared eyebrow/title/description block |
 | `src/components/Icons.tsx` | Inline SVG icon set |
 | `src/config.ts` | Hero video URL |
-| `src/data/marketData.ts` | Typed placeholder market data and research feed — swap in live APIs here |
 | `src/index.css` | Inter font setup, `.liquid-glass` surfaces, section backdrops, keyframes |
+
+## Data architecture
+
+All data flows through a service layer — components never import
+fixtures directly:
+
+| Layer | Purpose |
+| --- | --- |
+| `src/types/` | Domain interfaces (`MarketIndex`, `StockQuote`, `MarketSnapshot`, `ResearchReport`, `CompanyInfo`, `NewsItem`) |
+| `src/services/` | Async services (`marketService`, `researchService`, `companyService`, `newsService`) — currently resolve mock fixtures via `mockResponse()` |
+| `src/hooks/` | `useAsyncData` plus domain hooks (`useMarketSnapshot`, `useTickerQuotes`, `useResearchReports`, …) consumed by components |
+| `src/lib/apiClient.ts` | `apiGet<T>()` fetch wrapper (`VITE_API_BASE_URL`) — swap a service's `mockResponse` for `apiGet` to go live |
+
+Going live with real PSX data means editing only the service files;
+types, hooks, and components stay unchanged.
 
 ## Market data
 
