@@ -62,8 +62,13 @@ function PhoneScreen({
               minimumFractionDigits: 2,
             })}
           </p>
-          <p className="text-xs font-semibold text-emerald-400 tabular-nums">
-            ▲ +{index.changePercent.toFixed(2)}%
+          <p
+            className={`text-xs font-semibold tabular-nums ${
+              index.direction === "up" ? "text-emerald-400" : "text-rose-400"
+            }`}
+          >
+            {index.direction === "up" ? "▲ +" : "▼ "}
+            {index.changePercent.toFixed(2)}%
           </p>
         </div>
       </div>

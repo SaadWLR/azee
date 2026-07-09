@@ -116,12 +116,20 @@ export function MarketSnapshot() {
                 maximumFractionDigits: 2,
               })}
             </p>
-            <p className="text-sm font-semibold text-emerald-400 tabular-nums">
-              ▲ +{snapshot.index.changePercent.toFixed(2)}%
+            <p
+              className={`text-sm font-semibold tabular-nums ${
+                snapshot.index.direction === "up"
+                  ? "text-emerald-400"
+                  : "text-rose-400"
+              }`}
+            >
+              {snapshot.index.direction === "up" ? "▲ +" : "▼ "}
+              {snapshot.index.changePercent.toFixed(2)}%
             </p>
           </div>
           <p className="mt-1.5 text-xs text-gray-400 tabular-nums">
-            +{snapshot.index.changePoints.toLocaleString("en-US", {
+            {snapshot.index.direction === "up" ? "+" : ""}
+            {snapshot.index.changePoints.toLocaleString("en-US", {
               minimumFractionDigits: 2,
             })}{" "}
             pts

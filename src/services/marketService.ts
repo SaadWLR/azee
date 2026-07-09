@@ -1,4 +1,4 @@
-import { mockResponse } from "../lib/apiClient";
+import { apiGet, mockResponse } from "../lib/apiClient";
 import type { MarketSnapshot, StockQuote } from "../types";
 
 /*
@@ -8,6 +8,7 @@ import type { MarketSnapshot, StockQuote } from "../types";
  * market-data service) — payload shapes are already aligned.
  */
 
+/** Development fixture — production always serves live PSX data. */
 const MARKET_SNAPSHOT: MarketSnapshot = {
   index: {
     name: "KSE-100 Index",
@@ -45,8 +46,13 @@ const TICKER_QUOTES: StockQuote[] = [
 
 /** Index level, session statistics, and market status. */
 export async function getMarketSnapshot(): Promise<MarketSnapshot> {
-  // return apiGet<MarketSnapshot>("/market/snapshot");
-  return mockResponse(MARKET_SNAPSHOT);
+  if (import.meta.env.DEV) {
+    // Vercel serverless routes don't run under `vite dev`; the fixture
+    // keeps local development working. Deployed builds always fetch
+    // the live KSE-100 snapshot from the API route.
+    return mockResponse(MARKET_SNAPSHOT);
+  }
+  return apiGet<MarketSnapshot>("/api/market/snapshot");
 }
 
 /** Quotes for the scrolling ticker tape and watchlists. */
