@@ -9,7 +9,27 @@
    * Fallback for the fixed-bar offset; Navbar keeps this in sync
    * with its measured height at runtime.
    */
-  --nav-height: 84px;
+  --nav-height: 80px;
+  /*
+   * AZEE brand palette, sampled from azeetrade.com:
+   * #0c1842 structural deep navy, #0056b3/#00198d royal blues.
+   * --azee-blue is the royal anchored to #0056b3, lifted slightly
+   * so low-alpha glows stay visible on near-black.
+   */
+  --azee-blue: 37 99 191;
+  --azee-navy: 12 24 66;
+  --azee-royal: 0 25 141;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid rgb(var(--azee-blue) / 0.55);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 html {
@@ -21,7 +41,28 @@ html {
 
 body {
   margin: 0;
-  background-color: #000;
+  /*
+   * Near-black canvas with fixed, layered navy ambience. Sections
+   * are transparent so this atmosphere reads through the whole page.
+   */
+  background-color: #05070d;
+  background-image:
+    radial-gradient(
+      ellipse 80% 60% at 75% -10%,
+      rgb(var(--azee-navy) / 0.4),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 65% 50% at 5% 45%,
+      rgb(var(--azee-navy) / 0.28),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 90% 90%,
+      rgb(var(--azee-royal) / 0.14),
+      transparent 60%
+    );
+  background-attachment: fixed;
   color: #fff;
   overflow-x: hidden;
 }
@@ -35,17 +76,18 @@ body {
 .liquid-glass {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    rgba(255, 255, 255, 0.1) 100%
+    rgba(255, 255, 255, 0.1) 0%,
+    rgb(var(--azee-navy) / 0.32) 50%,
+    rgba(255, 255, 255, 0.07) 100%
   );
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgb(147 180 230 / 0.16);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.25),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.08),
-    0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 0 rgb(var(--azee-blue) / 0.08),
+    0 8px 32px 0 rgba(0, 0, 0, 0.35),
+    0 0 24px 0 rgb(var(--azee-blue) / 0.05);
 }
 
 /*
@@ -82,7 +124,8 @@ body {
 }
 
 .ticker-track {
-  animation: ticker-scroll 45s linear infinite;
+  animation: ticker-scroll 60s linear infinite;
+  will-change: transform;
 }
 
 .ticker-track:hover {
@@ -106,11 +149,130 @@ body {
   );
 }
 
+/*
+ * Navbar glass — darker and less frosted than the card surfaces,
+ * with a softer blur and a hairline border.
+ */
+.nav-glass {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 14, 26, 0.78),
+    rgb(var(--azee-navy) / 0.55)
+  );
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgb(var(--azee-blue) / 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 6px 28px rgb(var(--azee-blue) / 0.08);
+  transition: box-shadow 0.5s ease;
+}
+
+.nav-glass-scrolled {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 6px 28px rgb(var(--azee-blue) / 0.12);
+}
+
+/* Deep navy glass for secondary actions. */
+.glass-navy {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--azee-navy) / 0.6),
+    rgb(var(--azee-royal) / 0.28)
+  );
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgb(var(--azee-blue) / 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * Shared card hover: gentle lift with a faint blue border glow.
+ * Overrides the liquid-glass border/shadow on hover only.
+ */
+.card-glow {
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.5s ease,
+    border-color 0.5s ease,
+    background 0.5s ease;
+}
+
+.card-glow:hover {
+  transform: translateY(-5px);
+  border-color: rgb(var(--azee-blue) / 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 24px 48px rgba(0, 0, 0, 0.45),
+    0 0 44px rgb(var(--azee-blue) / 0.14);
+}
+
+/* Gentle vertical drift for the market snapshot card. */
+@keyframes card-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.card-float {
+  animation: card-float 9s ease-in-out infinite;
+}
+
+/* Extremely subtle blue rim light over the hero globe. */
+.globe-rim {
+  background:
+    radial-gradient(
+      ellipse 55% 45% at 50% 52%,
+      rgb(var(--azee-blue) / 0.14),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 100% 80% at 50% 110%,
+      rgb(var(--azee-navy) / 0.35),
+      transparent 65%
+    );
+}
+
+/* Tiny colour flashes when a live value ticks. */
+@keyframes flash-up {
+  0% {
+    color: rgb(52 211 153);
+  }
+  100% {
+    color: rgb(255 255 255);
+  }
+}
+
+@keyframes flash-down {
+  0% {
+    color: rgb(251 113 133);
+  }
+  100% {
+    color: rgb(255 255 255);
+  }
+}
+
+.flash-up {
+  animation: flash-up 0.8s ease-out;
+}
+
+.flash-down {
+  animation: flash-down 0.8s ease-out;
+}
+
 /* Faint terminal grid behind the research section. */
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(to right, rgb(147 180 230 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(147 180 230 / 0.07) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(
     ellipse 80% 70% at 50% 40%,
@@ -128,7 +290,7 @@ body {
 .bg-spotlight {
   background: radial-gradient(
     ellipse 60% 55% at 50% 40%,
-    rgba(255, 255, 255, 0.09),
+    rgb(var(--azee-blue) / 0.13),
     transparent 70%
   );
 }
@@ -169,24 +331,55 @@ body {
 .particle {
   position: absolute;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgb(190 210 255 / 0.4);
+  box-shadow: 0 0 6px rgb(var(--azee-blue) / 0.45);
   animation-name: particle-drift;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
 
+/*
+ * Section atmospheres — alternating navy tints so the page reads as
+ * layered depth rather than stacked black blocks.
+ */
+.section-tint-a {
+  background: radial-gradient(
+    ellipse 70% 55% at 12% 0%,
+    rgb(var(--azee-navy) / 0.35),
+    transparent 60%
+  );
+}
+
+.section-tint-b {
+  background: radial-gradient(
+    ellipse 70% 55% at 88% 100%,
+    rgb(var(--azee-navy) / 0.3),
+    transparent 60%
+  );
+}
+
+/* Footer identity: deep navy grounding the end of the page. */
+.footer-navy {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--azee-navy) / 0.25),
+    rgb(var(--azee-navy) / 0.55)
+  );
+}
+
 .liquid-glass-strong {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.16) 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0.14) 100%
+    rgba(255, 255, 255, 0.13) 0%,
+    rgb(var(--azee-navy) / 0.42) 50%,
+    rgba(255, 255, 255, 0.1) 100%
   );
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgb(147 180 230 / 0.2);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.1),
-    0 16px 48px 0 rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 0 rgb(var(--azee-blue) / 0.1),
+    0 16px 48px 0 rgba(0, 0, 0, 0.4),
+    0 0 36px 0 rgb(var(--azee-blue) / 0.07);
 }

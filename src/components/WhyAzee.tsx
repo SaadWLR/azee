@@ -51,7 +51,7 @@ const HIGHLIGHTS: Highlight[] = [
 
 export function WhyAzee() {
   return (
-    <section className="relative bg-black py-24 lg:py-32">
+    <section id="about" className="section-tint-a relative py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
         <SectionHeading
           eyebrow="Why AZEE Securities"
@@ -62,14 +62,14 @@ export function WhyAzee() {
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {HIGHLIGHTS.map((item, i) => (
             <Reveal key={item.title} delay={(i % 3) * 100}>
-              <div className="liquid-glass glass-sheen group h-full rounded-3xl p-7 transition-all duration-500 hover:-translate-y-1.5 hover:bg-white/[0.14] hover:shadow-[0_20px_48px_rgba(0,0,0,0.45)]">
+              <div className="liquid-glass glass-sheen card-glow group h-full rounded-3xl p-7 hover:bg-white/[0.12]">
                 <div className="liquid-glass flex h-12 w-12 items-center justify-center rounded-2xl text-white transition-transform duration-500 group-hover:scale-110">
                   <item.icon className="h-6 w-6" />
                 </div>
                 <h3 className="mt-5 text-lg font-semibold tracking-tight text-white">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-300">
+                <p className="mt-2.5 text-sm leading-relaxed text-gray-400">
                   {item.text}
                 </p>
               </div>

@@ -120,11 +120,11 @@ function StoreBadge({
   return (
     <a
       href="#"
-      className="liquid-glass flex items-center gap-3 rounded-2xl px-5 py-3 transition-all duration-300 hover:scale-105 hover:bg-white/20"
+      className="liquid-glass flex items-center gap-3 rounded-2xl px-5 py-3 transition-all duration-500 hover:scale-[1.04] hover:bg-white/20 hover:shadow-[0_0_28px_rgb(var(--azee-blue)/0.22)] active:scale-[0.98]"
     >
       <Icon className="h-7 w-7 text-white" />
       <span>
-        <span className="block text-[10px] leading-tight text-gray-300">
+        <span className="block text-[10px] leading-tight text-gray-400">
           {small}
         </span>
         <span className="block text-sm font-semibold leading-tight text-white">
@@ -137,12 +137,12 @@ function StoreBadge({
 
 export function AppShowcase() {
   return (
-    <section className="relative overflow-hidden bg-black py-24 lg:py-32">
+    <section id="trading" className="relative overflow-hidden py-24 lg:py-32">
       {/* Soft spotlight behind the phone */}
       <div aria-hidden="true" className="bg-spotlight absolute inset-0" />
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
       />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
@@ -159,7 +159,7 @@ export function AppShowcase() {
                 {FEATURES.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-start gap-3 text-sm leading-relaxed text-gray-300 sm:text-base"
+                    className="flex items-start gap-3 text-sm leading-relaxed text-gray-400 sm:text-base"
                   >
                     <span className="mt-1 text-emerald-400">✓</span>
                     {feature}

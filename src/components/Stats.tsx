@@ -80,14 +80,14 @@ function StatCard({ stat, delay }: { stat: Stat; delay: number }) {
     <Reveal delay={delay} className="h-full">
       <div
         ref={ref}
-        className="liquid-glass glass-sheen h-full rounded-3xl p-8 text-center transition-all duration-500 hover:-translate-y-1 hover:bg-white/[0.14]"
+        className="liquid-glass glass-sheen card-glow h-full rounded-3xl p-8 text-center hover:bg-white/[0.12]"
       >
         <p className="text-4xl font-bold tracking-tight text-white tabular-nums sm:text-5xl">
           {value.toLocaleString("en-US")}
           <span className="text-white/70">{stat.suffix}</span>
         </p>
         <p className="mt-3 text-sm font-semibold text-white">{stat.label}</p>
-        <p className="mt-1 text-xs text-gray-300">{stat.sub}</p>
+        <p className="mt-1.5 text-xs text-gray-400">{stat.sub}</p>
       </div>
     </Reveal>
   );
@@ -105,7 +105,7 @@ const PARTICLES = [
 
 export function Stats() {
   return (
-    <section className="relative overflow-hidden bg-black py-24 lg:py-32">
+    <section className="section-tint-a relative overflow-hidden py-24 lg:py-32">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {PARTICLES.map((p, i) => (
           <span
@@ -124,7 +124,7 @@ export function Stats() {
       </div>
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
       />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">

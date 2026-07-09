@@ -28,23 +28,52 @@ function useCountUp(target: number, duration = 1400, delay = 0) {
   return value;
 }
 
+/**
+ * Simulated live drift — a placeholder for a real market-data feed.
+ * Every few seconds the index nudges a few points and the value
+ * flashes green or red. Replace with socket updates without touching
+ * the render below.
+ */
+function useLiveDrift(intervalMs = 5000) {
+  const [delta, setDelta] = useState(0);
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const step = (Math.random() - 0.45) * 24;
+      setDelta((d) => d + step);
+      setFlash(step >= 0 ? "up" : "down");
+    }, intervalMs);
+    return () => clearInterval(interval);
+  }, [intervalMs]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timeout = setTimeout(() => setFlash(null), 900);
+    return () => clearTimeout(timeout);
+  }, [flash]);
+
+  return { delta, flash };
+}
+
 function DirectionArrow({ direction }: { direction: Direction }) {
   return direction === "up" ? (
     <span className="text-emerald-400">▲</span>
   ) : (
-    <span className="text-red-400">▼</span>
+    <span className="text-rose-400">▼</span>
   );
 }
 
 export function MarketSnapshot() {
   const indexValue = useCountUp(KSE_100.value, 1400, 1500);
+  const { delta, flash } = useLiveDrift();
 
   return (
     <FadeIn delay={1500}>
-      <div className="liquid-glass-strong glass-sheen w-full rounded-3xl p-6 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(0,0,0,0.5)] xl:w-[24rem]">
+      <div className="liquid-glass-strong glass-sheen card-glow w-full rounded-3xl p-7 xl:w-[24rem]">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
             PSX Market Snapshot
           </p>
           <span className="flex items-center gap-1.5">
@@ -59,11 +88,16 @@ export function MarketSnapshot() {
         </div>
 
         {/* KSE-100 */}
-        <div className="mt-5">
-          <p className="text-xs font-medium text-gray-300">{KSE_100.name}</p>
-          <div className="mt-1 flex items-baseline gap-3">
-            <p className="text-3xl font-semibold tracking-tight text-white tabular-nums">
-              {indexValue.toLocaleString("en-US", {
+        <div className="mt-6">
+          <p className="text-xs font-medium text-gray-400">{KSE_100.name}</p>
+          <div className="mt-1.5 flex items-baseline gap-3">
+            <p
+              key={flash ? `${flash}-${delta}` : "steady"}
+              className={`text-[2rem] font-semibold leading-none tracking-tight text-white tabular-nums ${
+                flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : ""
+              }`}
+            >
+              {(indexValue + delta).toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -72,7 +106,7 @@ export function MarketSnapshot() {
               ▲ +{KSE_100.changePercent.toFixed(2)}%
             </p>
           </div>
-          <p className="mt-0.5 text-xs text-gray-300 tabular-nums">
+          <p className="mt-1.5 text-xs text-gray-400 tabular-nums">
             +{KSE_100.changePoints.toLocaleString("en-US", {
               minimumFractionDigits: 2,
             })}{" "}
@@ -81,13 +115,13 @@ export function MarketSnapshot() {
         </div>
 
         {/* Session stats */}
-        <div className="mt-5 border-t border-white/15">
+        <div className="mt-6 border-t border-blue-200/15">
           {MARKET_STATS.map((stat) => (
             <div
               key={stat.label}
-              className="flex items-center justify-between border-b border-white/10 py-2.5 last:border-b-0"
+              className="flex items-center justify-between border-b border-blue-200/10 py-2.5 last:border-b-0"
             >
-              <p className="text-xs text-gray-300">{stat.label}</p>
+              <p className="text-xs text-gray-400">{stat.label}</p>
               <p className="flex items-center gap-1.5 text-sm font-medium text-white tabular-nums">
                 {stat.direction && <DirectionArrow direction={stat.direction} />}
                 {stat.value}
@@ -97,19 +131,19 @@ export function MarketSnapshot() {
         </div>
 
         {/* Research */}
-        <div className="mt-4 border-t border-white/15 pt-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-300">
+        <div className="mt-5 border-t border-blue-200/15 pt-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
             Recent Research
           </p>
-          <ul className="mt-2.5 space-y-1.5">
+          <ul className="mt-3 space-y-1.5">
             {RECENT_RESEARCH.map((title) => (
               <li key={title}>
                 <a
-                  href="#"
-                  className="group flex items-center justify-between text-sm text-white/90 transition-colors duration-300 hover:text-white"
+                  href="#research"
+                  className="group flex items-center justify-between text-sm text-white/90 transition-colors duration-500 hover:text-white"
                 >
                   <span>• {title}</span>
-                  <span className="text-gray-300 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <span className="text-gray-400 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
                     →
                   </span>
                 </a>
@@ -118,7 +152,7 @@ export function MarketSnapshot() {
           </ul>
         </div>
 
-        <p className="mt-4 text-[10px] tracking-wide text-gray-300/70">
+        <p className="mt-5 text-[10px] tracking-wide text-gray-400/80">
           Data: Pakistan Stock Exchange · {MARKET_TIMESTAMP}
         </p>
       </div>

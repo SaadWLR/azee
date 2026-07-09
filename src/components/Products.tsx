@@ -51,11 +51,11 @@ const PRODUCTS: Product[] = [
 
 export function Products() {
   return (
-    <section className="relative overflow-hidden bg-black py-24 lg:py-32">
+    <section id="products" className="section-tint-b relative overflow-hidden py-24 lg:py-32">
       {/* Soft top divider glow */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
       />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
@@ -70,7 +70,7 @@ export function Products() {
             <Reveal key={product.title} delay={(i % 3) * 100}>
               <a
                 href="#"
-                className="liquid-glass glass-sheen group flex h-full flex-col rounded-3xl p-8 transition-all duration-500 hover:-translate-y-1.5 hover:bg-white/[0.14] hover:shadow-[0_24px_56px_rgba(0,0,0,0.5)]"
+                className="liquid-glass glass-sheen card-glow group flex h-full flex-col rounded-3xl p-8 hover:bg-white/[0.12]"
               >
                 <div className="flex items-start justify-between">
                   <div className="liquid-glass flex h-12 w-12 items-center justify-center rounded-2xl text-white transition-transform duration-500 group-hover:scale-110">
@@ -83,10 +83,10 @@ export function Products() {
                 <h3 className="mt-6 text-xl font-semibold tracking-tight text-white">
                   {product.title}
                 </h3>
-                <p className="mt-3 flex-1 text-sm leading-relaxed text-gray-300">
+                <p className="mt-3 flex-1 text-sm leading-relaxed text-gray-400">
                   {product.text}
                 </p>
-                <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-300 group-hover:gap-3 group-hover:text-white">
+                <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-500 group-hover:gap-3 group-hover:text-white">
                   Explore
                   <span aria-hidden="true">→</span>
                 </span>

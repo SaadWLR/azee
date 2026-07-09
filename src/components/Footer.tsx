@@ -50,10 +50,10 @@ const SOCIALS = [
 
 export function Footer() {
   return (
-    <footer className="relative bg-black">
+    <footer className="footer-navy relative">
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/35 to-transparent"
       />
 
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-12 lg:py-20">
@@ -63,16 +63,16 @@ export function Footer() {
             <p className="text-sm font-bold tracking-[0.2em] text-white">
               AZEE TRADE
             </p>
-            <p className="mt-1 text-[10px] font-medium tracking-wide text-gray-300">
+            <p className="mt-1 text-[10px] font-medium tracking-wide text-gray-400">
               PSX Trading &amp; Research
             </p>
-            <p className="mt-5 max-w-sm text-sm leading-relaxed text-gray-300">
+            <p className="mt-5 max-w-sm text-sm leading-relaxed text-gray-400">
               AZEE Securities (Pvt.) Ltd. — brokerage, equity research, and
               online trading for the Pakistan Stock Exchange and Pakistan
               Mercantile Exchange since 2003.
             </p>
 
-            <address className="mt-6 space-y-1.5 text-sm not-italic leading-relaxed text-gray-300">
+            <address className="mt-6 space-y-1.5 text-sm not-italic leading-relaxed text-gray-400">
               <p>
                 Suite 705, 7th Floor, Business &amp; Finance Centre, Karachi
               </p>
@@ -102,7 +102,7 @@ export function Footer() {
                   key={social.label}
                   href="#"
                   aria-label={social.label}
-                  className="liquid-glass flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-all duration-300 hover:scale-110 hover:bg-white/20 hover:text-white"
+                  className="liquid-glass flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-all duration-500 hover:scale-110 hover:bg-white/20 hover:text-white hover:shadow-[0_0_20px_rgb(var(--azee-blue)/0.25)]"
                 >
                   <social.icon className="h-4 w-4" />
                 </a>

@@ -23,12 +23,12 @@ export function Research() {
   const rest = RESEARCH_ARTICLES.filter((a) => !a.featured);
 
   return (
-    <section className="relative overflow-hidden bg-black py-24 lg:py-32">
+    <section id="research" className="relative overflow-hidden py-24 lg:py-32">
       {/* Faint terminal grid behind the section */}
       <div aria-hidden="true" className="bg-grid absolute inset-0" />
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
       />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
@@ -43,25 +43,25 @@ export function Research() {
           <Reveal className="lg:col-span-2">
             <a
               href="#"
-              className="liquid-glass-strong glass-sheen group flex h-full flex-col justify-between rounded-3xl p-8 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_24px_64px_rgba(0,0,0,0.5)] sm:p-10"
+              className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
             >
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <CategoryTag category={featured.category} />
-                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-300/90">
                     Featured Research
                   </span>
                 </div>
-                <h3 className="mt-5 max-w-xl text-2xl font-bold tracking-tight text-white transition-colors duration-300 sm:text-3xl">
+                <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-white sm:text-3xl">
                   {featured.title}
                 </h3>
-                <p className="mt-4 max-w-xl text-sm leading-relaxed text-gray-300 sm:text-base">
+                <p className="mt-4 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">
                   {featured.excerpt}
                 </p>
               </div>
               <div className="mt-8 flex items-center justify-between">
                 <ArticleMeta article={featured} />
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-300 group-hover:gap-3 group-hover:text-white">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-500 group-hover:gap-3 group-hover:text-white">
                   Read the outlook <span aria-hidden="true">→</span>
                 </span>
               </div>
@@ -74,7 +74,7 @@ export function Research() {
               <Reveal key={article.title} delay={i * 100} className="flex-1">
                 <a
                   href="#"
-                  className="liquid-glass group flex h-full flex-col justify-between rounded-3xl p-6 transition-all duration-500 hover:-translate-y-1 hover:bg-white/[0.14]"
+                  className="liquid-glass card-glow group flex h-full flex-col justify-between rounded-3xl p-6 hover:bg-white/[0.12]"
                 >
                   <div>
                     <CategoryTag category={article.category} />
@@ -86,7 +86,7 @@ export function Research() {
                     <ArticleMeta article={article} />
                     <span
                       aria-hidden="true"
-                      className="text-white/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-white"
+                      className="text-white/60 transition-all duration-500 group-hover:translate-x-1 group-hover:text-white"
                     >
                       →
                     </span>
