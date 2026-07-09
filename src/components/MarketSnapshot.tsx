@@ -25,23 +25,24 @@ function useCountUp(target: number, duration = 1400, delay = 0) {
 }
 
 /**
- * Simulated live drift — a placeholder for a real market-data feed.
- * Every few seconds the index nudges a few points and the value
- * flashes green or red. Replace with socket updates without touching
- * the render below.
+ * Simulated live drift — demo motion for the development fixture
+ * only. When the snapshot comes from the live PSX API the drift is
+ * disabled so the displayed value always matches the exchange; real
+ * tick-by-tick updates arrive with the polling/streaming phase.
  */
-function useLiveDrift(intervalMs = 5000) {
+function useLiveDrift(enabled: boolean, intervalMs = 5000) {
   const [delta, setDelta] = useState(0);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     const interval = setInterval(() => {
       const step = (Math.random() - 0.45) * 24;
       setDelta((d) => d + step);
       setFlash(step >= 0 ? "up" : "down");
     }, intervalMs);
     return () => clearInterval(interval);
-  }, [intervalMs]);
+  }, [enabled, intervalMs]);
 
   useEffect(() => {
     if (!flash) return;
@@ -64,7 +65,8 @@ export function MarketSnapshot() {
   const { data: snapshot } = useMarketSnapshot();
   const { data: recentResearch } = useRecentResearchTitles();
   const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
-  const { delta, flash } = useLiveDrift();
+  // Live payloads carry a source marker; only fixture data drifts.
+  const { delta, flash } = useLiveDrift(snapshot?.source === undefined);
 
   if (!snapshot) return null;
 
