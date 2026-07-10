@@ -4,6 +4,7 @@ export type {
   MarketSnapshot,
   MarketStat,
   MarketStatus,
+  MarketWatchResponse,
   StockQuote,
 } from "./market";
 export type { ResearchCategory, ResearchReport } from "./research";
