@@ -86,11 +86,33 @@ function parseRow(row: string): StockQuote | null {
   const price = numbers[COL.current];
   if (!Number.isFinite(price) || price <= 0) return null;
 
+  /*
+   * Consistency check: changePoints and changePercent are parsed
+   * independently, so a silently misaligned row disagrees with
+   * itself. Observed in the wild with symbol "786", whose numeric
+   * ticker also matches the symbol cell's data-order attribute and
+   * shifts every column by one (price ended up ≈ changePoints).
+   * Since price − changePoints ≈ previous close, the implied percent
+   * must agree with the parsed percent; rows that disagree beyond
+   * tolerance are excluded like any other malformed row.
+   */
+  const changePoints = numbers[COL.change];
+  const changePercent = numbers[COL.changePercent];
+  const previousClose = price - changePoints;
+  if (previousClose <= 0) return null;
+  const impliedPercent = (changePoints / previousClose) * 100;
+  // Both fields come raw from PSX and should agree near-exactly; the
+  // tolerance only absorbs float noise (absolute floor for near-zero
+  // moves, 3% relative for larger ones). Misaligned rows miss by
+  // orders of magnitude.
+  const tolerance = Math.max(0.15, Math.abs(changePercent) * 0.03);
+  if (Math.abs(impliedPercent - changePercent) > tolerance) return null;
+
   return {
     symbol,
     price: round2(price),
-    changePercent: round2(numbers[COL.changePercent]),
-    changePoints: round2(numbers[COL.change]),
+    changePercent: round2(changePercent),
+    changePoints: round2(changePoints),
     volume: Math.round(numbers[COL.volume]),
   };
 }
