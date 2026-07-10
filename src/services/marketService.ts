@@ -1,5 +1,5 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
-import type { MarketSnapshot, StockQuote } from "../types";
+import type { MarketSnapshot, MarketWatchResponse, StockQuote } from "../types";
 
 /*
  * Fixtures reflect actual early-July-2026 PSX sessions (KSE-100 close
@@ -55,8 +55,24 @@ export async function getMarketSnapshot(): Promise<MarketSnapshot> {
   return apiGet<MarketSnapshot>("/api/market/snapshot");
 }
 
+/**
+ * The ticker marquee was designed around a ~12-symbol track; passing
+ * all ~490 listed symbols would multiply the track width ~40x and
+ * turn the fixed-duration CSS loop into a blur. Keep the designed
+ * visual density by showing the most active symbols by volume.
+ */
+const TICKER_SYMBOL_COUNT = 12;
+
 /** Quotes for the scrolling ticker tape and watchlists. */
 export async function getTickerQuotes(): Promise<StockQuote[]> {
-  // return apiGet<StockQuote[]>("/market/ticker");
-  return mockResponse(TICKER_QUOTES);
+  if (import.meta.env.DEV) {
+    // Vercel serverless routes don't run under `vite dev`; the fixture
+    // keeps local development working. Deployed builds always fetch
+    // live market-watch data from the API route.
+    return mockResponse(TICKER_QUOTES);
+  }
+  const watch = await apiGet<MarketWatchResponse>("/api/market/watch");
+  return [...watch.quotes]
+    .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+    .slice(0, TICKER_SYMBOL_COUNT);
 }
