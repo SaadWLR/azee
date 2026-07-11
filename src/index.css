@@ -241,33 +241,6 @@ body {
     );
 }
 
-/* Tiny colour flashes when a live value ticks. */
-@keyframes flash-up {
-  0% {
-    color: rgb(52 211 153);
-  }
-  100% {
-    color: rgb(255 255 255);
-  }
-}
-
-@keyframes flash-down {
-  0% {
-    color: rgb(251 113 133);
-  }
-  100% {
-    color: rgb(255 255 255);
-  }
-}
-
-.flash-up {
-  animation: flash-up 0.8s ease-out;
-}
-
-.flash-down {
-  animation: flash-down 0.8s ease-out;
-}
-
 /* Faint terminal grid behind the research section. */
 .bg-grid {
   background-image:

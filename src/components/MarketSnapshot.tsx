@@ -34,35 +34,6 @@ function useCountUp(target: number, duration = 1400, delay = 0) {
   return value;
 }
 
-/**
- * Simulated live drift — demo motion for the development fixture
- * only. When the snapshot comes from the live PSX API the drift is
- * disabled so the displayed value always matches the exchange; real
- * tick-by-tick updates arrive with the polling/streaming phase.
- */
-function useLiveDrift(enabled: boolean, intervalMs = 5000) {
-  const [delta, setDelta] = useState(0);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const interval = setInterval(() => {
-      const step = (Math.random() - 0.45) * 24;
-      setDelta((d) => d + step);
-      setFlash(step >= 0 ? "up" : "down");
-    }, intervalMs);
-    return () => clearInterval(interval);
-  }, [enabled, intervalMs]);
-
-  useEffect(() => {
-    if (!flash) return;
-    const timeout = setTimeout(() => setFlash(null), 900);
-    return () => clearTimeout(timeout);
-  }, [flash]);
-
-  return { delta, flash };
-}
-
 function DirectionArrow({ direction }: { direction: Direction }) {
   return direction === "up" ? (
     <span className="text-emerald-400">▲</span>
@@ -79,8 +50,6 @@ export function MarketSnapshot() {
     watchStats?.find((stat) => stat.label === label),
   ).filter((stat): stat is MarketStat => stat !== undefined);
   const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
-  // Live payloads carry a source marker; only fixture data drifts.
-  const { delta, flash } = useLiveDrift(snapshot?.source === undefined);
 
   if (!snapshot) return null;
 
@@ -121,13 +90,8 @@ export function MarketSnapshot() {
             {snapshot.index.name}
           </p>
           <div className="mt-1.5 flex items-baseline gap-3">
-            <p
-              key={flash ? `${flash}-${delta}` : "steady"}
-              className={`text-[2rem] font-semibold leading-none tracking-tight text-white tabular-nums ${
-                flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : ""
-              }`}
-            >
-              {(indexValue + delta).toLocaleString("en-US", {
+            <p className="text-[2rem] font-semibold leading-none tracking-tight text-white tabular-nums">
+              {indexValue.toLocaleString("en-US", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
