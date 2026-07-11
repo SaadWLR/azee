@@ -1,47 +1,54 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { NewsFeedItem, NewsFeedResponse } from "../../src/types";
 
 /**
- * GET /api/news/latest
+ * GET /api/news/latest  (Edge Runtime)
  *
- * Live, attributed Pakistani market headlines. Every title, link,
- * date, and publisher attribution comes from the feed — nothing here
- * is ever written or fabricated by us.
+ * Live, attributed Pakistani business/market headlines from Business
+ * Recorder's business-finance RSS feed, with direct publisher links.
+ * Every title, link, date, and summary comes from the publisher —
+ * nothing here is ever written or fabricated by us.
  *
- * The parser is inlined so the function has no relative runtime
- * imports — extensionless ESM imports between compiled files are a
- * known FUNCTION_INVOCATION_FAILED cause on Vercel with
- * "type": "module" projects (see api/market/snapshot.ts). Type-only
- * imports above are erased at compile time and safe.
+ * WHY EDGE: Business Recorder's Cloudflare tier returns 403 to
+ * Vercel's Node (Lambda) serverless egress IPs, but serves the same
+ * request from Vercel's Edge Runtime with 200 (both observed via
+ * deployed probes, Jul 12 2026 — bot scoring differs by egress
+ * infrastructure). The Edge Runtime has no Node APIs, which is fine:
+ * parsing below is plain string/regex work, and the module-scope
+ * lastGood survives warm isolate reuse just as it does in Node
+ * functions.
+ *
+ * Source history: investorslounge RSS is dead (404); Google News RSS
+ * served as an interim aggregator and remains the documented
+ * fallback of last resort; Mettis Global has no RSS (soft-404 shell)
+ * but its category pages are server-rendered and edge-reachable — a
+ * candidate for a future second source.
  */
+export const config = { runtime: "edge" };
 
-/*
- * ── Source selection (verified live, Jul 12 2026) ─────────────────
- * investorslounge.com/news/rss — 404, dead.
- * brecorder.com/feeds/business-finance — excellent Pakistan-centric
- *   content and parsed cleanly, BUT its Cloudflare tier returns 403
- *   to Vercel's datacenter egress IPs even with a browser UA
- *   (confirmed via deployed diagnostics). We do not circumvent bot
- *   protection, so it is unusable from serverless.
- * Google News RSS (query-scoped) — chosen primary: served by Google
- *   (reliable from datacenter IPs), and the PSX/KSE-100/SECP query
- *   makes every item market-relevant by construction. Each item
- *   carries the original publisher in <source>, which we surface as
- *   the attribution. Trade-offs, documented honestly: links are
- *   news.google.com redirects to the publisher (attribution intact,
- *   one hop for the reader), and the feed's <description> is a
- *   link-list snippet rather than a genuine publisher excerpt — so
- *   items carry NO summary field; we will not present aggregator
- *   boilerplate (or our own words) as publisher prose.
- */
-const FEED_URL =
-  "https://news.google.com/rss/search?q=%22Pakistan%20Stock%20Exchange%22%20OR%20KSE-100%20OR%20PSX%20OR%20SECP&hl=en-PK&gl=PK&ceid=PK:en";
+const FEED_URL = "https://www.brecorder.com/feeds/business-finance";
+const FEED_SOURCE = "Business Recorder";
 
 /**
- * A healthy query feed carries ~100 items. Fewer than 3 parsed items
- * means the feed or the parse broke (mirrors watch.ts's
- * MIN_VALID_ROWS role) — fail the whole fetch rather than serve a
- * near-empty, misleading list.
+ * Best-effort relevance filter over a Pakistan-business feed that
+ * occasionally carries international wire items. Keeps items that
+ * look Pakistan-market relevant (regulators, exchanges, currency,
+ * Rs amounts, "Pakistan" itself) and drops foreign-market items that
+ * share those words (e.g. "Indian rupee"). Known limitations,
+ * accepted openly: Pakistani stories mentioning only a company name
+ * with no keyword or Rs figure are missed, and globally-relevant
+ * items (oil prices) are dropped — better to under-show than to
+ * mislabel. Not perfect, by design.
+ */
+const INCLUDE_PATTERN =
+  /pakistan|\bpsx\b|kse-?100|\bsecp\b|\bsbp\b|state bank|karachi|sukuk|\bfbr\b|ogra|nepra|\bpkr\b|\brs\s?[\d,.]+\s?(bn|billion|mn|million|tr)?|per tola|pak-/i;
+const EXCLUDE_PATTERN =
+  /india|sri lanka|bangladesh|thailand|\bthai\b|nigeria|kenya/i;
+
+/**
+ * A healthy feed carries ~30 items and the filter typically keeps a
+ * third or more. Fewer than 3 survivors means the feed or the parse
+ * broke (mirrors watch.ts's MIN_VALID_ROWS role) — fail the whole
+ * fetch rather than serve a near-empty, misleading list.
  */
 const MIN_ITEMS = 3;
 
@@ -72,34 +79,41 @@ function textOf(block: string, tag: string): string | null {
   );
 }
 
+/**
+ * The feed's <description> is the full article body in HTML. The
+ * publisher's own first paragraph — their lede, verbatim — serves as
+ * the summary; we never compose or rewrite text.
+ */
+function ledeOf(item: string): string | undefined {
+  const description = textOf(item, "description");
+  if (!description) return undefined;
+  const firstParagraph = /<p[^>]*>([\s\S]*?)<\/p>/.exec(description)?.[1];
+  const text = (firstParagraph ?? description)
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 0 ? text : undefined;
+}
+
 function parseItem(block: string): NewsFeedItem | null {
-  let title = textOf(block, "title");
+  const title = textOf(block, "title");
   const link = textOf(block, "link");
   const pubDate = textOf(block, "pubDate");
-  const source = textOf(block, "source");
-  if (!title || !link || !pubDate || !source || !link.startsWith("http")) {
-    return null;
-  }
+  if (!title || !link || !pubDate || !link.startsWith("http")) return null;
   const published = new Date(pubDate);
   if (Number.isNaN(published.getTime())) return null;
-
-  // Google News suffixes titles with " - Publisher"; the publisher is
-  // carried separately in <source>, so strip the duplicate suffix.
-  // The headline text itself remains the publisher's, verbatim.
-  const suffix = ` - ${source}`;
-  if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
-
-  // Some registered publisher names carry stray leading punctuation
-  // (e.g. "| Associated Press Of Pakistan") — trim formatting only.
-  const cleanSource = source.replace(/^[|\s]+/, "").replace(/\s+/g, " ").trim();
-  if (!cleanSource) return null;
-
   return {
     title,
     link,
-    source: cleanSource,
+    source: FEED_SOURCE,
     publishedAt: published.toISOString(),
+    summary: ledeOf(block),
   };
+}
+
+function isRelevant(item: NewsFeedItem): boolean {
+  const haystack = `${item.title} ${item.summary ?? ""}`;
+  return INCLUDE_PATTERN.test(haystack) && !EXCLUDE_PATTERN.test(haystack);
 }
 
 /** Fetches and normalizes the live feed; raw XML never leaves here. */
@@ -119,11 +133,11 @@ async function fetchLatestNews(): Promise<NewsFeedResponse> {
   const items: NewsFeedItem[] = [];
   for (const block of blocks) {
     const item = parseItem(block);
-    if (item) items.push(item);
+    if (item && isRelevant(item)) items.push(item);
   }
   if (items.length < MIN_ITEMS) {
     throw new Error(
-      `News parse yielded only ${items.length} items — feed structure may have changed`,
+      `News parse yielded only ${items.length} relevant items — feed structure or filter may have broken`,
     );
   }
 
@@ -139,15 +153,22 @@ async function fetchLatestNews(): Promise<NewsFeedResponse> {
   };
 }
 
-/* ── HTTP handler ──────────────────────────────────────────────── */
+/* ── HTTP handler (Web API, Edge Runtime) ─────────────────────── */
 
-/** Survives warm invocations; the graceful answer when the feed is down. */
+/** Survives warm isolate reuse; the graceful answer when the feed is down. */
 let lastGood: NewsFeedResponse | null = null;
 
-export default async function handler(
-  _req: VercelRequest,
-  res: VercelResponse,
-) {
+function json(body: unknown, status: number, cacheControl: string): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+      "cache-control": cacheControl,
+    },
+  });
+}
+
+export default async function handler(): Promise<Response> {
   try {
     const news = await fetchLatestNews();
     lastGood = news;
@@ -157,25 +178,22 @@ export default async function handler(
      * current while the feed sees at most one fetch per window
      * worldwide.
      */
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=1800");
-    res.status(200).json(news);
+    return json(news, 200, "s-maxage=300, stale-while-revalidate=1800");
   } catch (error) {
     console.error("News feed fetch failed:", error);
     if (lastGood) {
       // Serve the last verified headlines, clearly labelled — never
       // fabricate news.
-      res.setHeader(
-        "Cache-Control",
+      return json(
+        { ...lastGood, stale: true, source: "cache" },
+        200,
         "s-maxage=60, stale-while-revalidate=1800",
       );
-      res.status(200).json({ ...lastGood, stale: true, source: "cache" });
-      return;
     }
-    res.setHeader("Cache-Control", "no-store");
-    res.status(503).json({
-      error: "Market news is temporarily unavailable",
-    });
+    return json(
+      { error: "Market news is temporarily unavailable" },
+      503,
+      "no-store",
+    );
   }
 }
-
-export { fetchLatestNews };
