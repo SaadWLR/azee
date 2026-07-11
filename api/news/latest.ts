@@ -113,18 +113,36 @@ function isRelevant(item: NewsFeedItem): boolean {
   return INCLUDE_PATTERN.test(haystack) && !EXCLUDE_PATTERN.test(haystack);
 }
 
+/**
+ * Business Recorder sits behind Cloudflare bot management, which can
+ * challenge datacenter IPs with non-browser user agents. Try the
+ * self-identifying agent first (polite default), then fall back to a
+ * standard browser UA — a common necessity for fetching public RSS
+ * from serverless egress IPs.
+ */
+const USER_AGENTS = [
+  "azee-trade-web/1.0 (market news)",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+];
+
+async function fetchFeedXml(): Promise<string> {
+  let lastError = "";
+  for (const userAgent of USER_AGENTS) {
+    const response = await fetch(FEED_URL, {
+      headers: {
+        Accept: "application/rss+xml, application/xml, text/xml",
+        "User-Agent": userAgent,
+      },
+    });
+    if (response.ok) return response.text();
+    lastError = `Feed responded ${response.status} (UA "${userAgent.slice(0, 20)}…")`;
+  }
+  throw new Error(lastError || `Feed unreachable at ${FEED_URL}`);
+}
+
 /** Fetches and normalizes the live feed; raw XML never leaves here. */
 async function fetchLatestNews(): Promise<NewsFeedResponse> {
-  const response = await fetch(FEED_URL, {
-    headers: {
-      Accept: "application/rss+xml, application/xml, text/xml",
-      "User-Agent": "azee-trade-web/1.0 (market news)",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Feed responded ${response.status} for ${FEED_URL}`);
-  }
-  const xml = await response.text();
+  const xml = await fetchFeedXml();
 
   const blocks = xml.match(/<item[\s>][\s\S]*?<\/item>/g) ?? [];
   const items: NewsFeedItem[] = [];
@@ -185,6 +203,9 @@ export default async function handler(
     res.setHeader("Cache-Control", "no-store");
     res.status(503).json({
       error: "Market news is temporarily unavailable",
+      // TEMP DEBUG: surfacing the upstream failure while diagnosing a
+      // Vercel-only fetch issue; remove once the source is stable.
+      detail: String(error).slice(0, 200),
     });
   }
 }
