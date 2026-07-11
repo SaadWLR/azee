@@ -41,10 +41,13 @@ export interface MarketWatchResponse {
   stale?: boolean;
 }
 
-/** Everything the market snapshot panel renders in one payload. */
+/**
+ * The index snapshot payload. Session stats are not part of this
+ * shape — they come live from MarketWatchResponse; the panel composes
+ * the two so no stat can ever be fabricated here.
+ */
 export interface MarketSnapshot {
   index: MarketIndex;
-  stats: MarketStat[];
   status: MarketStatus;
   timestamp: string;
   /** ISO time of the underlying PSX tick (live data only). */

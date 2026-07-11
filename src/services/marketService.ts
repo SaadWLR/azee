@@ -1,5 +1,10 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
-import type { MarketSnapshot, MarketWatchResponse, StockQuote } from "../types";
+import type {
+  MarketSnapshot,
+  MarketStat,
+  MarketWatchResponse,
+  StockQuote,
+} from "../types";
 
 /*
  * Fixtures reflect actual early-July-2026 PSX sessions (KSE-100 close
@@ -17,16 +22,21 @@ const MARKET_SNAPSHOT: MarketSnapshot = {
     changePoints: 2082.49,
     direction: "up",
   },
-  stats: [
-    { label: "Market Volume", value: "703.7M shares" },
-    { label: "Market Value", value: "PKR 38.8B" },
-    { label: "Top Gaining Sector", value: "Commercial Banks", direction: "up" },
-    { label: "Top Loser", value: "Textile Composite", direction: "down" },
-    { label: "IPOs", value: "2 Upcoming" },
-  ],
   status: "OPEN",
   timestamp: "Karachi · PKT",
 };
+
+/**
+ * Development fixture mirroring /api/market/watch's stats array
+ * (values from the real Jul 10, 2026 session) — production always
+ * serves live PSX data.
+ */
+const WATCH_STATS: MarketStat[] = [
+  { label: "Market Volume", value: "948.7M shares" },
+  { label: "Advancers", value: "291", direction: "up" },
+  { label: "Decliners", value: "170", direction: "down" },
+  { label: "Symbols Traded", value: "494" },
+];
 
 /** Liquid PSX main-board symbols for the ticker tape. */
 const TICKER_QUOTES: StockQuote[] = [
@@ -75,4 +85,21 @@ export async function getTickerQuotes(): Promise<StockQuote[]> {
   return [...watch.quotes]
     .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
     .slice(0, TICKER_SYMBOL_COUNT);
+}
+
+/**
+ * Live session stats (volume, breadth) from the market-watch feed.
+ * A second call to /api/market/watch alongside getTickerQuotes() —
+ * acceptable behind the endpoint's edge cache, matching the tradeoff
+ * accepted in M3.
+ */
+export async function getMarketWatchStats(): Promise<MarketStat[]> {
+  if (import.meta.env.DEV) {
+    // Vercel serverless routes don't run under `vite dev`; the fixture
+    // keeps local development working. Deployed builds always fetch
+    // live market-watch data from the API route.
+    return mockResponse(WATCH_STATS);
+  }
+  const watch = await apiGet<MarketWatchResponse>("/api/market/watch");
+  return watch.stats;
 }

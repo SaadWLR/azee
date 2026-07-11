@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { FadeIn } from "./FadeIn";
-import { useMarketSnapshot } from "../hooks/useMarketData";
+import {
+  useMarketSnapshot,
+  useMarketWatchStats,
+} from "../hooks/useMarketData";
 import { useRecentResearchTitles } from "../hooks/useResearch";
-import type { Direction } from "../types";
+import type { Direction, MarketStat } from "../types";
+
+/**
+ * Which live market-watch stats the panel shows, in display order.
+ * Volume plus breadth reads like a terminal side panel without
+ * cluttering the card; Symbols Traded adds little for investors.
+ */
+const SESSION_STAT_LABELS = ["Market Volume", "Advancers", "Decliners"];
 
 /** Eases a number from 0 to `target` once, for the index counter. */
 function useCountUp(target: number, duration = 1400, delay = 0) {
@@ -63,7 +73,11 @@ function DirectionArrow({ direction }: { direction: Direction }) {
 
 export function MarketSnapshot() {
   const { data: snapshot } = useMarketSnapshot();
+  const { data: watchStats } = useMarketWatchStats();
   const { data: recentResearch } = useRecentResearchTitles();
+  const sessionStats = SESSION_STAT_LABELS.map((label) =>
+    watchStats?.find((stat) => stat.label === label),
+  ).filter((stat): stat is MarketStat => stat !== undefined);
   const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
   // Live payloads carry a source marker; only fixture data drifts.
   const { delta, flash } = useLiveDrift(snapshot?.source === undefined);
@@ -138,21 +152,24 @@ export function MarketSnapshot() {
           </p>
         </div>
 
-        {/* Session stats */}
-        <div className="mt-6 border-t border-blue-200/15">
-          {snapshot.stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="flex items-center justify-between border-b border-blue-200/10 py-2.5 last:border-b-0"
-            >
-              <p className="text-xs text-gray-400">{stat.label}</p>
-              <p className="flex items-center gap-1.5 text-sm font-medium text-white tabular-nums">
-                {stat.direction && <DirectionArrow direction={stat.direction} />}
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
+        {/* Session stats — live market-watch data; the block renders
+            only once real stats exist (no placeholder slots). */}
+        {sessionStats.length > 0 && (
+          <div className="mt-6 border-t border-blue-200/15">
+            {sessionStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex items-center justify-between border-b border-blue-200/10 py-2.5 last:border-b-0"
+              >
+                <p className="text-xs text-gray-400">{stat.label}</p>
+                <p className="flex items-center gap-1.5 text-sm font-medium text-white tabular-nums">
+                  {stat.direction && <DirectionArrow direction={stat.direction} />}
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Research */}
         <div className="mt-5 border-t border-blue-200/15 pt-5">

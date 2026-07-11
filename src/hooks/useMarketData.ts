@@ -1,8 +1,20 @@
-import { getMarketSnapshot, getTickerQuotes } from "../services/marketService";
+import {
+  getMarketSnapshot,
+  getMarketWatchStats,
+  getTickerQuotes,
+} from "../services/marketService";
 import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
   return useAsyncData(getMarketSnapshot);
+}
+
+/**
+ * No polling: matches useMarketSnapshot's cadence — the snapshot
+ * panel refreshes on page load for now, consistent across its data.
+ */
+export function useMarketWatchStats() {
+  return useAsyncData(getMarketWatchStats);
 }
 
 export function useTickerQuotes() {

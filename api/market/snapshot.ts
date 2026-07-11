@@ -1,9 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type {
-  MarketSnapshot,
-  MarketStat,
-  MarketStatus,
-} from "../../src/types";
+import type { MarketSnapshot, MarketStatus } from "../../src/types";
 
 /**
  * GET /api/market/snapshot
@@ -44,18 +40,15 @@ interface DpsSeriesResponse {
   data: SeriesPoint[];
 }
 
-/**
- * Session stats beyond the index itself (volume, value, sector moves)
- * come from other DPS endpoints scheduled for a later phase; until
- * then the snapshot carries the Phase-1 placeholder rows unchanged.
+/*
+ * This payload carries no session stats. Live Market Volume and
+ * breadth come from /api/market/watch; the former placeholder rows
+ * were removed as unfabricatable from current sources: Market Value
+ * (no traded-value column on market-watch), sector gainers/losers
+ * (sector column carries numeric codes with no name mapping), and
+ * IPOs (eipo.psx.com.pk is JS-rendered — candidate for a dedicated
+ * research milestone). Nothing here may ever be hardcoded.
  */
-const PLACEHOLDER_STATS: MarketStat[] = [
-  { label: "Market Volume", value: "703.7M shares" },
-  { label: "Market Value", value: "PKR 38.8B" },
-  { label: "Top Gaining Sector", value: "Commercial Banks", direction: "up" },
-  { label: "Top Loser", value: "Textile Composite", direction: "down" },
-  { label: "IPOs", value: "2 Upcoming" },
-];
 
 async function fetchSeries(url: string): Promise<SeriesPoint[]> {
   const response = await fetch(url, {
@@ -133,7 +126,6 @@ async function fetchKse100Snapshot(): Promise<MarketSnapshot> {
       changePoints: round2(changePoints),
       direction: changePoints >= 0 ? "up" : "down",
     },
-    stats: PLACEHOLDER_STATS,
     status,
     timestamp: "Karachi · PKT",
     asOf: new Date(latestTs * 1000).toISOString(),
