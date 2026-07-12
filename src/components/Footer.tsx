@@ -18,14 +18,14 @@ const COLUMNS: { heading: string; links: string[] }[] = [
     ],
   },
   {
-    heading: "Research",
+    heading: "Research & News",
     links: [
-      "Featured Research",
-      "Weekly Market Outlook",
-      "Company Reports",
-      "Sector Analysis",
-      "Market Commentary",
+      "Latest Market News",
+      "Market Watch",
+      "PSX Snapshot",
+      "Research Portal",
       "Knowledge Centre",
+      "Investor Resources",
     ],
   },
   {

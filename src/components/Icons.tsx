@@ -20,6 +20,14 @@ export function IconLandmark(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconExternalLink(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M15 3h6v6M21 3l-9 9M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
 export function IconBadgeCheck(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

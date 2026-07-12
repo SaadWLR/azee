@@ -1,35 +1,58 @@
-import { mockResponse } from "../lib/apiClient";
-import type { NewsItem } from "../types";
+import { apiGet, mockResponse } from "../lib/apiClient";
+import type { NewsFeedResponse } from "../types";
 
 /*
- * Placeholder market-news feed — no consumer yet. Wire a headlines
- * strip or news page to getMarketNews() and swap the fixture for
- * apiGet against a news provider when one is selected.
+ * Live market news comes from /api/news/latest (Business Recorder via
+ * the Edge Runtime). Under `vite dev` the serverless route doesn't
+ * run, so the DEV fixture below keeps local development working.
+ *
+ * The fixture headlines are fictional, clearly-example placeholders —
+ * NOT real scraped content baked into source. Production always
+ * serves real, attributed, live articles.
  */
+const NEWS_FIXTURE: NewsFeedResponse = {
+  items: [
+    {
+      title: "KSE-100 extends gains as banking sector leads session (example)",
+      link: "https://www.brecorder.com/",
+      source: "Business Recorder",
+      publishedAt: "2026-07-11T11:30:00.000Z",
+      summary:
+        "Example development-only headline. In production this section shows real, live articles from Business Recorder.",
+    },
+    {
+      title: "SECP notifies updated disclosure framework for listed firms (example)",
+      link: "https://www.brecorder.com/",
+      source: "Business Recorder",
+      publishedAt: "2026-07-11T07:15:00.000Z",
+    },
+    {
+      title: "Sukuk issuance draws strong institutional demand (example)",
+      link: "https://www.brecorder.com/",
+      source: "Business Recorder",
+      publishedAt: "2026-07-11T05:00:00.000Z",
+    },
+    {
+      title: "Rupee holds firm against the dollar in interbank trade (example)",
+      link: "https://www.brecorder.com/",
+      source: "Business Recorder",
+      publishedAt: "2026-07-10T13:45:00.000Z",
+    },
+    {
+      title: "Gold prices ease as global bullion softens (example)",
+      link: "https://www.brecorder.com/",
+      source: "Business Recorder",
+      publishedAt: "2026-07-10T09:20:00.000Z",
+    },
+  ],
+  asOf: "2026-07-11T12:00:00.000Z",
+  source: "live",
+};
 
-const MARKET_NEWS: NewsItem[] = [
-  {
-    id: "news-1",
-    headline: "KSE-100 closes higher as banks lead post-budget recovery",
-    source: "Market Desk",
-    publishedAt: "2026-07-06T16:30:00+05:00",
-  },
-  {
-    id: "news-2",
-    headline: "SBP monetary policy meeting scheduled for late July",
-    source: "Market Desk",
-    publishedAt: "2026-07-03T11:00:00+05:00",
-  },
-  {
-    id: "news-3",
-    headline: "Two IPOs enter book-building on the PSX primary market",
-    source: "Market Desk",
-    publishedAt: "2026-07-01T09:45:00+05:00",
-  },
-];
-
-/** Latest market headlines, newest first. */
-export async function getMarketNews(): Promise<NewsItem[]> {
-  // return apiGet<NewsItem[]>("/news/market");
-  return mockResponse(MARKET_NEWS);
+/** Latest attributed market headlines, newest first. */
+export async function getLatestNews(): Promise<NewsFeedResponse> {
+  if (import.meta.env.DEV) {
+    return mockResponse(NEWS_FIXTURE);
+  }
+  return apiGet<NewsFeedResponse>("/api/news/latest");
 }

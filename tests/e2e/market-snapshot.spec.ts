@@ -49,12 +49,19 @@ test.describe("PSX Market Snapshot panel", () => {
      * showed hardcoded placeholder rows (Market Value, sector
      * gainers/losers, IPOs) that were not derivable from any live
      * source — fabricated data on a brokerage site. If any of these
-     * labels ever reappear in the panel (an M4 revert, a fixture
+     * labels ever reappear as a stat row (an M4 revert, a fixture
      * leaking into production, or a new hardcoded row), this fails
-     * immediately. Scoped to the panel so legitimate uses elsewhere
-     * (e.g. the "IPO Investment" product card) don't false-positive.
+     * immediately.
+     *
+     * Scoped to the stats region — everything above the "Latest News"
+     * block — because the panel now also renders live news headlines,
+     * which can legitimately contain market terms like "IPOs" or "Top
+     * Loser" (they are real Business Recorder article titles, not
+     * fabricated stat rows). Checking the whole panel would
+     * false-positive on genuine news.
      */
-    const text = await panel.innerText();
+    const fullText = await panel.innerText();
+    const statsRegion = fullText.split("Latest News")[0];
     for (const forbidden of [
       "Market Value",
       "Top Gaining Sector",
@@ -62,9 +69,10 @@ test.describe("PSX Market Snapshot panel", () => {
       "IPOs",
       "Symbols Traded",
     ]) {
-      expect(text, `panel must not contain fabricated stat "${forbidden}"`).not.toContain(
-        forbidden,
-      );
+      expect(
+        statsRegion,
+        `stats region must not contain fabricated stat "${forbidden}"`,
+      ).not.toContain(forbidden);
     }
   });
 });

@@ -1,12 +1,3 @@
-/** A market news headline from an external or in-house feed. */
-export interface NewsItem {
-  id: string;
-  headline: string;
-  source: string;
-  publishedAt: string;
-  url?: string;
-}
-
 /**
  * A live, attributed headline from a real publisher's RSS feed.
  * `summary`, when present, is the publisher's own lede text verbatim

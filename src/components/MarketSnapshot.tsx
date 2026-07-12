@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { FadeIn } from "./FadeIn";
+import { IconExternalLink } from "./Icons";
 import {
   useMarketSnapshot,
   useMarketWatchStats,
 } from "../hooks/useMarketData";
-import { useRecentResearchTitles } from "../hooks/useResearch";
+import { useLatestNews } from "../hooks/useNews";
 import type { Direction, MarketStat } from "../types";
 
 /**
@@ -45,10 +46,11 @@ function DirectionArrow({ direction }: { direction: Direction }) {
 export function MarketSnapshot() {
   const { data: snapshot } = useMarketSnapshot();
   const { data: watchStats } = useMarketWatchStats();
-  const { data: recentResearch } = useRecentResearchTitles();
+  const { data: news } = useLatestNews();
   const sessionStats = SESSION_STAT_LABELS.map((label) =>
     watchStats?.find((stat) => stat.label === label),
   ).filter((stat): stat is MarketStat => stat !== undefined);
+  const latestHeadlines = news?.items.slice(0, 3) ?? [];
   const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
 
   if (!snapshot) return null;
@@ -135,27 +137,30 @@ export function MarketSnapshot() {
           </div>
         )}
 
-        {/* Research */}
-        <div className="mt-5 border-t border-blue-200/15 pt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-            Recent Research
-          </p>
-          <ul className="mt-3 space-y-1.5">
-            {(recentResearch ?? []).map((title) => (
-              <li key={title}>
-                <a
-                  href="#research"
-                  className="group flex items-center justify-between text-sm text-white/90 transition-colors duration-500 hover:text-white"
-                >
-                  <span>• {title}</span>
-                  <span className="text-gray-400 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-                    →
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Latest news — live, attributed headlines linking out to the
+            publisher; the block renders only once headlines load. */}
+        {latestHeadlines.length > 0 && (
+          <div className="mt-5 border-t border-blue-200/15 pt-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+              Latest News
+            </p>
+            <ul className="mt-3 space-y-2">
+              {latestHeadlines.map((item) => (
+                <li key={item.title}>
+                  <a
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-start justify-between gap-2 text-sm text-white/90 transition-colors duration-500 hover:text-white"
+                  >
+                    <span className="line-clamp-2">{item.title}</span>
+                    <IconExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-gray-400 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <p className="mt-5 text-[10px] tracking-wide text-gray-400/80">
           Data: Pakistan Stock Exchange · {snapshot.timestamp}
