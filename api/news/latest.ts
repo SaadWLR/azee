@@ -45,7 +45,7 @@ const FEED_SOURCE = "Business Recorder";
  * to pad the section with noise. Not perfect, by design.
  */
 const INCLUDE_PATTERN =
-  /\bpsx\b|pakistan stock|\bkse-?\d+\b|\bsecp\b|\bsbp\b|state bank|\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal (?:policy|deficit|consolidation|reforms?)|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bdiesel\b|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt/i;
+  /\bpsx\b|pakistan stock|\bkse-?\d+\b|\bsecp\b|\bsbp\b|state bank|\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal (?:policy|deficit|consolidation|reforms?)|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt/i;
 const EXCLUDE_PATTERN =
   /india|sri lanka|bangladesh|thailand|\bthai\b|nigeria|kenya/i;
 
