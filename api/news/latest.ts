@@ -29,18 +29,23 @@ const FEED_URL = "https://www.brecorder.com/feeds/business-finance";
 const FEED_SOURCE = "Business Recorder";
 
 /**
- * Best-effort relevance filter over a Pakistan-business feed that
- * occasionally carries international wire items. Keeps items that
- * look Pakistan-market relevant (regulators, exchanges, currency,
- * Rs amounts, "Pakistan" itself) and drops foreign-market items that
- * share those words (e.g. "Indian rupee"). Known limitations,
- * accepted openly: Pakistani stories mentioning only a company name
- * with no keyword or Rs figure are missed, and globally-relevant
- * items (oil prices) are dropped — better to under-show than to
- * mislabel. Not perfect, by design.
+ * Best-effort relevance filter over a Pakistan-business feed. The
+ * item must contain genuine market/investing terminology — exchanges
+ * and regulators, securities and issuance, corporate results, rates
+ * and macro policy, or the commodity/currency prices Pakistani
+ * investors actually track. Deliberately absent: bare "Pakistan",
+ * city names, agency names (FBR/OGRA/customs), and any-Rs-amount
+ * matching — those let local-interest stories (trade-body luncheons,
+ * training sessions, expo coverage) through, which is real news but
+ * not market news. Known limitations, accepted openly: stories about
+ * a listed company that name only the company with none of these
+ * terms are missed; generic words like "shares"/"profit" can
+ * occasionally admit a business-adjacent story; macro stories phrased
+ * without these exact terms are dropped — better to under-show than
+ * to pad the section with noise. Not perfect, by design.
  */
 const INCLUDE_PATTERN =
-  /pakistan|\bpsx\b|kse-?100|\bsecp\b|\bsbp\b|state bank|karachi|sukuk|\bfbr\b|ogra|nepra|\bpkr\b|\brs\s?[\d,.]+\s?(bn|billion|mn|million|tr)?|per tola|pak-/i;
+  /\bpsx\b|pakistan stock|\bkse-?\d+\b|\bsecp\b|\bsbp\b|state bank|\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal (?:policy|deficit|consolidation|reforms?)|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bdiesel\b|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt/i;
 const EXCLUDE_PATTERN =
   /india|sri lanka|bangladesh|thailand|\bthai\b|nigeria|kenya/i;
 
