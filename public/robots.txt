@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://azee.vercel.app/sitemap.xml

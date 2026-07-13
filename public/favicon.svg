@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    Placeholder favicon built from the site's existing palette
+    (AZEE navy #0c1842, brand blue #2563bf, market-green #34d399):
+    a rising chart line. Replace with a professionally designed
+    brand mark when one exists.
+  -->
+  <rect width="64" height="64" rx="14" fill="#0c1842" />
+  <rect width="64" height="64" rx="14" fill="none" stroke="#2563bf" stroke-opacity="0.45" stroke-width="2" />
+  <polyline
+    points="13,45 25,32 33,38 49,19"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="49" cy="19" r="5.5" fill="#34d399" />
+</svg>

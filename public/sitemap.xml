@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Single-page site: the homepage is the only real route (sections are
+  in-page anchors, not routes). Add entries here when real routes
+  (e.g. /research, /markets) exist.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://azee.vercel.app/</loc>
+    <lastmod>2026-07-13</lastmod>
+    <changefreq>daily</changefreq>
+  </url>
+</urlset>
