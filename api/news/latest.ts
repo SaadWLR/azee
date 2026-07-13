@@ -46,24 +46,42 @@ const SOURCES: NewsSource[] = [
   },
 ];
 
-/**
- * Best-effort relevance filter. The item must contain genuine
- * market/investing terminology — exchanges and regulators, securities
- * and issuance, corporate results, rates and macro policy, or the
- * commodity/currency prices Pakistani investors track. Deliberately
- * absent: bare "Pakistan", city names, agency names, and any-Rs-amount
- * matching, which let local-interest stories through. Known
- * limitations, accepted openly and shared by every source: some
- * foreign-market items that use these same terms (e.g. a US Fed rate
- * decision, an overseas current-account figure) still pass, since the
- * EXCLUDE list only enumerates a few countries; and relevant stories
- * that name only a company with none of these terms are missed. Not
- * perfect, by design — better to under-show than to pad with noise.
+/*
+ * Relevance filter — a required Pakistan-specific gate, not generic
+ * market terminology. On a global-news day (e.g. a Gulf conflict
+ * driving worldwide market wire copy) the old "any market term"
+ * approach let through mostly foreign stories; a country-name EXCLUDE
+ * blacklist couldn't keep up (Japan/Australia/China/US were never on
+ * it). Inverting fixes that whole class structurally.
+ *
+ * An item passes only if it carries a genuine Pakistan signal:
+ *
+ *  - STRONG_PAKISTAN — Pakistani market institutions (PSX, KSE, PMEX,
+ *    SECP, SBP). These are inherently market + Pakistan, so they pass
+ *    on their own.
+ *  - WEAK_PAKISTAN — Pakistan/PKR or a finance-hub dateline (Karachi,
+ *    Lahore, Islamabad, Rawalpindi; publisher ledes carry these,
+ *    which is how Pakistani corporate stories that name only a
+ *    company — e.g. "KARACHI: Bank Alfalah…" — get caught). These
+ *    must co-occur with MARKET_TERMS to exclude Pakistani non-market
+ *    news (local-government, consumer prices, etc.).
+ *
+ * Bare "rupee" is deliberately NOT a Pakistan signal — "Indian rupee"
+ * would false-positive; only "PKR" (unambiguous) or an explicit
+ * Pakistan mention counts. No country EXCLUDE list is needed anymore:
+ * foreign stories simply lack any Pakistan signal. Known limitations,
+ * accepted openly: a few Pakistani business-but-not-strictly-market
+ * items (a ministry MoU, an agri-import story) can slip through the
+ * weak+market path, and a Pakistani market story with none of these
+ * signals would be missed. Best-effort, not perfect — but it now errs
+ * toward Pakistani over foreign, which is the point.
  */
-const INCLUDE_PATTERN =
-  /\bpsx\b|pakistan stock|\bkse-?\d+\b|\bsecp\b|\bsbp\b|state bank|\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal (?:policy|deficit|consolidation|reforms?)|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt/i;
-const EXCLUDE_PATTERN =
-  /india|sri lanka|bangladesh|thailand|\bthai\b|nigeria|kenya/i;
+const STRONG_PAKISTAN =
+  /\bpsx\b|pakistan stock|\bkse-?\d*\b|\bpmex\b|\bsecp\b|\bsbp\b|state bank of pakistan/i;
+const WEAK_PAKISTAN =
+  /pakistan|\bpkr\b|\bkarachi\b|\blahore\b|\bislamabad\b|\brawalpindi\b/i;
+const MARKET_TERMS =
+  /\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bindex\b|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt|\bdebt\b|\brating\b|issuance|bourse/i;
 
 /**
  * Floor on the COMBINED, deduplicated result. Fewer than this means
@@ -134,7 +152,10 @@ function parseItem(block: string, sourceName: string): NewsFeedItem | null {
 
 function isRelevant(item: NewsFeedItem): boolean {
   const haystack = `${item.title} ${item.summary ?? ""}`;
-  return INCLUDE_PATTERN.test(haystack) && !EXCLUDE_PATTERN.test(haystack);
+  return (
+    STRONG_PAKISTAN.test(haystack) ||
+    (WEAK_PAKISTAN.test(haystack) && MARKET_TERMS.test(haystack))
+  );
 }
 
 /**
