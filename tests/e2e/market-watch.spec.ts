@@ -80,11 +80,14 @@ test("KMI-30 filter shows only Islamic-index constituents with badges + note", a
   await expect(page.locator(TABLE)).toBeVisible();
 
   // The methodology note must be genuinely rendered (not just coded),
-  // and must not phrase membership as a religious ruling.
+  // and must not phrase membership as a religious ruling. Scoped to the
+  // Market Watch section (the footer has an unrelated, pre-existing
+  // "Halal Stocks" nav link that is not part of this feature).
+  const watchSection = page.locator("section:has(table)");
   const note = page.getByText(/statement of index membership/i);
   await expect(note).toBeVisible();
   await expect(note).toContainText("not individual religious advice");
-  await expect(page.locator("main")).not.toContainText("Halal");
+  await expect(watchSection).not.toContainText("Halal");
 
   await page.getByRole("button", { name: "KMI-30", exact: true }).click();
   await page.waitForTimeout(400);
