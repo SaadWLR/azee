@@ -108,12 +108,29 @@ function parseRow(row: string): StockQuote | null {
   const tolerance = Math.max(0.15, Math.abs(changePercent) * 0.03);
   if (Math.abs(impliedPercent - changePercent) > tolerance) return null;
 
+  /*
+   * Index-membership cell — the 3rd <td>, a comma-separated list of
+   * index codes (e.g. "ALLSHR,KMI30,KMIALLSHR,KSE100,..."). Located by
+   * requiring a known index token so the numeric sector-code cell
+   * (e.g. "0820") is never mistaken for it. Missing/unmatched cell ⇒
+   * membership left false; a parse gap here degrades to "not a listed
+   * member", never a fabricated compliance claim. KMI30/KMIALLSHR are
+   * PSX's official Shariah indices (screened per KMI methodology).
+   */
+  const membership =
+    /<td>([A-Z0-9,]*(?:ALLSHR|KMIALLSHR|KMI30|KSE100|KSE30)[A-Z0-9,]*)<\/td>/.exec(
+      row,
+    )?.[1] ?? "";
+  const codes = new Set(membership.split(","));
+
   return {
     symbol,
     price: round2(price),
     changePercent: round2(changePercent),
     changePoints: round2(changePoints),
     volume: Math.round(numbers[COL.volume]),
+    isKmi30: codes.has("KMI30"),
+    isKmiAllShare: codes.has("KMIALLSHR"),
   };
 }
 

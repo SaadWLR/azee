@@ -13,7 +13,7 @@ import type { StockQuote } from "../types";
 
 type SortColumn = "symbol" | "price" | "changePercent" | "changePoints" | "volume";
 type SortDir = "asc" | "desc";
-type Preset = "all" | "gainers" | "losers" | "active";
+type Preset = "all" | "gainers" | "losers" | "active" | "kmi30" | "kmiAllShare";
 
 const PAGE_SIZE = 50;
 
@@ -22,6 +22,8 @@ const PRESETS: { id: Preset; label: string }[] = [
   { id: "gainers", label: "Gainers" },
   { id: "losers", label: "Losers" },
   { id: "active", label: "Most Active" },
+  { id: "kmi30", label: "KMI-30" },
+  { id: "kmiAllShare", label: "KMI All-Share" },
 ];
 
 const COLUMNS: { id: SortColumn; label: string; numeric: boolean }[] = [
@@ -38,7 +40,20 @@ const PRESET_SORT: Record<Preset, { column: SortColumn; dir: SortDir }> = {
   gainers: { column: "changePercent", dir: "desc" },
   losers: { column: "changePercent", dir: "asc" },
   active: { column: "volume", dir: "desc" },
+  kmi30: { column: "symbol", dir: "asc" },
+  kmiAllShare: { column: "symbol", dir: "asc" },
 };
+
+/**
+ * Membership badge label for a row, or null. KMI-30 (the 30-stock
+ * index) is shown in preference to the broader KMI All-Share, since a
+ * KMI-30 constituent is by definition also in KMI All-Share.
+ */
+function membershipBadge(quote: StockQuote): string | null {
+  if (quote.isKmi30) return "KMI-30";
+  if (quote.isKmiAllShare) return "KMI All-Share";
+  return null;
+}
 
 function fmtNum(value: number | undefined, dp = 2): string {
   if (value === undefined || !Number.isFinite(value)) return "—";
@@ -100,6 +115,8 @@ export function MarketWatchPage() {
     // Preset filter (views over data already in hand — not new data).
     if (preset === "gainers") rows = rows.filter((q) => q.changePercent > 0);
     else if (preset === "losers") rows = rows.filter((q) => q.changePercent < 0);
+    else if (preset === "kmi30") rows = rows.filter((q) => q.isKmi30);
+    else if (preset === "kmiAllShare") rows = rows.filter((q) => q.isKmiAllShare);
     // "active" and "all" include every row; their difference is sort.
 
     // Symbol text filter.
@@ -177,6 +194,17 @@ export function MarketWatchPage() {
             </label>
           </div>
 
+          {/* Methodology note — required, always visible, never phrased
+              as a religious ruling. Do not drop for visual simplicity. */}
+          <p className="mt-4 max-w-3xl text-xs leading-relaxed text-gray-400/90">
+            <span className="font-semibold text-gray-300">KMI-30</span> and{" "}
+            <span className="font-semibold text-gray-300">KMI All-Share</span>{" "}
+            indicate a symbol&apos;s membership in the Pakistan Stock
+            Exchange&apos;s official Shariah-compliant indices, screened per the
+            published PSX KMI index methodology. This is a statement of index
+            membership — not individual religious advice.
+          </p>
+
           {/* Table / states */}
           <div className="liquid-glass glass-sheen mt-6 overflow-hidden rounded-3xl">
             {error && !quotes ? (
@@ -226,8 +254,17 @@ export function MarketWatchPage() {
                         key={quote.symbol}
                         className="border-b border-white/5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.04]"
                       >
-                        <td className="px-5 py-3 font-semibold tracking-wide text-white">
-                          {quote.symbol}
+                        <td className="px-5 py-3">
+                          <span className="flex items-center gap-2">
+                            <span className="font-semibold tracking-wide text-white">
+                              {quote.symbol}
+                            </span>
+                            {membershipBadge(quote) && (
+                              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-300">
+                                {membershipBadge(quote)}
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-white">
                           {fmtNum(quote.price)}

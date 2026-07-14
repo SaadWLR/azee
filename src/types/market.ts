@@ -20,6 +20,15 @@ export interface StockQuote {
   changePoints?: number;
   /** Shares traded this session (live market-watch data only). */
   volume?: number;
+  /**
+   * Constituent of PSX's KMI-30 Islamic index. A statement of official
+   * index membership (per the published KMI methodology), not a
+   * religious ruling. Absent/false means "not a listed KMI-30 member",
+   * never a fabricated claim. KMI-30 is a subset of KMI All-Share.
+   */
+  isKmi30?: boolean;
+  /** Constituent of PSX's KMI All-Share Islamic index (see isKmi30). */
+  isKmiAllShare?: boolean;
 }
 
 /** A labelled session statistic (volume, value, sector moves…). */

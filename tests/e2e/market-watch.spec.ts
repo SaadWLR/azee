@@ -73,6 +73,41 @@ test("sorting reorders rows", async ({ page }) => {
   expect(topAsc).not.toBe(topDesc);
 });
 
+test("KMI-30 filter shows only Islamic-index constituents with badges + note", async ({
+  page,
+}) => {
+  await page.goto("/market-watch");
+  await expect(page.locator(TABLE)).toBeVisible();
+
+  // The methodology note must be genuinely rendered (not just coded),
+  // and must not phrase membership as a religious ruling.
+  const note = page.getByText(/statement of index membership/i);
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("not individual religious advice");
+  await expect(page.locator("main")).not.toContainText("Halal");
+
+  await page.getByRole("button", { name: "KMI-30", exact: true }).click();
+  await page.waitForTimeout(400);
+
+  // Plausible index size (~30 constituents) and every visible row badged.
+  const count = await page.locator(ROWS).count();
+  expect(count).toBeGreaterThanOrEqual(25);
+  expect(count).toBeLessThanOrEqual(35);
+  const badges = await page.locator(`${ROWS} td:first-child`).allInnerTexts();
+  for (const cell of badges) expect(cell).toContain("KMI-30");
+
+  // Symbol text is the first span in the cell (badge is a sibling span).
+  const visible = await page
+    .locator(`${ROWS} td:first-child span span:first-child`)
+    .allInnerTexts();
+  for (const inc of ["MEBL", "OGDC", "LUCK", "MARI", "SYS"]) {
+    expect(visible).toContain(inc);
+  }
+  for (const exc of ["HBL", "UBL", "MCB", "BAFL", "NBP", "ABL"]) {
+    expect(visible).not.toContain(exc);
+  }
+});
+
 test("quick-filter presets work (Gainers / Losers)", async ({ page }) => {
   await page.goto("/market-watch");
   await expect(page.locator(TABLE)).toBeVisible();
