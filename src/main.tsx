@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App";
@@ -6,16 +6,43 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
 
 /*
- * Routing shell. The existing homepage is the sole route for now; a
- * later milestone adds the Screener route to this array. Plain in-page
- * hash anchors (Navbar → #markets etc.) are handled natively by the
- * browser and are not intercepted by the router, so section
- * navigation behaves exactly as before.
+ * The Market Watch page is lazy-loaded so its code (and React Router's
+ * weight it builds on) splits into a separate chunk, off the main
+ * bundle every homepage visitor downloads. A visitor who never opens
+ * /market-watch never fetches it.
+ */
+const MarketWatchPage = lazy(() =>
+  import("./components/MarketWatchPage").then((m) => ({
+    default: m.MarketWatchPage,
+  })),
+);
+
+function PageLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-black text-sm text-gray-400">
+      Loading…
+    </main>
+  );
+}
+
+/*
+ * Routing shell. The homepage ("/") stays eager in the main bundle;
+ * /market-watch code-splits. Plain in-page hash anchors on the
+ * homepage are handled natively by the browser and are not
+ * intercepted by the router.
  */
 const router = createBrowserRouter([
   {
     path: "/",
     element: <App />,
+  },
+  {
+    path: "/market-watch",
+    element: (
+      <Suspense fallback={<PageLoading />}>
+        <MarketWatchPage />
+      </Suspense>
+    ),
   },
 ]);
 

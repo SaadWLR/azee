@@ -1,20 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { FadeIn } from "./FadeIn";
 
+/** Homepage in-page section anchors (hash targets on "/"). */
 const NAV_LINKS = [
-  { label: "Markets", href: "#markets" },
-  { label: "Research", href: "#research" },
-  { label: "Trading", href: "#trading" },
-  { label: "Products", href: "#products" },
-  { label: "About", href: "#about" },
+  { label: "Markets", hash: "#markets" },
+  { label: "Research", hash: "#research" },
+  { label: "Trading", hash: "#trading" },
+  { label: "Products", hash: "#products" },
+  { label: "About", hash: "#about" },
 ];
 
 /** Mobile dropdown: navigation links plus the client login action. */
 function MobileMenu({
   open,
+  onHome,
   onNavigate,
 }: {
   open: boolean;
+  onHome: boolean;
   onNavigate: () => void;
 }) {
   return (
@@ -27,9 +31,9 @@ function MobileMenu({
     >
       <ul>
         {NAV_LINKS.map((link) => (
-          <li key={link.href} className="border-b border-white/10">
+          <li key={link.hash} className="border-b border-white/10">
             <a
-              href={link.href}
+              href={onHome ? link.hash : `/${link.hash}`}
               onClick={onNavigate}
               className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
             >
@@ -37,6 +41,15 @@ function MobileMenu({
             </a>
           </li>
         ))}
+        <li className="border-b border-white/10">
+          <Link
+            to="/market-watch"
+            onClick={onNavigate}
+            className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+          >
+            Market Watch
+          </Link>
+        </li>
       </ul>
       <a
         href="#"
@@ -54,6 +67,11 @@ export function Navbar() {
   const [active, setActive] = useState("");
   const headerRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  // Section anchors point at in-page hashes on the homepage, and at
+  // the homepage-plus-hash from any other route so they still work.
+  const pathname = useLocation().pathname;
+  const onHome = pathname === "/";
+  const onMarketWatch = pathname === "/market-watch";
 
   /*
    * Publish the fixed bar's bottom edge as --nav-height so the ticker
@@ -102,7 +120,7 @@ export function Navbar() {
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
     const targets = NAV_LINKS.map((link) =>
-      document.getElementById(link.href.slice(1)),
+      document.getElementById(link.hash.slice(1)),
     ).filter((el): el is HTMLElement => el !== null);
     const observer = new IntersectionObserver(
       (entries) => {
@@ -128,23 +146,35 @@ export function Navbar() {
             scrolled ? "nav-glass-scrolled" : ""
           }`}
         >
-          {/* Identity */}
-          <a href="#" className="shrink-0">
-            <p className="text-sm font-bold leading-tight tracking-[0.2em] text-white">
-              AZEE TRADE
-            </p>
-            <p className="text-[10px] font-medium leading-tight tracking-wide text-gray-400">
-              PSX Trading &amp; Research
-            </p>
-          </a>
+          {/* Identity — scrolls to top on the homepage, returns home
+              from any other route. */}
+          {onHome ? (
+            <a href="#" className="shrink-0">
+              <p className="text-sm font-bold leading-tight tracking-[0.2em] text-white">
+                AZEE TRADE
+              </p>
+              <p className="text-[10px] font-medium leading-tight tracking-wide text-gray-400">
+                PSX Trading &amp; Research
+              </p>
+            </a>
+          ) : (
+            <Link to="/" className="shrink-0">
+              <p className="text-sm font-bold leading-tight tracking-[0.2em] text-white">
+                AZEE TRADE
+              </p>
+              <p className="text-[10px] font-medium leading-tight tracking-wide text-gray-400">
+                PSX Trading &amp; Research
+              </p>
+            </Link>
+          )}
 
-          <ul className="hidden items-center gap-8 lg:flex">
+          <ul className="hidden items-center gap-7 lg:flex">
             {NAV_LINKS.map((link) => (
-              <li key={link.href} className="flex items-center">
+              <li key={link.hash} className="flex items-center">
                 <a
-                  href={link.href}
+                  href={onHome ? link.hash : `/${link.hash}`}
                   className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                    active === link.href
+                    active === link.hash
                       ? "text-white after:w-6"
                       : "text-gray-300 after:w-0"
                   }`}
@@ -153,6 +183,18 @@ export function Navbar() {
                 </a>
               </li>
             ))}
+            <li className="flex items-center">
+              <Link
+                to="/market-watch"
+                className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
+                  onMarketWatch
+                    ? "text-white after:w-6"
+                    : "text-gray-300 after:w-0"
+                }`}
+              >
+                Market Watch
+              </Link>
+            </li>
           </ul>
 
           <a
@@ -184,7 +226,11 @@ export function Navbar() {
         </nav>
       </FadeIn>
 
-      <MobileMenu open={menuOpen} onNavigate={() => setMenuOpen(false)} />
+      <MobileMenu
+        open={menuOpen}
+        onHome={onHome}
+        onNavigate={() => setMenuOpen(false)}
+      />
     </header>
   );
 }

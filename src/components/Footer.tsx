@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   IconFacebook,
   IconInstagram,
@@ -119,12 +120,22 @@ export function Footer() {
               <ul className="mt-5 space-y-3">
                 {column.links.map((link) => (
                   <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-gray-300 transition-colors duration-300 hover:text-white"
-                    >
-                      {link}
-                    </a>
+                    {link === "Market Watch" ? (
+                      // The one real destination so far — a live route.
+                      <Link
+                        to="/market-watch"
+                        className="text-sm text-gray-300 transition-colors duration-300 hover:text-white"
+                      >
+                        {link}
+                      </Link>
+                    ) : (
+                      <a
+                        href="#"
+                        className="text-sm text-gray-300 transition-colors duration-300 hover:text-white"
+                      >
+                        {link}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

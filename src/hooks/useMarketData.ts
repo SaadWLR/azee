@@ -1,4 +1,5 @@
 import {
+  getAllMarketQuotes,
   getMarketSnapshot,
   getMarketWatchStats,
   getTickerQuotes,
@@ -26,4 +27,14 @@ export function useTickerQuotes() {
    * revalidated edge entry without ever defeating the cache.
    */
   return useAsyncData(getTickerQuotes, { intervalMs: 75_000 });
+}
+
+export function useAllMarketQuotes() {
+  /*
+   * Same 75s cadence and same /api/market/watch URL as useTickerQuotes
+   * — not a new fetch cadence. The apiClient dedup/TTL layer already
+   * collapses concurrent same-URL requests, so the Market Watch page's
+   * poll rides the same endpoint and edge-cache window.
+   */
+  return useAsyncData(getAllMarketQuotes, { intervalMs: 75_000 });
 }
