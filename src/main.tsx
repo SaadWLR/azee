@@ -17,6 +17,12 @@ const MarketWatchPage = lazy(() =>
   })),
 );
 
+const CorporateCalendarPage = lazy(() =>
+  import("./components/CorporateCalendarPage").then((m) => ({
+    default: m.CorporateCalendarPage,
+  })),
+);
+
 function PageLoading() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-black text-sm text-gray-400">
@@ -41,6 +47,14 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<PageLoading />}>
         <MarketWatchPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/corporate-calendar",
+    element: (
+      <Suspense fallback={<PageLoading />}>
+        <CorporateCalendarPage />
       </Suspense>
     ),
   },

@@ -50,6 +50,15 @@ function MobileMenu({
             Market Watch
           </Link>
         </li>
+        <li className="border-b border-white/10">
+          <Link
+            to="/corporate-calendar"
+            onClick={onNavigate}
+            className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+          >
+            Corporate Calendar
+          </Link>
+        </li>
       </ul>
       <a
         href="#"
@@ -72,6 +81,7 @@ export function Navbar() {
   const pathname = useLocation().pathname;
   const onHome = pathname === "/";
   const onMarketWatch = pathname === "/market-watch";
+  const onCalendar = pathname === "/corporate-calendar";
 
   /*
    * Publish the fixed bar's bottom edge as --nav-height so the ticker
@@ -193,6 +203,18 @@ export function Navbar() {
                 }`}
               >
                 Market Watch
+              </Link>
+            </li>
+            <li className="flex items-center">
+              {/* "Calendar" (not "Corporate Calendar") keeps the 7-item
+                  bar inside its measured width budget at 1024px. */}
+              <Link
+                to="/corporate-calendar"
+                className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
+                  onCalendar ? "text-white after:w-6" : "text-gray-300 after:w-0"
+                }`}
+              >
+                Calendar
               </Link>
             </li>
           </ul>

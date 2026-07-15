@@ -14,6 +14,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
       "Halal Stocks",
       "PMEX Commodities",
       "Currencies & Futures",
+      "Corporate Calendar",
       "IPO Calendar",
       "Mutual Funds & ETFs",
     ],
@@ -41,6 +42,12 @@ const COLUMNS: { heading: string; links: string[] }[] = [
     ],
   },
 ];
+
+/** Footer labels that have a real in-app destination. */
+const LIVE_ROUTES: Record<string, string> = {
+  "Market Watch": "/market-watch",
+  "Corporate Calendar": "/corporate-calendar",
+};
 
 const SOCIALS = [
   { label: "Facebook", icon: IconFacebook },
@@ -120,10 +127,11 @@ export function Footer() {
               <ul className="mt-5 space-y-3">
                 {column.links.map((link) => (
                   <li key={link}>
-                    {link === "Market Watch" ? (
-                      // The one real destination so far — a live route.
+                    {LIVE_ROUTES[link] ? (
+                      // Labels with real destinations render as router
+                      // links; the rest remain placeholders for now.
                       <Link
-                        to="/market-watch"
+                        to={LIVE_ROUTES[link]}
                         className="text-sm text-gray-300 transition-colors duration-300 hover:text-white"
                       >
                         {link}
