@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FadeIn } from "./FadeIn";
 import { IconExternalLink } from "./Icons";
 import {
@@ -15,17 +15,30 @@ import type { Direction, MarketStat } from "../types";
  */
 const SESSION_STAT_LABELS = ["Market Volume", "Advancers", "Decliners"];
 
-/** Eases a number from 0 to `target` once, for the index counter. */
+/**
+ * Eases the displayed number toward `target`. First mount animates
+ * from 0 with the entrance delay (the original behavior); subsequent
+ * target changes — e.g. a background poll delivering a fresh index
+ * level — glide from the CURRENTLY displayed value with no delay, so
+ * a refetch never flashes the value back to zero.
+ */
 function useCountUp(target: number, duration = 1400, delay = 0) {
   const [value, setValue] = useState(0);
+  const displayedRef = useRef(0);
+  const firstRunRef = useRef(true);
 
   useEffect(() => {
+    const from = displayedRef.current;
+    const isFirstRun = firstRunRef.current;
+    firstRunRef.current = false;
     let raf = 0;
-    const start = performance.now() + delay;
+    const start = performance.now() + (isFirstRun ? delay : 0);
     const tick = (now: number) => {
       const t = Math.min(Math.max((now - start) / duration, 0), 1);
       const eased = 1 - Math.pow(1 - t, 3);
-      setValue(target * eased);
+      const next = from + (target - from) * eased;
+      displayedRef.current = next;
+      setValue(next);
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

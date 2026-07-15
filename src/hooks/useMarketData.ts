@@ -7,7 +7,17 @@ import {
 import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
-  return useAsyncData(getMarketSnapshot);
+  /*
+   * 75s: the snapshot endpoint's edge cache is s-maxage=60 during
+   * market hours (confirmed in api/market/snapshot.ts, same window as
+   * /api/market/watch), so the same slightly-above-the-cache-window
+   * reasoning as useTickerQuotes applies. Outside sessions the
+   * endpoint serves a 30-minute cache, so those polls are cheap edge
+   * hits. Background refetches update the value in place — no
+   * loading state (per useAsyncData's polling design) and the panel's
+   * count-up glides from the displayed value rather than resetting.
+   */
+  return useAsyncData(getMarketSnapshot, { intervalMs: 75_000 });
 }
 
 /**
