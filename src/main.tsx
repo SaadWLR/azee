@@ -1,8 +1,9 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ScrollToHash } from "./components/ScrollToHash";
 import "./index.css";
 
 /*
@@ -31,32 +32,52 @@ function PageLoading() {
   );
 }
 
+/**
+ * Path-less layout route: mounts router-level behaviors (currently
+ * scroll-to-hash / scroll-to-top on navigation) exactly once, above
+ * every current and future route.
+ */
+function RootLayout() {
+  return (
+    <>
+      <ScrollToHash />
+      <Outlet />
+    </>
+  );
+}
+
 /*
  * Routing shell. The homepage ("/") stays eager in the main bundle;
- * /market-watch code-splits. Plain in-page hash anchors on the
+ * the other pages code-split. Plain in-page hash anchors on the
  * homepage are handled natively by the browser and are not
- * intercepted by the router.
+ * intercepted by the router; cross-route hash navigation is handled
+ * by ScrollToHash in the layout route.
  */
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <App />,
-  },
-  {
-    path: "/market-watch",
-    element: (
-      <Suspense fallback={<PageLoading />}>
-        <MarketWatchPage />
-      </Suspense>
-    ),
-  },
-  {
-    path: "/corporate-calendar",
-    element: (
-      <Suspense fallback={<PageLoading />}>
-        <CorporateCalendarPage />
-      </Suspense>
-    ),
+    element: <RootLayout />,
+    children: [
+      {
+        path: "/",
+        element: <App />,
+      },
+      {
+        path: "/market-watch",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <MarketWatchPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/corporate-calendar",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <CorporateCalendarPage />
+          </Suspense>
+        ),
+      },
+    ],
   },
 ]);
 

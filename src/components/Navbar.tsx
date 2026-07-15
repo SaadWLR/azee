@@ -32,13 +32,27 @@ function MobileMenu({
       <ul>
         {NAV_LINKS.map((link) => (
           <li key={link.hash} className="border-b border-white/10">
-            <a
-              href={onHome ? link.hash : `/${link.hash}`}
-              onClick={onNavigate}
-              className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-            >
-              {link.label}
-            </a>
+            {onHome ? (
+              // Same-page anchor: native browser scroll, untouched.
+              <a
+                href={link.hash}
+                onClick={onNavigate}
+                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+              >
+                {link.label}
+              </a>
+            ) : (
+              // Cross-route: client-side navigation; ScrollToHash in
+              // the root layout scrolls to the section once home
+              // renders.
+              <Link
+                to={`/${link.hash}`}
+                onClick={onNavigate}
+                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+              >
+                {link.label}
+              </Link>
+            )}
           </li>
         ))}
         <li className="border-b border-white/10">
@@ -179,20 +193,29 @@ export function Navbar() {
           )}
 
           <ul className="hidden items-center gap-7 lg:flex">
-            {NAV_LINKS.map((link) => (
-              <li key={link.hash} className="flex items-center">
-                <a
-                  href={onHome ? link.hash : `/${link.hash}`}
-                  className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                    active === link.hash
-                      ? "text-white after:w-6"
-                      : "text-gray-300 after:w-0"
-                  }`}
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
+            {NAV_LINKS.map((link) => {
+              const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
+                active === link.hash
+                  ? "text-white after:w-6"
+                  : "text-gray-300 after:w-0"
+              }`;
+              return (
+                <li key={link.hash} className="flex items-center">
+                  {onHome ? (
+                    // Same-page anchor: native browser scroll, untouched.
+                    <a href={link.hash} className={linkClass}>
+                      {link.label}
+                    </a>
+                  ) : (
+                    // Cross-route: client-side navigation; ScrollToHash
+                    // in the root layout scrolls once home renders.
+                    <Link to={`/${link.hash}`} className={linkClass}>
+                      {link.label}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
             <li className="flex items-center">
               <Link
                 to="/market-watch"

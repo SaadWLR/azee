@@ -1,0 +1,96 @@
+import { expect, test } from "@playwright/test";
+
+/*
+ * Guards the cross-route → homepage-section navigation path that
+ * regressed unnoticed when the Navbar became route-aware. Desktop-
+ * scoped like the other functional specs to manage the suite's known
+ * rate-limit thin margin.
+ */
+test.beforeEach(() => {
+  test.skip(
+    test.info().project.name !== "desktop",
+    "Navigation behavior is viewport-independent; run once on desktop",
+  );
+});
+
+/** Is the section with this id scrolled to (near) the viewport top? */
+async function sectionAtTop(page: import("@playwright/test").Page, id: string) {
+  return page.evaluate((sectionId) => {
+    const el = document.getElementById(sectionId);
+    if (!el) return { found: false, top: NaN, scrollY: window.scrollY };
+    const top = el.getBoundingClientRect().top;
+    return { found: true, top: Math.round(top), scrollY: Math.round(window.scrollY) };
+  }, id);
+}
+
+for (const from of ["/market-watch", "/corporate-calendar"]) {
+  test(`from ${from}, a Navbar section link navigates home AND scrolls to the section`, async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    page.on("console", (m) => {
+      if (m.type() === "error") consoleErrors.push(m.text());
+    });
+
+    await page.goto(from);
+    await expect(page.locator("h1")).toBeVisible();
+
+    // Marker proves the click is CLIENT-SIDE routing (it would be
+    // wiped by a full page reload, the old <a href="/#..."> behavior).
+    await page.evaluate(() => {
+      (window as unknown as { __noReload?: number }).__noReload = 1;
+    });
+
+    await page.locator('header nav ul a', { hasText: "Research" }).click();
+
+    // Navigated to home with the hash...
+    await expect(page).toHaveURL(/\/#research$/);
+    // ...client-side (marker survived)...
+    const marker = await page.evaluate(
+      () => (window as unknown as { __noReload?: number }).__noReload,
+    );
+    expect(marker).toBe(1);
+
+    // ...and genuinely scrolled to the section (ScrollToHash retries
+    // until the homepage content has rendered).
+    await expect
+      .poll(async () => (await sectionAtTop(page, "research")).scrollY, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThan(500);
+    const pos = await sectionAtTop(page, "research");
+    expect(pos.found).toBe(true);
+    expect(Math.abs(pos.top)).toBeLessThan(250);
+
+    expect(consoleErrors).toEqual([]);
+  });
+}
+
+test("same-page anchors on the homepage still work (no regression)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  await page.locator('header nav ul a[href="#products"]').click();
+  await expect
+    .poll(async () => (await sectionAtTop(page, "products")).scrollY, {
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(500);
+  const pos = await sectionAtTop(page, "products");
+  expect(Math.abs(pos.top)).toBeLessThan(250);
+});
+
+test("direct navigation to /#research loads home scrolled to the section", async ({
+  page,
+}) => {
+  await page.goto("/#research");
+  await expect
+    .poll(async () => (await sectionAtTop(page, "research")).scrollY, {
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(500);
+  const pos = await sectionAtTop(page, "research");
+  expect(pos.found).toBe(true);
+  expect(Math.abs(pos.top)).toBeLessThan(250);
+});
