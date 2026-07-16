@@ -6,6 +6,52 @@
 npm run test:e2e
 ```
 
+Running against production also needs the rate-limit bypass secret —
+see the next section. Without it the suite still runs, but later tests
+can fail with 429s.
+
+## Rate-limit bypass (required for production runs)
+
+The production API sits behind a Vercel WAF rate-limit rule
+(**30 requests / 60s per IP**). The suite's cumulative volume exceeds
+that, which used to 429 its own later-scheduled tests. A Vercel
+Firewall exception lets requests carrying the **`x-e2e-bypass`** header
+with the correct secret skip that rule, and `playwright.config.ts`
+attaches that header to every request the suite makes.
+
+**The secret is never stored in this repo.** Supply it via the
+`E2E_BYPASS_SECRET` environment variable, either way:
+
+**1. Local — a gitignored `.env` at the repo root** (simplest; the
+config reads it automatically, no `dotenv` dependency needed):
+
+```bash
+# .env  — gitignored, never commit this file
+E2E_BYPASS_SECRET=<the secret from the Vercel dashboard>
+```
+
+**2. Shell / CI — a real environment variable** (always wins over
+`.env`):
+
+```bash
+# bash
+E2E_BYPASS_SECRET=<secret> npm run test:e2e
+
+# PowerShell
+$env:E2E_BYPASS_SECRET = "<secret>"; npm run test:e2e
+```
+
+In CI, add `E2E_BYPASS_SECRET` as an encrypted secret and expose it to
+the step that runs `npm run test:e2e`.
+
+Where to find the secret: the Vercel dashboard → project → Firewall →
+the `api-rate-limit` rule's bypass exception (also stored as a Vercel
+environment variable). Ask the project owner if you don't have access.
+
+If the secret is missing and the run targets production, the config
+prints a prominent warning naming this section — it will not fail
+silently and then look like a wall of mysterious 429 bugs.
+
 ## What these tests target — and why production
 
 Tests run against **https://azee.vercel.app by default**. This project

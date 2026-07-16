@@ -2,6 +2,10 @@ node_modules/
 dist/ 
 .claude/ 
 
+# Local secrets — never commit (see tests/e2e/README.md)
+.env
+.env.local
+
 # Playwright
 test-results/
 playwright-report/
