@@ -51,16 +51,18 @@ for (const from of ["/market-watch", "/corporate-calendar"]) {
     );
     expect(marker).toBe(1);
 
-    // ...and genuinely scrolled to the section (ScrollToHash retries
-    // until the homepage content has rendered).
+    // ...and genuinely scrolled to the section. Poll on the LANDING
+    // condition itself (element near viewport top) — polling scrollY
+    // alone succeeds mid-animation and then measures a scroll still
+    // in flight.
     await expect
-      .poll(async () => (await sectionAtTop(page, "research")).scrollY, {
+      .poll(async () => Math.abs((await sectionAtTop(page, "research")).top), {
         timeout: 10_000,
       })
-      .toBeGreaterThan(500);
+      .toBeLessThan(250);
     const pos = await sectionAtTop(page, "research");
     expect(pos.found).toBe(true);
-    expect(Math.abs(pos.top)).toBeLessThan(250);
+    expect(pos.scrollY).toBeGreaterThan(500);
 
     expect(consoleErrors).toEqual([]);
   });
@@ -73,12 +75,11 @@ test("same-page anchors on the homepage still work (no regression)", async ({
   await expect(page.locator("h1")).toBeVisible();
   await page.locator('header nav ul a[href="#products"]').click();
   await expect
-    .poll(async () => (await sectionAtTop(page, "products")).scrollY, {
+    .poll(async () => Math.abs((await sectionAtTop(page, "products")).top), {
       timeout: 10_000,
     })
-    .toBeGreaterThan(500);
-  const pos = await sectionAtTop(page, "products");
-  expect(Math.abs(pos.top)).toBeLessThan(250);
+    .toBeLessThan(250);
+  expect((await sectionAtTop(page, "products")).scrollY).toBeGreaterThan(500);
 });
 
 test("direct navigation to /#research loads home scrolled to the section", async ({
@@ -86,11 +87,11 @@ test("direct navigation to /#research loads home scrolled to the section", async
 }) => {
   await page.goto("/#research");
   await expect
-    .poll(async () => (await sectionAtTop(page, "research")).scrollY, {
+    .poll(async () => Math.abs((await sectionAtTop(page, "research")).top), {
       timeout: 10_000,
     })
-    .toBeGreaterThan(500);
+    .toBeLessThan(250);
   const pos = await sectionAtTop(page, "research");
   expect(pos.found).toBe(true);
-  expect(Math.abs(pos.top)).toBeLessThan(250);
+  expect(pos.scrollY).toBeGreaterThan(500);
 });
