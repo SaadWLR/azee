@@ -134,6 +134,36 @@ function ledeOf(item: string): string | undefined {
   return text.length > 0 ? text : undefined;
 }
 
+/**
+ * The publisher's own article image URL, taken verbatim from the RSS
+ * item — never composed or guessed. Two publisher conventions, both
+ * already present in the fetched XML:
+ *
+ *  - Business Recorder: standard Media RSS. Prefer the full-size
+ *    <media:content url="…"> and fall back to <media:thumbnail url="…">
+ *    only if content is absent.
+ *  - The Express Tribune: a custom item-scoped <image><img src="…"></image>.
+ *    This must be the item's element, NOT the channel-level feed-logo
+ *    <image>; parseItem only ever sees one <item> block, so the
+ *    channel image is out of scope here by construction.
+ *
+ * Only http(s) URLs are accepted; anything else (or no match) yields
+ * undefined rather than a fabricated URL.
+ */
+const MEDIA_CONTENT = /<media:content\b[^>]*\burl="([^"]+)"/i;
+const MEDIA_THUMBNAIL = /<media:thumbnail\b[^>]*\burl="([^"]+)"/i;
+const ITEM_IMAGE = /<image\b[^>]*>\s*<img\b[^>]*\bsrc="([^"]+)"/i;
+
+function imageOf(block: string): string | undefined {
+  const url =
+    MEDIA_CONTENT.exec(block)?.[1] ??
+    MEDIA_THUMBNAIL.exec(block)?.[1] ??
+    ITEM_IMAGE.exec(block)?.[1];
+  if (!url) return undefined;
+  const decoded = decodeEntities(url).trim();
+  return decoded.startsWith("http") ? decoded : undefined;
+}
+
 function parseItem(block: string, sourceName: string): NewsFeedItem | null {
   const title = textOf(block, "title");
   const link = textOf(block, "link");
@@ -147,6 +177,7 @@ function parseItem(block: string, sourceName: string): NewsFeedItem | null {
     source: sourceName,
     publishedAt: published.toISOString(),
     summary: ledeOf(block),
+    imageUrl: imageOf(block),
   };
 }
 
@@ -198,8 +229,8 @@ async function fetchSource(source: NewsSource): Promise<NewsFeedItem[]> {
  * very generic title pair could in theory over-merge — imperfect
  * dedup is fine here ("that's what news looks like"). When a
  * duplicate is found we keep the first (newest, since the list is
- * date-sorted first) and, if only the dropped copy carried a summary,
- * lift that summary onto the kept item.
+ * date-sorted first) and, if only the dropped copy carried a summary
+ * or image, lift that field onto the kept item.
  */
 const STOPWORDS = new Set(
   "the a an in on of to as for and at by with from over after amid new its is are was were has have will".split(
@@ -238,6 +269,7 @@ function dedupe(items: NewsFeedItem[]): NewsFeedItem[] {
       continue;
     }
     if (!match.item.summary && item.summary) match.item.summary = item.summary;
+    if (!match.item.imageUrl && item.imageUrl) match.item.imageUrl = item.imageUrl;
   }
   return kept.map((k) => k.item);
 }

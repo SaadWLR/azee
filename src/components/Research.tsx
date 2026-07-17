@@ -1,8 +1,30 @@
+import { useState } from "react";
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
 import { IconExternalLink } from "./Icons";
 import { useLatestNews } from "../hooks/useNews";
 import type { NewsFeedItem } from "../types";
+
+/**
+ * The publisher's article image, hotlinked from their CDN. Renders
+ * nothing when there's no URL or the image fails to load — so a card
+ * with a missing or dead image reflows cleanly to the text-only
+ * layout rather than showing a gap or a broken-image icon. Decorative
+ * (alt=""): the adjacent headline is already the link's accessible name.
+ */
+function ArticleImage({ src, className }: { src?: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className={className}
+    />
+  );
+}
 
 function SourceTag({ source }: { source: string }) {
   return (
@@ -63,6 +85,10 @@ export function Research() {
                   className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
                 >
                   <div>
+                    <ArticleImage
+                      src={lead.imageUrl}
+                      className="mb-6 aspect-[16/9] w-full rounded-2xl object-cover"
+                    />
                     <div className="flex items-center justify-between gap-3">
                       <SourceTag source={lead.source} />
                       <IconExternalLink className="h-4 w-4 text-white/50 transition-colors duration-500 group-hover:text-white" />
@@ -97,6 +123,10 @@ export function Research() {
                     className="liquid-glass card-glow group flex h-full flex-col justify-between rounded-3xl p-6 hover:bg-white/[0.12]"
                   >
                     <div>
+                      <ArticleImage
+                        src={item.imageUrl}
+                        className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"
+                      />
                       <div className="flex items-center justify-between gap-3">
                         <SourceTag source={item.source} />
                         <IconExternalLink className="h-3.5 w-3.5 text-white/40 transition-colors duration-500 group-hover:text-white" />
