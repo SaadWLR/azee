@@ -52,6 +52,24 @@ If the secret is missing and the run targets production, the config
 prints a prominent warning naming this section — it will not fail
 silently and then look like a wall of mysterious 429 bugs.
 
+**How the header is attached (and why not `extraHTTPHeaders` globally):**
+`use.extraHTTPHeaders` in `playwright.config.ts` would add the header
+to *every* request the browser makes, including cross-origin ones —
+which turns the Google Fonts requests into CORS-preflighted requests
+that get blocked (`Request header field x-e2e-bypass is not allowed by
+Access-Control-Allow-Headers`), breaking fonts and the clean-console
+assertions. Since the WAF rule only matches `/api/*`, the header is
+scoped to those requests instead:
+
+- **Page-based specs** get it from `tests/e2e/fixtures.ts` (an auto
+  fixture that routes `**/api/**`). These specs import `test`/`expect`
+  from `./fixtures` rather than `@playwright/test` — keep that import
+  when adding a new page-based spec, or it will hit rate limits.
+- **`api-contracts.spec.ts`** calls `/api/*` through the `request`
+  context, which page routing does not intercept, so it sets the
+  header via `test.use({ extraHTTPHeaders })`. That is safe there
+  precisely because it loads no page (no fonts, no CORS).
+
 ## What these tests target — and why production
 
 Tests run against **https://azee.vercel.app by default**. This project

@@ -4,6 +4,20 @@ import { expect, test } from "@playwright/test";
  * API-level contract tests via request context — no page loads.
  * Viewport is irrelevant here, so these run in a single project.
  */
+
+/*
+ * These hit /api/* directly through the request context, which page
+ * routing (tests/e2e/fixtures.ts) does not intercept — so the WAF
+ * rate-limit bypass header is set here instead. Safe as
+ * extraHTTPHeaders precisely because this spec loads no page: there
+ * are no cross-origin font requests to CORS-preflight. Secret comes
+ * from the environment only; see tests/e2e/README.md.
+ */
+test.use({
+  extraHTTPHeaders: process.env.E2E_BYPASS_SECRET
+    ? { "x-e2e-bypass": process.env.E2E_BYPASS_SECRET }
+    : {},
+});
 test.beforeEach(() => {
   test.skip(
     test.info().project.name !== "desktop",

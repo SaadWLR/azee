@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /*
  * Desktop-scoped like the Market Watch tests, to manage the suite's

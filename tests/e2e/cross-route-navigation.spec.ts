@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /*
  * Guards the cross-route → homepage-section navigation path that

@@ -47,8 +47,12 @@ loadEnvFile();
  * carrying the x-e2e-bypass header with the correct secret skip that
  * rule, so the suite's cumulative volume stops 429-ing its own later
  * tests. The secret lives only in the environment — never in the repo.
+ *
+ * The header is NOT set here via use.extraHTTPHeaders: that would add
+ * it to cross-origin requests too, CORS-preflighting the Google Fonts
+ * fetches and getting them blocked. It is attached per-request to our
+ * own /api/* calls instead — see tests/e2e/fixtures.ts.
  */
-const BYPASS_HEADER = "x-e2e-bypass";
 const bypassSecret = process.env.E2E_BYPASS_SECRET;
 
 /*
@@ -97,11 +101,6 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "retain-on-failure",
-    // Applies to page navigations, in-page fetches, and request-context
-    // calls alike — i.e. every request the suite makes.
-    ...(bypassSecret
-      ? { extraHTTPHeaders: { [BYPASS_HEADER]: bypassSecret } }
-      : {}),
   },
   projects: Object.entries(VIEWPORTS).map(([name, viewport]) => ({
     name,

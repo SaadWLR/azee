@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 /** The snapshot card inside the hero (Research also uses this glass class). */
 const PANEL = "#markets .liquid-glass-strong";
