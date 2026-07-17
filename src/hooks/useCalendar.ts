@@ -1,4 +1,4 @@
-import { getCorporateCalendar } from "../services/calendarService";
+import { getCorporateCalendar, getPayouts } from "../services/calendarService";
 import { useAsyncData } from "./useAsyncData";
 
 export function useCorporateCalendar() {
@@ -10,4 +10,15 @@ export function useCorporateCalendar() {
    * payload.
    */
   return useAsyncData(getCorporateCalendar);
+}
+
+export function usePayouts() {
+  /*
+   * No polling either. The endpoint's edge cache is 30 minutes and
+   * announcements arrive ~4/week (bursting to ~9/day only in results
+   * season), so a poll would almost always re-read the same cached
+   * payload; one fetch per page visit is already far fresher than the
+   * data changes.
+   */
+  return useAsyncData(getPayouts);
 }
