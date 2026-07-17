@@ -3,10 +3,12 @@ import type { MeetingCalendarResponse } from "../types";
 import type { PayoutsResponse } from "../types/payouts";
 
 /**
- * Development fixture mirroring /api/calendar/agm's shape (entries
- * modelled on the real mid-July-2026 EOGM cluster that follows
- * Pakistan's June fiscal year-end) — production always serves live
- * PSX data.
+ * Development fixture mirroring /api/calendar/agm. Every entry is a
+ * real meeting copied from the live endpoint (verified Jul 17 2026),
+ * covering the mid-July EOGM cluster that follows Pakistan's June
+ * fiscal year-end plus two later AGMs. As with PAYOUTS_FIXTURE below,
+ * do not invent or re-attribute entries — production always serves
+ * live PSX data, and a dev fixture that looks real must be real.
  */
 const CALENDAR_FIXTURE: MeetingCalendarResponse = {
   meetings: [
@@ -25,7 +27,7 @@ const CALENDAR_FIXTURE: MeetingCalendarResponse = {
       meetingType: "EOGM",
       date: "2026-07-20",
       time: "11:00",
-      city: "Lahore",
+      city: "Karachi",
       periodEnd: "2026-06-30",
     },
     {
@@ -72,11 +74,18 @@ export async function getCorporateCalendar(): Promise<MeetingCalendarResponse> {
 }
 
 /**
- * Development fixture mirroring /api/payouts/latest — deliberately
- * includes the awkward real-world shapes so they're exercised
- * locally: a compound announcement (two payouts, hence no single
- * `percent`), a free-text rights issue, an (F) final, an (iii) third
- * interim, and a bonus. Production always serves live PSX data.
+ * Development fixture mirroring /api/payouts/latest. Every entry is a
+ * real announcement copied verbatim from the live endpoint (verified
+ * Jul 17 2026) — company, sector, text and timestamps all belong
+ * together as PSX reported them. Do not invent entries or re-attribute
+ * a real announcement to a different company: a plausible-looking
+ * payout is a fabricated market fact even in a dev-only fixture.
+ *
+ * The selection deliberately covers the awkward shapes so they're
+ * exercised locally: a compound announcement (two payouts, hence no
+ * single `percent`), a free-text rights issue, a rights issue with no
+ * book closure, an (F) final, an (iii) third interim, and a bonus.
+ * Production always serves live PSX data.
  */
 const PAYOUTS_FIXTURE: PayoutsResponse = {
   payouts: [
@@ -130,41 +139,41 @@ const PAYOUTS_FIXTURE: PayoutsResponse = {
     },
     {
       // Compound: two payouts in one announcement → no single percent.
-      symbol: "PSEL",
-      companyName: "Pakistan Services Limited",
-      sector: "MISCELLANEOUS",
-      announcement: "25%(i) (D)  -  25%(i) (D)",
+      symbol: "HMB",
+      companyName: "Habib Metropolitan Bank Limited",
+      sector: "COMMERCIAL BANKS",
+      announcement: "25%(i) (D) - 25%(i) (D)",
       kinds: ["dividend"],
       period: "interim",
       interimNumber: 1,
-      announcedAt: "2026-06-29T10:30:00.000Z",
-      bookClosureFrom: "2026-07-08",
-      bookClosureTo: "2026-07-10",
-      bookClosureRaw: "08/07/2026  - 10/07/2026",
+      announcedAt: "2026-04-24T11:35:00.000Z",
+      bookClosureFrom: "2026-05-06",
+      bookClosureTo: "2026-05-08",
+      bookClosureRaw: "06/05/2026 - 06/05/2026 - 08/05/2026 - 08/05/2026",
     },
     {
       // Free-text rights terms — nuance a plain percentage would lose.
-      symbol: "BIPL",
-      companyName: "BankIslami Pakistan Limited",
-      sector: "COMMERCIAL BANKS",
+      symbol: "TCORP",
+      companyName: "Tariq Corporation Limited",
+      sector: "SUGAR & ALLIED INDUSTRIES",
       announcement: "23.855376% AT A PREMIUM RS.10/= PER SHARES (R)",
       kinds: ["rights"],
       percent: 23.855376,
-      announcedAt: "2026-06-22T09:15:00.000Z",
+      announcedAt: "2026-05-25T10:44:00.000Z",
     },
     {
-      symbol: "MLCF",
-      companyName: "Maple Leaf Cement Factory Limited",
-      sector: "CEMENT",
+      symbol: "OGDC",
+      companyName: "Oil & Gas Development Company Limited",
+      sector: "OIL & GAS EXPLORATION COMPANIES",
       announcement: "32.50%(iii) (D)",
       kinds: ["dividend"],
       percent: 32.5,
       period: "interim",
       interimNumber: 3,
-      announcedAt: "2026-04-29T11:20:00.000Z",
-      bookClosureFrom: "2026-05-08",
-      bookClosureTo: "2026-05-12",
-      bookClosureRaw: "08/05/2026  - 12/05/2026",
+      announcedAt: "2026-04-29T10:56:00.000Z",
+      bookClosureFrom: "2026-05-12",
+      bookClosureTo: "2026-05-13",
+      bookClosureRaw: "12/05/2026 - 13/05/2026",
     },
   ],
   totalAvailable: 562,
