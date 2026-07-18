@@ -63,14 +63,15 @@ function ArticleDate({ item }: { item: NewsFeedItem }) {
 }
 
 /**
- * How many headlines sit in the side list beside the lead card. Capped
+ * How many headlines sit in the side list beside the lead card. Chosen
  * so the 1/3-width side column stays close in height to the lead card
- * rather than stacking every fetched item into a column several screens
- * tall — which, via the grid's row sizing, used to drag the lead card's
- * height along with it. A homepage teaser wants a handful of headlines,
- * not the full feed.
+ * (each side card ≈ the lead's content height split in two) rather than
+ * stacking every fetched item into a column several screens tall —
+ * which, via the grid's row sizing, used to drag the lead card's height
+ * along with it. A homepage teaser wants a few headlines, not the full
+ * feed; raise this if a taller side column is acceptable.
  */
-const SIDE_HEADLINES = 3;
+const SIDE_HEADLINES = 2;
 
 export function Research() {
   const { data: news } = useLatestNews();
