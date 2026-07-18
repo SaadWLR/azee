@@ -62,12 +62,23 @@ function ArticleDate({ item }: { item: NewsFeedItem }) {
   );
 }
 
+/**
+ * How many headlines sit in the side list beside the lead card. Capped
+ * so the 1/3-width side column stays close in height to the lead card
+ * rather than stacking every fetched item into a column several screens
+ * tall — which, via the grid's row sizing, used to drag the lead card's
+ * height along with it. A homepage teaser wants a handful of headlines,
+ * not the full feed.
+ */
+const SIDE_HEADLINES = 3;
+
 export function Research() {
   const { data: news } = useLatestNews();
   const items = news?.items ?? [];
   // Newest item gets the large card — structural emphasis only, not
-  // editorial curation. The rest fill the side list, reverse-chron.
+  // editorial curation. The next few fill the side list, reverse-chron.
   const [lead, ...rest] = items;
+  const sideHeadlines = rest.slice(0, SIDE_HEADLINES);
 
   return (
     <section id="research" className="relative overflow-hidden py-24 lg:py-32">
@@ -86,7 +97,7 @@ export function Research() {
         />
 
         {items.length > 0 && (
-          <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
             {/* Lead story */}
             {lead && (
               <Reveal className="lg:col-span-2">
@@ -126,7 +137,7 @@ export function Research() {
 
             {/* Headline list */}
             <div className="flex flex-col gap-5">
-              {rest.map((item, i) => (
+              {sideHeadlines.map((item, i) => (
                 <Reveal key={item.title} delay={i * 100} className="flex-1">
                   <a
                     href={item.link}
