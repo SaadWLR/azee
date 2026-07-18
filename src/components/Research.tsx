@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
 import { IconExternalLink } from "./Icons";
@@ -8,17 +8,17 @@ import type { NewsFeedItem } from "../types";
 /**
  * The publisher's article image, hotlinked from their CDN.
  *
- * Deferred loading is done with our own IntersectionObserver, NOT the
- * native loading="lazy" attribute. Native lazy-loading proved
- * unreliable for this section: it sits far below the fold and its
- * cards mount only after the news fetch resolves, and Chromium would
- * then never load images that were already in the viewport when the
- * user jumped straight to the section (e.g. via a nav/#research link
- * or restored scroll position) — leaving every card image blank.
- * An IntersectionObserver fires an initial callback for elements
- * already on-screen, so it covers that jump case too, while still
- * deferring off-screen images (a single Tribune photo can be ~1.5MB,
- * so eager-loading all of them on every visit is not an option).
+ * Loaded eagerly — deliberately NO loading="lazy". This section sits
+ * far below the fold and its cards mount only after the news fetch
+ * resolves; in that situation native lazy-loading never loaded images
+ * that were already in the viewport when the user reached the section
+ * by a jump rather than a scroll (e.g. the "Research" nav item links
+ * to /#research), leaving every card image blank — the real bug this
+ * replaces. An IntersectionObserver-based lazy variant was tried but
+ * could not be verified to fire reliably in that jump case. Eager
+ * loading is simple and always works, and the cost is modest: the
+ * whole set is ~0.5 MB (≈13 images, most 10–60 KB), only fetched once
+ * the cards exist, and browsers still prioritise on-screen images.
  *
  * Renders nothing when there's no URL or the image fails to load, so a
  * card with a missing or dead image reflows cleanly to the text-only
@@ -27,39 +27,10 @@ import type { NewsFeedItem } from "../types";
  */
 function ArticleImage({ src, className }: { src?: string; className: string }) {
   const [failed, setFailed] = useState(false);
-  const [shouldLoad, setShouldLoad] = useState(false);
-  const ref = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setShouldLoad(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShouldLoad(true);
-          observer.disconnect();
-        }
-      },
-      // Start fetching a little before the image scrolls into view so
-      // it's usually ready by the time the card is on screen.
-      { rootMargin: "300px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
   if (!src || failed) return null;
-  // The <img> always mounts (so the observer has an element to watch
-  // and the aspect-ratio box reserves space with no layout shift); its
-  // src is only set once the card nears the viewport.
   return (
     <img
-      ref={ref}
-      src={shouldLoad ? src : undefined}
+      src={src}
       alt=""
       onError={() => setFailed(true)}
       className={className}
