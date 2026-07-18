@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
 import { IconExternalLink } from "./Icons";
@@ -6,20 +6,61 @@ import { useLatestNews } from "../hooks/useNews";
 import type { NewsFeedItem } from "../types";
 
 /**
- * The publisher's article image, hotlinked from their CDN. Renders
- * nothing when there's no URL or the image fails to load — so a card
- * with a missing or dead image reflows cleanly to the text-only
+ * The publisher's article image, hotlinked from their CDN.
+ *
+ * Deferred loading is done with our own IntersectionObserver, NOT the
+ * native loading="lazy" attribute. Native lazy-loading proved
+ * unreliable for this section: it sits far below the fold and its
+ * cards mount only after the news fetch resolves, and Chromium would
+ * then never load images that were already in the viewport when the
+ * user jumped straight to the section (e.g. via a nav/#research link
+ * or restored scroll position) — leaving every card image blank.
+ * An IntersectionObserver fires an initial callback for elements
+ * already on-screen, so it covers that jump case too, while still
+ * deferring off-screen images (a single Tribune photo can be ~1.5MB,
+ * so eager-loading all of them on every visit is not an option).
+ *
+ * Renders nothing when there's no URL or the image fails to load, so a
+ * card with a missing or dead image reflows cleanly to the text-only
  * layout rather than showing a gap or a broken-image icon. Decorative
  * (alt=""): the adjacent headline is already the link's accessible name.
  */
 function ArticleImage({ src, className }: { src?: string; className: string }) {
   const [failed, setFailed] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      // Start fetching a little before the image scrolls into view so
+      // it's usually ready by the time the card is on screen.
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   if (!src || failed) return null;
+  // The <img> always mounts (so the observer has an element to watch
+  // and the aspect-ratio box reserves space with no layout shift); its
+  // src is only set once the card nears the viewport.
   return (
     <img
-      src={src}
+      ref={ref}
+      src={shouldLoad ? src : undefined}
       alt=""
-      loading="lazy"
       onError={() => setFailed(true)}
       className={className}
     />
