@@ -65,6 +65,51 @@ test("news cards render the publisher image when the CDN serves it", async ({
   expect(served).toBeGreaterThan(0);
 });
 
+test("shows ≥5 stories by default and 'See more' reveals the rest without fabricating", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator("#research").scrollIntoViewIfNeeded();
+
+  // Every card is an external <a target="_blank">; the "See more"
+  // control is a <button>, so this counts stories only.
+  const stories = page.locator('#research a[target="_blank"]');
+  await expect.poll(async () => stories.count()).toBeGreaterThanOrEqual(5);
+  const defaultCount = await stories.count();
+
+  // Nothing shown is invented: the visible set never exceeds what the
+  // API actually returned.
+  const apiCount = await page.evaluate(async () => {
+    const r = await fetch("/api/news/latest", {
+      headers: { Accept: "application/json" },
+    });
+    return (await r.json()).items.length as number;
+  });
+  expect(defaultCount).toBeLessThanOrEqual(apiCount);
+
+  // The live feed returns well over the default set, so the control is
+  // present; guard so a rare thin-feed day can't flake the suite.
+  const seeMore = page.getByRole("button", { name: /see more/i });
+  if (await seeMore.count()) {
+    const advertised = Number(
+      (await seeMore.textContent())?.match(/\((\d+)\)/)?.[1],
+    );
+    expect(advertised).toBeGreaterThan(0);
+
+    await seeMore.click();
+    // Expanding reveals exactly the advertised count of already-fetched
+    // items, and never more than the feed returned.
+    await expect
+      .poll(async () => stories.count())
+      .toBe(defaultCount + advertised);
+    expect(await stories.count()).toBeLessThanOrEqual(apiCount);
+
+    // The toggle collapses back to the default set.
+    await page.getByRole("button", { name: /show fewer/i }).click();
+    await expect.poll(async () => stories.count()).toBe(defaultCount);
+  }
+});
+
 test("cards degrade gracefully when publisher images fail to load", async ({
   page,
 }) => {

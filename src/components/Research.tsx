@@ -16,9 +16,9 @@ import type { NewsFeedItem } from "../types";
  * to /#research), leaving every card image blank — the real bug this
  * replaces. An IntersectionObserver-based lazy variant was tried but
  * could not be verified to fire reliably in that jump case. Eager
- * loading is simple and always works, and the cost is modest: the
- * whole set is ~0.5 MB (≈13 images, most 10–60 KB), only fetched once
- * the cards exist, and browsers still prioritise on-screen images.
+ * loading is simple and always works, and the cost is modest: most
+ * images are 10–60 KB, and the collapsed grid only mounts the visible
+ * cards, so the extra "See more" images aren't fetched until revealed.
  *
  * Renders nothing when there's no URL or the image fails to load, so a
  * card with a missing or dead image reflows cleanly to the text-only
@@ -63,23 +63,86 @@ function ArticleDate({ item }: { item: NewsFeedItem }) {
 }
 
 /**
- * How many headlines sit in the side list beside the lead card. Chosen
- * so the 1/3-width side column stays close in height to the lead card
- * (each side card ≈ the lead's content height split in two) rather than
- * stacking every fetched item into a column several screens tall —
- * which, via the grid's row sizing, used to drag the lead card's height
- * along with it. A homepage teaser wants a few headlines, not the full
- * feed; raise this if a taller side column is acceptable.
+ * The compact headline card used both in the side column beside the
+ * lead and in the full-width grid below it. `wrapperClassName` lets the
+ * caller size the Reveal wrapper to its container (flex-1 in the side
+ * column, h-full in the grid so a row's cards share a height).
+ */
+function HeadlineCard({
+  item,
+  delay = 0,
+  wrapperClassName,
+}: {
+  item: NewsFeedItem;
+  delay?: number;
+  wrapperClassName: string;
+}) {
+  return (
+    <Reveal delay={delay} className={wrapperClassName}>
+      <a
+        href={item.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="liquid-glass card-glow group flex h-full flex-col justify-between rounded-3xl p-6 hover:bg-white/[0.12]"
+      >
+        <div>
+          <ArticleImage
+            src={item.imageUrl}
+            className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <SourceTag source={item.source} />
+            <IconExternalLink className="h-3.5 w-3.5 text-white/40 transition-colors duration-500 group-hover:text-white" />
+          </div>
+          <h3 className="mt-3 text-base font-semibold leading-snug tracking-tight text-white">
+            {item.title}
+          </h3>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <ArticleDate item={item} />
+          <span
+            aria-hidden="true"
+            className="text-white/60 transition-all duration-500 group-hover:translate-x-1 group-hover:text-white"
+          >
+            →
+          </span>
+        </div>
+      </a>
+    </Reveal>
+  );
+}
+
+/**
+ * Beside the lead card sit exactly this many headlines, kept at 2 so
+ * the 1/3-width side column stays close in height to the lead card
+ * (the prior height-balance fix — see lg:items-start below). Everything
+ * past the lead + side pair flows into the full-width grid underneath,
+ * which is free to be as tall as it likes without affecting the lead.
  */
 const SIDE_HEADLINES = 2;
 
+/**
+ * How many grid cards show before "See more" — one full desktop row
+ * (the grid is 3 columns at lg). With the lead + 2 side cards that's
+ * 6 stories visible by default; the rest of whatever the feed returned
+ * (typically ~14 items) are one click away, no extra request.
+ */
+const GRID_HEADLINES_DEFAULT = 3;
+
 export function Research() {
   const { data: news } = useLatestNews();
+  const [expanded, setExpanded] = useState(false);
   const items = news?.items ?? [];
   // Newest item gets the large card — structural emphasis only, not
-  // editorial curation. The next few fill the side list, reverse-chron.
+  // editorial curation. The next two fill the side list; the remainder
+  // form the grid below.
   const [lead, ...rest] = items;
   const sideHeadlines = rest.slice(0, SIDE_HEADLINES);
+  const gridHeadlines = rest.slice(SIDE_HEADLINES);
+  const visibleGrid = expanded
+    ? gridHeadlines
+    : gridHeadlines.slice(0, GRID_HEADLINES_DEFAULT);
+  const hiddenCount = gridHeadlines.length - GRID_HEADLINES_DEFAULT;
 
   return (
     <section id="research" className="relative overflow-hidden py-24 lg:py-32">
@@ -98,81 +161,91 @@ export function Research() {
         />
 
         {items.length > 0 && (
-          <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
-            {/* Lead story */}
-            {lead && (
-              <Reveal className="lg:col-span-2">
-                <a
-                  href={lead.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
-                >
-                  <div>
-                    <ArticleImage
-                      src={lead.imageUrl}
-                      className="mb-6 aspect-[16/9] w-full rounded-2xl object-cover"
-                    />
-                    <div className="flex items-center justify-between gap-3">
-                      <SourceTag source={lead.source} />
-                      <IconExternalLink className="h-4 w-4 text-white/50 transition-colors duration-500 group-hover:text-white" />
-                    </div>
-                    <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-white sm:text-3xl">
-                      {lead.title}
-                    </h3>
-                    {lead.summary && (
-                      <p className="mt-4 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">
-                        {lead.summary}
-                      </p>
-                    )}
-                  </div>
-                  <div className="mt-8 flex items-center justify-between">
-                    <ArticleDate item={lead} />
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-500 group-hover:gap-3 group-hover:text-white">
-                      Read at {lead.source} <span aria-hidden="true">→</span>
-                    </span>
-                  </div>
-                </a>
-              </Reveal>
-            )}
-
-            {/* Headline list */}
-            <div className="flex flex-col gap-5">
-              {sideHeadlines.map((item, i) => (
-                <Reveal key={item.title} delay={i * 100} className="flex-1">
+          <>
+            {/* Featured row: large lead + a short side list. lg:items-start
+                keeps the lead card sized by its own content instead of
+                stretching to the side column's height. */}
+            <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
+              {lead && (
+                <Reveal className="lg:col-span-2">
                   <a
-                    href={item.link}
+                    href={lead.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="liquid-glass card-glow group flex h-full flex-col justify-between rounded-3xl p-6 hover:bg-white/[0.12]"
+                    className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
                   >
                     <div>
                       <ArticleImage
-                        src={item.imageUrl}
-                        className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"
+                        src={lead.imageUrl}
+                        className="mb-6 aspect-[16/9] w-full rounded-2xl object-cover"
                       />
                       <div className="flex items-center justify-between gap-3">
-                        <SourceTag source={item.source} />
-                        <IconExternalLink className="h-3.5 w-3.5 text-white/40 transition-colors duration-500 group-hover:text-white" />
+                        <SourceTag source={lead.source} />
+                        <IconExternalLink className="h-4 w-4 text-white/50 transition-colors duration-500 group-hover:text-white" />
                       </div>
-                      <h3 className="mt-3 text-base font-semibold leading-snug tracking-tight text-white">
-                        {item.title}
+                      <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-white sm:text-3xl">
+                        {lead.title}
                       </h3>
+                      {lead.summary && (
+                        <p className="mt-4 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">
+                          {lead.summary}
+                        </p>
+                      )}
                     </div>
-                    <div className="mt-4 flex items-center justify-between">
-                      <ArticleDate item={item} />
-                      <span
-                        aria-hidden="true"
-                        className="text-white/60 transition-all duration-500 group-hover:translate-x-1 group-hover:text-white"
-                      >
-                        →
+                    <div className="mt-8 flex items-center justify-between">
+                      <ArticleDate item={lead} />
+                      <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-500 group-hover:gap-3 group-hover:text-white">
+                        Read at {lead.source} <span aria-hidden="true">→</span>
                       </span>
                     </div>
                   </a>
                 </Reveal>
-              ))}
+              )}
+
+              {/* Side list */}
+              <div className="flex flex-col gap-5">
+                {sideHeadlines.map((item, i) => (
+                  <HeadlineCard
+                    key={item.title}
+                    item={item}
+                    delay={i * 100}
+                    wrapperClassName="flex-1"
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+
+            {/* Full-width grid of further headlines — a plain uniform grid,
+                so each row's cards share a height and no single column can
+                run away with the layout. */}
+            {visibleGrid.length > 0 && (
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleGrid.map((item, i) => (
+                  <HeadlineCard
+                    key={item.title}
+                    item={item}
+                    delay={(i % 3) * 100}
+                    wrapperClassName="h-full"
+                  />
+                ))}
+              </div>
+            )}
+
+            {hiddenCount > 0 && (
+              <div className="mt-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  aria-expanded={expanded}
+                  className="liquid-glass rounded-full px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-white/15"
+                >
+                  {expanded
+                    ? "Show fewer"
+                    : `See more headlines (${hiddenCount})`}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
