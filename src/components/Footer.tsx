@@ -47,6 +47,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
 const LIVE_ROUTES: Record<string, string> = {
   "Market Watch": "/market-watch",
   "Corporate Calendar": "/corporate-calendar",
+  "Knowledge Centre": "/knowledge-centre",
 };
 
 const SOCIALS = [

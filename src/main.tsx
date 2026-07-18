@@ -24,6 +24,18 @@ const CorporateCalendarPage = lazy(() =>
   })),
 );
 
+const KnowledgeCentrePage = lazy(() =>
+  import("./components/KnowledgeCentrePage").then((m) => ({
+    default: m.KnowledgeCentrePage,
+  })),
+);
+
+const KnowledgeModulePage = lazy(() =>
+  import("./components/KnowledgeModulePage").then((m) => ({
+    default: m.KnowledgeModulePage,
+  })),
+);
+
 function PageLoading() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-black text-sm text-gray-400">
@@ -74,6 +86,22 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <CorporateCalendarPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/knowledge-centre",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <KnowledgeCentrePage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/knowledge-centre/:moduleSlug",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <KnowledgeModulePage />
           </Suspense>
         ),
       },

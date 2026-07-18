@@ -338,6 +338,89 @@ body {
   );
 }
 
+/*
+ * ── Knowledge Centre hero ─────────────────────────────────────────
+ * These classes are used ONLY by the Knowledge Centre hero and are
+ * intentionally named apart from the site-wide .liquid-glass so they
+ * can never collide with or override it. Where .liquid-glass is a
+ * heavy frost (blur 24px, a real gradient fill), .kc-glass is a light
+ * frost (blur 6px, near-invisible fill) ringed by a glowing blue
+ * gradient hairline — a distinct material for the hero's pills.
+ */
+.kc-glass {
+  position: relative;
+  background: rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 24px rgb(var(--azee-blue) / 0.1);
+  transition:
+    background 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+/* Glowing blue gradient border, drawn as a masked ring on the pseudo. */
+.kc-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    130deg,
+    rgb(var(--azee-blue) / 0.65),
+    rgb(147 180 230 / 0.15) 45%,
+    rgb(var(--azee-royal) / 0.55)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.kc-glass:hover {
+  background: rgb(255 255 255 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 0 32px rgb(var(--azee-blue) / 0.28);
+}
+
+/*
+ * Blur-fade-up entrance for the hero's stacked elements. Runs once on
+ * mount (the hero is at the top of the page, always in view on load),
+ * staggered via an inline animation-delay per element. Scoped to this
+ * class so it can't affect anything else.
+ */
+@keyframes kc-fade-up {
+  from {
+    opacity: 0;
+    filter: blur(20px);
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+.kc-fade-up {
+  opacity: 0;
+  animation: kc-fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kc-fade-up {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
 /* Footer identity: deep navy grounding the end of the page. */
 .footer-navy {
   background: linear-gradient(
