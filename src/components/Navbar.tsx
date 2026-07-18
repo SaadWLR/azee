@@ -255,7 +255,7 @@ export function Navbar() {
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
-            className="liquid-glass flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full transition-all duration-500 active:scale-[0.95] lg:hidden"
+            className="flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full border border-white/10 bg-white/[0.05] transition-all duration-500 hover:bg-white/10 active:scale-[0.95] lg:hidden"
           >
             <span
               className={`h-px w-4 bg-white transition-transform duration-500 ${

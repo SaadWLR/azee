@@ -150,14 +150,17 @@ body {
 }
 
 /*
- * Navbar glass — darker and less frosted than the card surfaces,
- * with a softer blur and a hairline border.
+ * Navbar surface — a near-solid dark bar, not a floating translucent
+ * layer. The blur is kept only for a soft edge; the background itself
+ * is ~0.94–0.97 opaque so the bar reads as grounded and, crucially,
+ * so the mobile dropdown (which reuses this class) is a genuine solid
+ * panel with no hero content bleeding through behind its items.
  */
 .nav-glass {
   background: linear-gradient(
     180deg,
-    rgba(10, 14, 26, 0.78),
-    rgb(var(--azee-navy) / 0.55)
+    rgba(10, 14, 26, 0.97),
+    rgb(var(--azee-navy) / 0.94)
   );
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
