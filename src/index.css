@@ -150,17 +150,21 @@ body {
 }
 
 /*
- * Navbar surface — a near-solid dark bar, not a floating translucent
- * layer. The blur is kept only for a soft edge; the background itself
- * is ~0.94–0.97 opaque so the bar reads as grounded and, crucially,
- * so the mobile dropdown (which reuses this class) is a genuine solid
- * panel with no hero content bleeding through behind its items.
+ * Navbar surface — a solid, grounded dark bar, not a floating
+ * translucent layer. The background is fully opaque (a subtle navy
+ * gradient for dimension, not translucency): the CSS build ships only
+ * the -webkit-backdrop-filter, so the frosted blur does not render in
+ * Chromium and cannot be relied on to hide bleed-through. Making the
+ * fill opaque is what guarantees the mobile dropdown (which reuses this
+ * class) is a genuine solid panel with zero hero content ghosting
+ * behind its items, in every browser. The blur is left in as a
+ * harmless progressive nicety for engines that honour it.
  */
 .nav-glass {
   background: linear-gradient(
     180deg,
-    rgba(10, 14, 26, 0.97),
-    rgb(var(--azee-navy) / 0.94)
+    rgb(10 14 26),
+    rgb(var(--azee-navy))
   );
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
