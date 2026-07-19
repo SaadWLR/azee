@@ -11,6 +11,123 @@ const NAV_LINKS = [
   { label: "About", hash: "#about" },
 ];
 
+/**
+ * Standalone tool/resource pages, grouped under the desktop "Tools"
+ * dropdown (and listed flat on mobile). Adding a future tool page —
+ * e.g. Forex & Commodities or an Economic Calendar — is a one-line
+ * entry here; nothing else needs wiring. "Calendar" is deliberately
+ * short (the desktop bar's width budget); the destination is the full
+ * Corporate Calendar page.
+ */
+const TOOL_LINKS = [
+  { label: "Market Watch", to: "/market-watch" },
+  { label: "Calendar", to: "/corporate-calendar" },
+  { label: "Knowledge Centre", to: "/knowledge-centre" },
+];
+
+/**
+ * Desktop "Tools" dropdown. Click-to-open (robust on touch/hybrid
+ * devices, unlike hover-only), closing on: the trigger again, an
+ * outside click, Escape (which returns focus to the trigger), a route
+ * change, or picking a link. The trigger wears the same link treatment
+ * and shows the active underline when the current route is any of its
+ * links. The panel reuses the nav-glass surface so it reads as one nav.
+ */
+function ToolsDropdown({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLLIElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const active = TOOL_LINKS.some((tool) => tool.to === pathname);
+
+  // Close on outside click and Escape while open.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  // Any navigation dismisses the menu.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  const underline =
+    "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500";
+  const triggerState = active
+    ? "text-white after:w-6"
+    : open
+      ? "text-white after:w-0"
+      : "text-gray-300 after:w-0";
+
+  return (
+    <li ref={containerRef} className="relative flex items-center">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className={`relative flex items-center gap-1 text-sm font-medium transition-colors duration-500 hover:text-white ${underline} ${triggerState}`}
+      >
+        Tools
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-3 w-3 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M3 4.5 6 7.5 9 4.5" />
+        </svg>
+      </button>
+
+      <div
+        role="menu"
+        aria-label="Tools"
+        className={`nav-glass absolute right-0 top-[calc(100%+1.5rem)] w-56 rounded-2xl p-2 transition-all duration-300 ease-out ${
+          open
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0"
+        }`}
+      >
+        {TOOL_LINKS.map((tool) => (
+          <Link
+            key={tool.to}
+            to={tool.to}
+            role="menuitem"
+            tabIndex={open ? 0 : -1}
+            onClick={() => setOpen(false)}
+            className={`block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
+              pathname === tool.to
+                ? "bg-white/10 text-white"
+                : "text-gray-300 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {tool.label}
+          </Link>
+        ))}
+      </div>
+    </li>
+  );
+}
+
 /** Mobile dropdown: navigation links plus the client login action. */
 function MobileMenu({
   open,
@@ -55,24 +172,23 @@ function MobileMenu({
             )}
           </li>
         ))}
-        <li className="border-b border-white/10">
-          <Link
-            to="/market-watch"
-            onClick={onNavigate}
-            className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-          >
-            Market Watch
-          </Link>
+        {/* Tools group — same links as the desktop dropdown, listed
+            flat here (mobile's vertical list has no width pressure). A
+            small label groups them, mirroring the desktop grouping. */}
+        <li className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+          Tools
         </li>
-        <li className="border-b border-white/10">
-          <Link
-            to="/corporate-calendar"
-            onClick={onNavigate}
-            className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-          >
-            Corporate Calendar
-          </Link>
-        </li>
+        {TOOL_LINKS.map((tool) => (
+          <li key={tool.to} className="border-b border-white/10">
+            <Link
+              to={tool.to}
+              onClick={onNavigate}
+              className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+            >
+              {tool.label}
+            </Link>
+          </li>
+        ))}
       </ul>
       <a
         href="#"
@@ -94,8 +210,6 @@ export function Navbar() {
   // the homepage-plus-hash from any other route so they still work.
   const pathname = useLocation().pathname;
   const onHome = pathname === "/";
-  const onMarketWatch = pathname === "/market-watch";
-  const onCalendar = pathname === "/corporate-calendar";
 
   /*
    * Publish the fixed bar's bottom edge as --nav-height so the ticker
@@ -216,30 +330,10 @@ export function Navbar() {
                 </li>
               );
             })}
-            <li className="flex items-center">
-              <Link
-                to="/market-watch"
-                className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                  onMarketWatch
-                    ? "text-white after:w-6"
-                    : "text-gray-300 after:w-0"
-                }`}
-              >
-                Market Watch
-              </Link>
-            </li>
-            <li className="flex items-center">
-              {/* "Calendar" (not "Corporate Calendar") keeps the 7-item
-                  bar inside its measured width budget at 1024px. */}
-              <Link
-                to="/corporate-calendar"
-                className={`relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                  onCalendar ? "text-white after:w-6" : "text-gray-300 after:w-0"
-                }`}
-              >
-                Calendar
-              </Link>
-            </li>
+            {/* The standalone tool pages collapse into one dropdown so
+                the top-level bar stays inside its 1024px width budget
+                and future tool pages have room. */}
+            <ToolsDropdown pathname={pathname} />
           </ul>
 
           <a
