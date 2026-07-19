@@ -421,6 +421,70 @@ body {
   }
 }
 
+/*
+ * ── Homepage closing CTA ──────────────────────────────────────────
+ * Used ONLY by the closing section and named apart from both
+ * .liquid-glass (site-wide) and .kc-glass (Knowledge Centre) so the
+ * three glass materials stay independent. Brighter and more solid than
+ * kc-glass — a bold frosted pill (blur 10px, a strong white rim + blue
+ * glow) suited to the energetic night-city footage behind it.
+ */
+.closing-glass {
+  background: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.35);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 8px 30px rgb(0 0 0 / 0.35),
+    0 0 30px rgb(var(--azee-blue) / 0.2);
+  transition:
+    background 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.closing-glass:hover {
+  background: rgb(255 255 255 / 0.18);
+  border-color: rgb(255 255 255 / 0.55);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 10px 36px rgb(0 0 0 / 0.4),
+    0 0 40px rgb(var(--azee-blue) / 0.35);
+}
+
+/*
+ * Its own blur-fade-up keyframe (same mechanic as .kc-fade-up, separate
+ * name so the two can't affect each other), with the matching
+ * reduced-motion fallback.
+ */
+@keyframes closing-fade-up {
+  from {
+    opacity: 0;
+    filter: blur(20px);
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+.closing-fade-up {
+  opacity: 0;
+  animation: closing-fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .closing-fade-up {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
 /* Footer identity: deep navy grounding the end of the page. */
 .footer-navy {
   background: linear-gradient(

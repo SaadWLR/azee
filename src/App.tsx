@@ -5,6 +5,7 @@ import { Products } from "./components/Products";
 import { Research } from "./components/Research";
 import { AppShowcase } from "./components/AppShowcase";
 import { Stats } from "./components/Stats";
+import { ClosingCTA } from "./components/ClosingCTA";
 import { Footer } from "./components/Footer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -29,6 +30,9 @@ export default function App() {
       </ErrorBoundary>
       <AppShowcase />
       <Stats />
+      {/* Closing cinematic CTA — the last moment before the footer,
+          bookending the opening hero video. */}
+      <ClosingCTA />
       <Footer />
     </main>
   );
