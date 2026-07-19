@@ -8,6 +8,7 @@ import { Stats } from "./components/Stats";
 import { ClosingCTA } from "./components/ClosingCTA";
 import { Footer } from "./components/Footer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { usePageMeta } from "./hooks/usePageMeta";
 
 /*
  * Section-level boundaries wrap the two live-data regions (the hero's
@@ -17,6 +18,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
  * are covered by the app-level boundary in main.tsx.
  */
 export default function App() {
+  // Homepage keeps the site-wide default title/description.
+  usePageMeta();
   return (
     <main className="min-h-screen text-white">
       <Navbar />

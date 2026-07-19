@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useCorporateCalendar, usePayouts } from "../hooks/useCalendar";
+import { usePageMeta } from "../hooks/usePageMeta";
 import type { CorporateMeeting } from "../types";
 import type { Payout, PayoutKind } from "../types/payouts";
 
@@ -471,6 +472,10 @@ function PayoutsView() {
 /* ── Page ─────────────────────────────────────────────────────── */
 
 export function CorporateCalendarPage() {
+  usePageMeta(
+    "Corporate Calendar — PSX AGM/EOGM Meetings & Payouts | AZEE Trade",
+    "Upcoming AGM and EOGM meetings of PSX-listed companies, plus recent dividend, bonus, and rights announcements — as reported to the Pakistan Stock Exchange.",
+  );
   /*
    * Tab lives in the URL (?tab=payouts) so a view can be linked and
    * shared, and browser back/forward moves between them. Meetings is

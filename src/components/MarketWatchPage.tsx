@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useAllMarketQuotes } from "../hooks/useMarketData";
+import { usePageMeta } from "../hooks/usePageMeta";
 import type { StockQuote } from "../types";
 
 /*
@@ -86,6 +87,10 @@ function ChangeCell({ value, suffix }: { value: number | undefined; suffix: stri
 }
 
 export function MarketWatchPage() {
+  usePageMeta(
+    "Market Watch — Live PSX Stock Prices | AZEE Trade",
+    "Live prices for all ~490 Pakistan Stock Exchange symbols — sortable and searchable, with KMI-30, gainers, and losers filters, updated through the trading session.",
+  );
   const { data: quotes, loading, error } = useAllMarketQuotes();
   const [preset, setPreset] = useState<Preset>("all");
   const [search, setSearch] = useState("");

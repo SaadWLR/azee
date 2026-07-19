@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { getKnowledgeModule } from "../data/knowledge";
+import { usePageMeta } from "../hooks/usePageMeta";
 import type { KnowledgeLevel, KnowledgeModule } from "../types/knowledge";
 
 const LEVEL_BADGE: Record<KnowledgeLevel, string> = {
@@ -20,6 +21,24 @@ const LEVEL_BADGE: Record<KnowledgeLevel, string> = {
 export function KnowledgeModulePage() {
   const { moduleSlug } = useParams();
   const knowledgeModule = getKnowledgeModule(moduleSlug);
+
+  // Per-module title/description straight from the registry, so it can
+  // never drift from what the page renders. Honest: the description
+  // states the module's structure and that lessons are still pending.
+  // "an 8-chapter" vs "a 5-chapter": 8/11/18 read with an initial vowel.
+  const chapterArticle = knowledgeModule
+    ? [8, 11, 18].includes(knowledgeModule.chapterCount)
+      ? "an"
+      : "a"
+    : "a";
+  usePageMeta(
+    knowledgeModule
+      ? `${knowledgeModule.title} | AZEE Knowledge Centre`
+      : "Module not found | AZEE Knowledge Centre",
+    knowledgeModule
+      ? `${knowledgeModule.title}: ${chapterArticle} ${knowledgeModule.chapterCount}-chapter ${knowledgeModule.level.toLowerCase()} module (~${knowledgeModule.estimatedMinutes} min) in the AZEE Knowledge Centre. Lessons coming soon.`
+      : "This Knowledge Centre module could not be found.",
+  );
 
   return (
     <main className="min-h-screen text-white">

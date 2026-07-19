@@ -4,6 +4,7 @@ import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { KNOWLEDGE_HERO_VIDEO_URL } from "../config";
 import { KNOWLEDGE_MODULES, KNOWLEDGE_TOTAL_HOURS } from "../data/knowledge";
+import { usePageMeta } from "../hooks/usePageMeta";
 import type { KnowledgeLevel } from "../types/knowledge";
 
 /** Cool-toned level badges, consistent with the site's blue palette. */
@@ -22,6 +23,10 @@ const LEVEL_BADGE: Record<KnowledgeLevel, string> = {
  * fabricated content.
  */
 export function KnowledgeCentrePage() {
+  usePageMeta(
+    "Knowledge Centre — Investor Education | AZEE Trade",
+    "Structured investor education for the Pakistan Stock Exchange — eight modules from market basics to advanced trading, spanning beginner to advanced level.",
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
