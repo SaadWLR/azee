@@ -87,8 +87,10 @@ export async function getMarketSnapshot(): Promise<MarketSnapshot> {
   if (import.meta.env.DEV) {
     // Vercel serverless routes don't run under `vite dev`; the fixture
     // keeps local development working. Deployed builds always fetch
-    // the live KSE-100 snapshot from the API route.
-    return mockResponse(MARKET_SNAPSHOT);
+    // the live KSE-100 snapshot from the API route. asOf is stamped
+    // fresh per call so the "updated Xs ago" indicator behaves like the
+    // live endpoint (which always returns a real asOf) during dev.
+    return mockResponse({ ...MARKET_SNAPSHOT, asOf: new Date().toISOString() });
   }
   return apiGet<MarketSnapshot>("/api/market/snapshot");
 }

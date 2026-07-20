@@ -48,6 +48,52 @@ function useCountUp(target: number, duration = 1400, delay = 0) {
   return value;
 }
 
+/**
+ * Ticks `now` once a second while `enabled`, so the "Updated Xs ago"
+ * label counts up live between the 75s data polls (this movement is
+ * what fixes the "feels stale" perception). Idle — no interval — when
+ * disabled, e.g. the market is closed and the age is shown as a fixed
+ * session time rather than a growing counter. Background tabs throttle
+ * setInterval, which is fine: the count catches up when refocused.
+ */
+function useNow(enabled: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!enabled) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [enabled]);
+  return now;
+}
+
+/**
+ * "Updated just now" / "Updated 23s ago" / "Updated 2m ago", computed
+ * from the REAL data age (now − the snapshot's own asOf tick time),
+ * never the client fetch time — so a cache serving the same asOf across
+ * polls honestly keeps ageing instead of resetting to "just now".
+ */
+function formatDataAge(asOfMs: number, nowMs: number): string {
+  const ageSeconds = Math.max(0, Math.round((nowMs - asOfMs) / 1000));
+  if (ageSeconds < 5) return "Updated just now";
+  if (ageSeconds < 60) return `Updated ${ageSeconds}s ago`;
+  return `Updated ${Math.floor(ageSeconds / 60)}m ago`;
+}
+
+/**
+ * Closed-market phrasing: the last session's tick time in PKT, stated
+ * plainly — not a growing "5 hours ago" that would read like the panel
+ * is stuck or broken.
+ */
+function formatClosedAsOf(asOfMs: number): string {
+  const time = new Date(asOfMs).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Karachi",
+  });
+  return `As of ${time} PKT · market closed`;
+}
+
 function DirectionArrow({ direction }: { direction: Direction }) {
   return direction === "up" ? (
     <span className="text-emerald-400">▲</span>
@@ -65,10 +111,20 @@ export function MarketSnapshot() {
   ).filter((stat): stat is MarketStat => stat !== undefined);
   const latestHeadlines = news?.items.slice(0, 3) ?? [];
   const indexValue = useCountUp(snapshot?.index.value ?? 0, 1400, 1500);
+  // Tick every second only while the market is open (the count-up is
+  // meaningless once the age is a fixed "As of …, closed" line).
+  const marketOpen = snapshot?.status === "OPEN";
+  const now = useNow(marketOpen);
 
   if (!snapshot) return null;
 
   const open = snapshot.status === "OPEN";
+  const asOfMs = snapshot.asOf ? Date.parse(snapshot.asOf) : NaN;
+  const updatedLabel = Number.isNaN(asOfMs)
+    ? null
+    : open
+      ? formatDataAge(asOfMs, now)
+      : formatClosedAsOf(asOfMs);
 
   return (
     <FadeIn delay={1500}>
@@ -129,6 +185,11 @@ export function MarketSnapshot() {
             })}{" "}
             pts
           </p>
+          {updatedLabel && (
+            <p className="mt-2 text-[11px] font-medium text-gray-400/90 tabular-nums">
+              {updatedLabel}
+            </p>
+          )}
         </div>
 
         {/* Session stats — live market-watch data; the block renders
