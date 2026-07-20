@@ -32,9 +32,12 @@ export const KNOWLEDGE_HERO_VIDEO_URL =
  * A cinematic aerial night city skyline (Pexels, free license) —
  * energetic, urban, cool-toned, deliberately more kinetic than the
  * Knowledge Centre's calm moonlit footage. It bookends the homepage's
- * opening market video with a second, closing visual moment. Same
- * technical setup as HERO_VIDEO_URL: full-bleed, object-cover,
- * autoplay/muted/loop, 1080p landscape (16:9).
+ * opening market video with a second, closing visual moment.
+ *
+ * This is the 4K (3840×2160, ~31 MB) variant, chosen for sharpness.
+ * Because the section sits at the very bottom of the homepage (below
+ * the fold), ClosingCTA loads this only when the section approaches the
+ * viewport — a visitor who never scrolls that far never fetches it.
  */
 export const CLOSING_VIDEO_URL =
-  "https://videos.pexels.com/video-files/36244310/15370737_1920_1080_30fps.mp4";
+  "https://videos.pexels.com/video-files/36244310/15370741_3840_2160_30fps.mp4";

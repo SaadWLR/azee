@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { CLOSING_VIDEO_URL } from "../config";
 
 /**
@@ -9,16 +9,49 @@ import { CLOSING_VIDEO_URL } from "../config";
  * own centered layout, original closing copy, and independently-scoped
  * .closing-glass / .closing-fade-up styling — no overlap with Hero,
  * Knowledge Centre, or the site-wide glass classes.
+ *
+ * The background is a heavy 4K file, so it is DEFERRED: the <video>
+ * carries no src until the section nears the viewport (an
+ * IntersectionObserver with a ~600px margin, so it's loading before it
+ * scrolls into view). A visitor who never reaches the bottom of the
+ * page never downloads it. Until it loads, the section's solid-black
+ * base and dark overlays stand in — the CTA copy is always visible over
+ * them (the entrance animation is independent of the video), so there's
+ * no blank gap.
  */
 export function ClosingCTA() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [loadVideo, setLoadVideo] = useState(false);
 
+  // Only pull the 4K file once the section is approaching the viewport.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setLoadVideo(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setLoadVideo(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
+  // Kick off playback once the src has actually been attached.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !loadVideo) return;
     video.playbackRate = 0.75;
     video.play().catch(() => {});
-  }, []);
+  }, [loadVideo]);
 
   const handleMouseMove = (event: MouseEvent<HTMLElement>) => {
     const video = videoRef.current;
@@ -30,6 +63,7 @@ export function ClosingCTA() {
 
   return (
     <section
+      ref={sectionRef}
       className="relative flex min-h-[80vh] w-full items-center overflow-hidden bg-black py-24 sm:py-28"
       onMouseMove={handleMouseMove}
     >
@@ -37,7 +71,8 @@ export function ClosingCTA() {
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out"
         style={{ transform: "scale(1.06)" }}
-        src={CLOSING_VIDEO_URL}
+        src={loadVideo ? CLOSING_VIDEO_URL : undefined}
+        preload="none"
         autoPlay
         muted
         loop
