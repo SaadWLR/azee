@@ -50,7 +50,10 @@ interface DpsSeriesResponse {
  * research milestone). Nothing here may ever be hardcoded.
  */
 
-async function fetchSeries(url: string): Promise<SeriesPoint[]> {
+async function fetchSeries(
+  url: string,
+  { allowEmpty = false }: { allowEmpty?: boolean } = {},
+): Promise<SeriesPoint[]> {
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
@@ -61,14 +64,20 @@ async function fetchSeries(url: string): Promise<SeriesPoint[]> {
     throw new Error(`PSX responded ${response.status} for ${url}`);
   }
   const body = (await response.json()) as DpsSeriesResponse;
-  if (
-    body.status !== 1 ||
-    !Array.isArray(body.data) ||
-    body.data.length === 0 ||
-    !Array.isArray(body.data[0]) ||
-    typeof body.data[0][1] !== "number"
-  ) {
-    throw new Error(`PSX returned an empty or malformed series for ${url}`);
+  if (body.status !== 1 || !Array.isArray(body.data)) {
+    throw new Error(`PSX returned a malformed series for ${url}`);
+  }
+  if (body.data.length === 0) {
+    // PSX legitimately serves an empty intraday series outside trading
+    // hours — the current-day feed is cleared until the next session's
+    // first tick (~9:30 AM PKT). Callers that can fall back to EOD pass
+    // allowEmpty so this normal overnight state isn't treated as an
+    // error.
+    if (allowEmpty) return [];
+    throw new Error(`PSX returned an empty series for ${url}`);
+  }
+  if (!Array.isArray(body.data[0]) || typeof body.data[0][1] !== "number") {
+    throw new Error(`PSX returned a malformed series for ${url}`);
   }
   return body.data;
 }
@@ -94,12 +103,26 @@ function round2(value: number): number {
  * payload never leaves this function.
  */
 async function fetchKse100Snapshot(): Promise<MarketSnapshot> {
+  // EOD is the source of truth for session closes and must be present.
+  // Intraday supplies the live value DURING a session, but PSX serves
+  // it empty outside trading hours, so an empty (or failed) intraday
+  // must degrade to the latest EOD close with the market marked CLOSED
+  // — not fail the whole snapshot. Requiring intraday meant every
+  // overnight cold start returned 503 even though the last verified
+  // close was available. The EOD close is real PSX data, so this is a
+  // graceful degradation, not fabrication.
   const [intraday, eod] = await Promise.all([
-    fetchSeries(INTRADAY_URL),
+    fetchSeries(INTRADAY_URL, { allowEmpty: true }).catch((error) => {
+      console.warn("PSX intraday unavailable; using latest EOD close:", error);
+      return [] as SeriesPoint[];
+    }),
     fetchSeries(EOD_URL),
   ]);
 
-  const [latestTs, latestValue] = intraday[0];
+  // A fresh intraday tick means a live or just-closed session; with no
+  // intraday, the newest EOD entry is the reference close.
+  const hasLiveTick = intraday.length > 0;
+  const [latestTs, latestValue] = hasLiveTick ? intraday[0] : eod[0];
   const latestDay = pktDayKey(latestTs);
 
   // Previous close = newest EOD entry from an earlier PKT calendar day
@@ -114,7 +137,7 @@ async function fetchKse100Snapshot(): Promise<MarketSnapshot> {
   const changePercent = (changePoints / previousClose) * 100;
 
   const status: MarketStatus =
-    Date.now() / 1000 - latestTs <= OPEN_TICK_MAX_AGE_SECONDS
+    hasLiveTick && Date.now() / 1000 - latestTs <= OPEN_TICK_MAX_AGE_SECONDS
       ? "OPEN"
       : "CLOSED";
 
