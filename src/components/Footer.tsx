@@ -5,6 +5,7 @@ import {
   IconLinkedIn,
   IconYouTube,
 } from "./Icons";
+import azeeLogo from "../assets/azee-logo.png";
 
 const COLUMNS: { heading: string; links: string[] }[] = [
   {
@@ -72,12 +73,16 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-5">
           {/* Brand + contact */}
           <div className="lg:col-span-2">
-            <p className="text-sm font-bold tracking-[0.2em] text-white">
-              AZEE TRADE
-            </p>
-            <p className="mt-1 text-[10px] font-medium tracking-wide text-gray-400">
-              PSX Trading &amp; Research
-            </p>
+            {/* Real AZEE mark (same asset as the navbar), sized a touch
+                larger for the footer's looser column; h-10 stays crisp
+                to 3× DPR against the 316×123 source. */}
+            <img
+              src={azeeLogo}
+              alt="AZEE Securities"
+              width={316}
+              height={123}
+              className="h-10 w-auto"
+            />
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-gray-400">
               AZEE Securities (Pvt.) Ltd. — brokerage, equity research, and
               online trading for the Pakistan Stock Exchange and Pakistan
