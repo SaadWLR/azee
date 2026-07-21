@@ -68,13 +68,23 @@ const SOURCES: NewsSource[] = [
  *
  * Bare "rupee" is deliberately NOT a Pakistan signal — "Indian rupee"
  * would false-positive; only "PKR" (unambiguous) or an explicit
- * Pakistan mention counts. No country EXCLUDE list is needed anymore:
- * foreign stories simply lack any Pakistan signal. Known limitations,
- * accepted openly: a few Pakistani business-but-not-strictly-market
- * items (a ministry MoU, an agri-import story) can slip through the
- * weak+market path, and a Pakistani market story with none of these
- * signals would be missed. Best-effort, not perfect — but it now errs
- * toward Pakistani over foreign, which is the point.
+ * Pakistan mention counts. The inverted filter needs no broad country
+ * EXCLUDE list: foreign stories simply lack any Pakistan signal. One
+ * residual leak remains, though — a foreign-focused wire story can pick
+ * up an INCIDENTAL Pakistan token (a "Karachi-based analyst" quote in
+ * the lede) and a generic MARKET_TERM ("current account"), passing the
+ * weak+market path even though its SUBJECT is another country (the
+ * confirmed Egypt case). FOREIGN_FOCUS is a small, title-scoped guard
+ * for exactly that: if the headline is centred on a foreign economy and
+ * carries no Pakistan anchor of its own, it's dropped. It is checked on
+ * the title (the subject line) only, and never overrides a Pakistan
+ * token in the title, so "Pakistan, China sign…" or "PSX rises on
+ * US-Iran news" are untouched. Known limitations, accepted openly: a
+ * few Pakistani business-but-not-strictly-market items (a ministry MoU,
+ * an agri-import story) can slip through the weak+market path, and a
+ * Pakistani market story with none of these signals would be missed.
+ * Best-effort, not perfect — but it now errs toward Pakistani over
+ * foreign, which is the point.
  */
 const STRONG_PAKISTAN =
   /\bpsx\b|pakistan stock|\bkse-?\d*\b|\bpmex\b|\bsecp\b|\bsbp\b|state bank of pakistan/i;
@@ -82,6 +92,37 @@ const WEAK_PAKISTAN =
   /pakistan|\bpkr\b|\bkarachi\b|\blahore\b|\bislamabad\b|\brawalpindi\b/i;
 const MARKET_TERMS =
   /\bstocks?\b|\bshares?\b|equit(?:y|ies)|\bindex\b|\bsukuk\b|\btfc\b|\bbonds?\b|\bipo\b|dividend|earnings|\bprofits?\b|interest rate|policy rate|monetary policy|fiscal|inflation|\bcpi\b|\bgdp\b|trade (?:deficit|surplus)|current account|exchange rate|\brupee\b|\bpkr\b|\bgold\b|\bsilver\b|per tola|petrol|\bhsd\b|crude|oil price|\bkibor\b|t-bills?|treasury bill|remittances?|mutual funds?|\bpmex\b|circular debt|\bdebt\b|\brating\b|issuance|bourse/i;
+
+/*
+ * Foreign economies whose market/economic wire copy commonly false-
+ * positives against the weak+market path (Egypt was the confirmed
+ * case). Deliberately a short list of demonstrated, frequently-covered
+ * offenders — not an exhaustive world atlas. Checked against the TITLE
+ * only, and only excludes when the title carries no Pakistan anchor
+ * (see isForeignFocused), so genuine Pakistan stories that name a
+ * foreign country ("Pakistan, China sign…") are never affected.
+ */
+const FOREIGN_FOCUS =
+  /\begypt(?:ian)?\b|\bindian?\b|\bbangladesh(?:i)?\b|\bsri\s*lankan?\b|\bt[uü]rk(?:ey|ish|iye)\b|\biran(?:ian)?\b|\bnigerian?\b|\brussian?\b|\bukrain(?:e|ian)\b|\bchin(?:a|ese)\b/i;
+
+/** Pakistan anchor in the title itself — the "pak" abbreviation ("Pak-China")
+ *  is added to the STRONG/WEAK signals since headlines use it freely. */
+const PAKISTAN_IN_TITLE = (title: string): boolean =>
+  STRONG_PAKISTAN.test(title) ||
+  WEAK_PAKISTAN.test(title) ||
+  /\bpak\b/i.test(title);
+
+/**
+ * True when the headline is centred on a foreign economy and carries no
+ * Pakistan anchor of its own — the residual false-positive class the
+ * weak+market path lets through (a foreign story with an incidental
+ * Karachi/Pakistan mention in its lede). Title-scoped on purpose: the
+ * title is the subject, so a Pakistan story that merely references a
+ * foreign country in its body is kept.
+ */
+function isForeignFocused(title: string): boolean {
+  return FOREIGN_FOCUS.test(title) && !PAKISTAN_IN_TITLE(title);
+}
 
 /**
  * Floor on the COMBINED, deduplicated result. Fewer than this means
@@ -183,10 +224,12 @@ function parseItem(block: string, sourceName: string): NewsFeedItem | null {
 
 function isRelevant(item: NewsFeedItem): boolean {
   const haystack = `${item.title} ${item.summary ?? ""}`;
-  return (
+  const pakistanSignal =
     STRONG_PAKISTAN.test(haystack) ||
-    (WEAK_PAKISTAN.test(haystack) && MARKET_TERMS.test(haystack))
-  );
+    (WEAK_PAKISTAN.test(haystack) && MARKET_TERMS.test(haystack));
+  // Precision guard: even with a Pakistan signal, drop stories whose
+  // headline is centred on a foreign economy (the signal was incidental).
+  return pakistanSignal && !isForeignFocused(item.title);
 }
 
 /**
