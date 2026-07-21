@@ -11,7 +11,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
     heading: "Markets",
     links: [
       "PSX Equities",
-      "Halal Stocks",
+      "KMI-30 Stocks",
       "PMEX Commodities",
       "Currencies & Futures",
       "Corporate Calendar",
@@ -48,7 +48,7 @@ const LIVE_ROUTES: Record<string, string> = {
   "Market Watch": "/market-watch",
   // The KMI-30 / KMI All-Share index-membership filter on Market Watch
   // is the closest real destination for this label.
-  "Halal Stocks": "/market-watch",
+  "KMI-30 Stocks": "/market-watch",
   "Corporate Calendar": "/corporate-calendar",
   "Knowledge Centre": "/knowledge-centre",
 };

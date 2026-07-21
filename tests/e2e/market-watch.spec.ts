@@ -81,8 +81,8 @@ test("KMI-30 filter shows only Islamic-index constituents with badges + note", a
 
   // The methodology note must be genuinely rendered (not just coded),
   // and must not phrase membership as a religious ruling. Scoped to the
-  // Market Watch section (the footer has an unrelated, pre-existing
-  // "Halal Stocks" nav link that is not part of this feature).
+  // Market Watch section so the guard targets the feature's own copy
+  // (membership is framed as KMI-30 index membership, never "Halal").
   const watchSection = page.locator("section:has(table)");
   const note = page.getByText(/statement of index membership/i);
   await expect(note).toBeVisible();
