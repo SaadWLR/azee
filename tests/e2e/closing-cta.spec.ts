@@ -35,23 +35,24 @@ test("homepage closing section: night-city video, entrance, functional CTA, hone
   await expect(closing).toHaveCount(1);
   const video = closing.locator("video");
 
-  // Deferred loading: the heavy 4K file is NOT attached, and never
-  // requested, on initial load (the section is far below the fold).
-  await expect(video).not.toHaveAttribute("src", /videos\.pexels\.com/);
-  await page.waitForTimeout(500);
-  expect(videoRequests, "4K must not be fetched on initial load").toHaveLength(
-    0,
-  );
-
-  // Scrolling to the section attaches the 4K (3840×2160) source and
-  // triggers the actual network fetch.
-  await closing.scrollIntoViewIfNeeded();
+  // Immediate-load pattern (matches the Hero): the 1080p source is
+  // attached on mount — not deferred behind an IntersectionObserver —
+  // so it has the full page-dwell time to buffer before the visitor
+  // scrolls down. This replaced a deferred 4K load that intermittently
+  // left the section blank on real mobile/wifi connections.
   await expect(video).toHaveAttribute(
     "src",
-    /videos\.pexels\.com\/video-files\/36244310\/.*3840_2160/,
+    /videos\.pexels\.com\/video-files\/36244310\/.*1920_1080/,
   );
   await expect.poll(() => videoRequests.length).toBeGreaterThan(0);
-  expect(videoRequests[0]).toMatch(/3840_2160/);
+  expect(
+    videoRequests.every((u) => /1920_1080/.test(u)),
+    "closing video must load the 1080p variant",
+  ).toBe(true);
+  expect(
+    videoRequests.some((u) => /3840_2160/.test(u)),
+    "the heavy 4K variant must never be fetched",
+  ).toBe(false);
   const media = await video.evaluate((v: HTMLVideoElement) => ({
     muted: v.muted,
     loop: v.loop,

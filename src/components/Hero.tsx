@@ -1,10 +1,11 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { AnimatedHeading } from "./AnimatedHeading";
 import { FadeIn } from "./FadeIn";
 import { MarketSnapshot } from "./MarketSnapshot";
 import { TickerTape } from "./TickerTape";
 import { TrustBadges } from "./TrustBadges";
 import { HERO_VIDEO_URL } from "../config";
+import { useBackgroundVideo } from "../hooks/useBackgroundVideo";
 
 /** Deterministic particle field — subtle drifting points of light. */
 const PARTICLES = [
@@ -19,17 +20,7 @@ const PARTICLES = [
 ];
 
 export function Hero() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    // Some browsers pause muted autoplay videos until play() is
-    // called explicitly; the catch swallows rejected autoplay.
-    // Playback is slowed slightly for a calmer, more cinematic feel.
-    const video = videoRef.current;
-    if (!video) return;
-    video.playbackRate = 0.75;
-    video.play().catch(() => {});
-  }, []);
+  const { videoRef, onError } = useBackgroundVideo();
 
   // Soft parallax: the video is slightly over-scaled and drifts a few
   // pixels against the cursor.
@@ -59,6 +50,7 @@ export function Hero() {
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out"
         style={{ transform: "scale(1.06)" }}
         src={HERO_VIDEO_URL}
+        onError={onError}
         autoPlay
         muted
         loop

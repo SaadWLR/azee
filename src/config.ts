@@ -34,10 +34,15 @@ export const KNOWLEDGE_HERO_VIDEO_URL =
  * Knowledge Centre's calm moonlit footage. It bookends the homepage's
  * opening market video with a second, closing visual moment.
  *
- * This is the 4K (3840×2160, ~31 MB) variant, chosen for sharpness.
- * Because the section sits at the very bottom of the homepage (below
- * the fold), ClosingCTA loads this only when the section approaches the
- * viewport — a visitor who never scrolls that far never fetches it.
+ * This is the 1080p (1920×1080, ~10 MB) variant — the same size class
+ * as the Hero footage (which is actually larger, ~20 MB, and loads
+ * reliably). ClosingCTA loads it immediately on mount, exactly like the
+ * Hero, so it has the full page-dwell time to buffer before the visitor
+ * scrolls to the bottom. The 4K variant was dropped: deferring a ~31 MB
+ * file until the section neared the viewport left too little time to
+ * buffer on real mobile/wifi connections, so the section sometimes
+ * showed only its dark background — reliability now takes priority over
+ * the extra sharpness.
  */
 export const CLOSING_VIDEO_URL =
-  "https://videos.pexels.com/video-files/36244310/15370741_3840_2160_30fps.mp4";
+  "https://videos.pexels.com/video-files/36244310/15370737_1920_1080_30fps.mp4";

@@ -1,10 +1,11 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { KNOWLEDGE_HERO_VIDEO_URL } from "../config";
 import { KNOWLEDGE_MODULES, KNOWLEDGE_TOTAL_HOURS } from "../data/knowledge";
 import { usePageMeta } from "../hooks/usePageMeta";
+import { useBackgroundVideo } from "../hooks/useBackgroundVideo";
 import type { KnowledgeLevel } from "../types/knowledge";
 
 /** Cool-toned level badges, consistent with the site's blue palette. */
@@ -27,14 +28,7 @@ export function KnowledgeCentrePage() {
     "Knowledge Centre — Investor Education | AZEE Trade",
     "Structured investor education for the Pakistan Stock Exchange — eight modules from market basics to advanced trading, spanning beginner to advanced level.",
   );
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.playbackRate = 0.75;
-    video.play().catch(() => {});
-  }, []);
+  const { videoRef, onError } = useBackgroundVideo();
 
   // Soft parallax: the over-scaled video drifts a few pixels against
   // the cursor (identical feel to the homepage hero).
@@ -60,6 +54,7 @@ export function KnowledgeCentrePage() {
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out"
           style={{ transform: "scale(1.06)" }}
           src={KNOWLEDGE_HERO_VIDEO_URL}
+          onError={onError}
           autoPlay
           muted
           loop

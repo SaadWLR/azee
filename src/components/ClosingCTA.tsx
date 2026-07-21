@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { CLOSING_VIDEO_URL } from "../config";
+import { useBackgroundVideo } from "../hooks/useBackgroundVideo";
 
 /**
  * Homepage closing section — a second, cinematic video moment that
@@ -10,48 +11,20 @@ import { CLOSING_VIDEO_URL } from "../config";
  * .closing-glass / .closing-fade-up styling — no overlap with Hero,
  * Knowledge Centre, or the site-wide glass classes.
  *
- * The background is a heavy 4K file, so it is DEFERRED: the <video>
- * carries no src until the section nears the viewport (an
- * IntersectionObserver with a ~600px margin, so it's loading before it
- * scrolls into view). A visitor who never reaches the bottom of the
- * page never downloads it. Until it loads, the section's solid-black
- * base and dark overlays stand in — the CTA copy is always visible over
- * them (the entrance animation is independent of the video), so there's
- * no blank gap.
+ * The background video loads immediately on mount, exactly like the
+ * Hero — no IntersectionObserver deferral. An earlier attempt deferred
+ * a heavy 4K file until the section neared the viewport; on real
+ * mobile/wifi connections that left too little time to buffer and the
+ * section sometimes showed only its dark background. Loading a
+ * right-sized 1080p file up front (smaller than the Hero's own footage,
+ * which loads this way reliably) gives it the full page-dwell time to
+ * buffer before the visitor scrolls down. The solid-black base and dark
+ * overlays remain as an on-brand fallback, and useBackgroundVideo
+ * retries once and logs on a genuine load failure, so a slow or failed
+ * load never leaves a silent, permanently blank section.
  */
 export function ClosingCTA() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const sectionRef = useRef<HTMLElement>(null);
-  const [loadVideo, setLoadVideo] = useState(false);
-
-  // Only pull the 4K file once the section is approaching the viewport.
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setLoadVideo(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setLoadVideo(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "600px 0px" },
-    );
-    observer.observe(section);
-    return () => observer.disconnect();
-  }, []);
-
-  // Kick off playback once the src has actually been attached.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !loadVideo) return;
-    video.playbackRate = 0.75;
-    video.play().catch(() => {});
-  }, [loadVideo]);
+  const { videoRef, onError } = useBackgroundVideo();
 
   const handleMouseMove = (event: MouseEvent<HTMLElement>) => {
     const video = videoRef.current;
@@ -63,7 +36,6 @@ export function ClosingCTA() {
 
   return (
     <section
-      ref={sectionRef}
       className="relative flex min-h-[80vh] w-full items-center overflow-hidden bg-black py-24 sm:py-28"
       onMouseMove={handleMouseMove}
     >
@@ -71,8 +43,8 @@ export function ClosingCTA() {
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out"
         style={{ transform: "scale(1.06)" }}
-        src={loadVideo ? CLOSING_VIDEO_URL : undefined}
-        preload="none"
+        src={CLOSING_VIDEO_URL}
+        onError={onError}
         autoPlay
         muted
         loop

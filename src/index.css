@@ -392,12 +392,15 @@ body {
  * Blur-fade-up entrance for the hero's stacked elements. Runs once on
  * mount (the hero is at the top of the page, always in view on load),
  * staggered via an inline animation-delay per element. Scoped to this
- * class so it can't affect anything else.
+ * class so it can't affect anything else. The peak blur is kept modest
+ * (12px) because an animated filter: blur() is re-rasterised every
+ * frame — a smaller radius is materially cheaper on weaker GPUs while
+ * reading as the same blur-in.
  */
 @keyframes kc-fade-up {
   from {
     opacity: 0;
-    filter: blur(20px);
+    filter: blur(12px);
     transform: translateY(40px);
   }
   to {
@@ -461,7 +464,7 @@ body {
 @keyframes closing-fade-up {
   from {
     opacity: 0;
-    filter: blur(20px);
+    filter: blur(12px);
     transform: translateY(40px);
   }
   to {
