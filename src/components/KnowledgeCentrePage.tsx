@@ -95,6 +95,14 @@ export function KnowledgeCentrePage() {
               </span>
             </h1>
 
+            {/* Brand-signature stripe — same motif as the hero headline;
+                fades in with the page's own staggered entrance (between
+                the heading at 0.4s and the description at 0.55s). */}
+            <div
+              className="kc-fade-up mt-6 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]"
+              style={{ animationDelay: "0.5s" }}
+            />
+
             <p
               className="kc-fade-up mt-6 max-w-xl text-base leading-relaxed text-gray-300 sm:text-lg"
               style={{ animationDelay: "0.55s" }}

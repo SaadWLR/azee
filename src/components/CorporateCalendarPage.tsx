@@ -508,6 +508,9 @@ export function CorporateCalendarPage() {
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Corporate Calendar
           </h1>
+          {/* Brand-signature stripe — same motif as the hero headline
+              (mt-4 sits it under this page's more compact heading). */}
+          <div className="mt-4 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
             {TAB_INTRO[tab]}
           </p>
