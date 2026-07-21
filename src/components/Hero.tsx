@@ -100,6 +100,13 @@ export function Hero() {
               className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl"
             />
 
+            {/* Brand signature: a single short orange stripe echoing the
+                logo mark's own orange slash — the one deliberately warm
+                note at the top of the page. */}
+            <FadeIn delay={900}>
+              <div className="mt-6 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />
+            </FadeIn>
+
             <FadeIn delay={1000}>
               <p className="mt-7 max-w-xl text-base leading-relaxed text-gray-300 sm:text-lg">
                 AZEE Securities connects investors to the Pakistan Stock
@@ -112,7 +119,7 @@ export function Hero() {
               <div className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
                 <a
                   href="#"
-                  className="rounded-full bg-[#f7f4ee] px-9 py-[1.125rem] text-center text-[15px] font-semibold text-black shadow-[0_10px_32px_rgba(0,0,0,0.4)] transition-all duration-500 hover:scale-[1.04] hover:bg-white hover:shadow-[0_12px_40px_rgb(var(--azee-blue)/0.3)] active:scale-[0.98] sm:w-auto"
+                  className="rounded-full bg-[#f7f4ee] px-9 py-[1.125rem] text-center text-[15px] font-semibold text-black shadow-[0_10px_32px_rgba(0,0,0,0.4)] transition-all duration-500 hover:scale-[1.04] hover:bg-white hover:shadow-[0_12px_40px_rgb(var(--azee-orange)/0.35)] active:scale-[0.98] sm:w-auto"
                 >
                   Open a Trading Account
                 </a>

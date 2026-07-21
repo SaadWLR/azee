@@ -19,6 +19,15 @@
   --azee-blue: 37 99 191;
   --azee-navy: 12 24 66;
   --azee-royal: 0 25 141;
+  /*
+   * Brand orange, sampled directly from the logo mark (#e95126). A
+   * deliberately RARE accent — the site stays predominantly navy/blue.
+   * Reserved for the primary "Open a Trading Account" conversion action
+   * and a single logo-stripe signature under the hero headline; it is
+   * never used for financial data (gain/loss stays green/red) or as a
+   * parallel to the site-wide blue glow language.
+   */
+  --azee-orange: 233 81 38;
 }
 
 html {
@@ -450,10 +459,14 @@ body {
 .closing-glass:hover {
   background: rgb(255 255 255 / 0.18);
   border-color: rgb(255 255 255 / 0.55);
+  /* Warm orange outer glow on hover only — this is the closing
+     section's primary "Open a Trading Account" CTA, so it carries the
+     same warm brand accent as the hero's primary button. The resting
+     state keeps its blue halo, so blue stays dominant until intent. */
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.35),
     0 10px 36px rgb(0 0 0 / 0.4),
-    0 0 40px rgb(var(--azee-blue) / 0.35);
+    0 0 40px rgb(var(--azee-orange) / 0.4);
 }
 
 /*
