@@ -82,6 +82,9 @@ function ModuleView({ module }: { module: KnowledgeModule }) {
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
           {module.title}
         </h1>
+        {/* Brand-signature stripe — same motif as the hero and the other
+            page headings (mt-4 under this 3xl/4xl heading). */}
+        <div className="mt-4 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />
 
         {/* Honest coming-soon state — no fabricated lesson content. */}
         <div className="liquid-glass glass-sheen mt-8 rounded-3xl p-8 sm:p-10">
