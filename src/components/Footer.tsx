@@ -57,9 +57,9 @@ const LIVE_ROUTES: Record<string, string> = {
 };
 
 /**
- * Official AZEE social profiles. Real external URLs open in a new tab
- * (same target/rel convention as the news article links). YouTube has
- * no live channel URL yet, so it stays a placeholder "#" (not external).
+ * Official AZEE social profiles. All six point to real external URLs
+ * and open in a new tab (same target/rel convention as the news article
+ * links — the map derives target/rel from an http(s) href).
  */
 const SOCIALS = [
   {
@@ -83,7 +83,11 @@ const SOCIALS = [
     href: "https://whatsapp.com/channel/0029Vas5ijgId7nHOoycqd47",
   },
   { label: "X (Twitter)", icon: IconX, href: "https://x.com/azeetrade" },
-  { label: "YouTube", icon: IconYouTube, href: "#" },
+  {
+    label: "YouTube",
+    icon: IconYouTube,
+    href: "https://youtube.com/@azeetrade?si=8blmvN9K4HzCn9g4",
+  },
 ];
 
 export function Footer() {
