@@ -51,6 +51,36 @@ export interface MarketWatchResponse {
 }
 
 /**
+ * One benchmark index in the multi-index feed (/api/market/indices).
+ * Carries MarketIndex's fields plus the PSX timeseries code and the
+ * index's own tick time. Every value is real PSX data — an index that
+ * fails to fetch is omitted from the response, never fabricated.
+ */
+export interface MarketIndexQuote extends MarketIndex {
+  /** PSX timeseries code, e.g. "KSE100", "ALLSHR", "KMIALLSHR". */
+  code: string;
+  /** ISO time of this index's latest underlying PSX tick. */
+  asOf: string;
+}
+
+/**
+ * Live values for PSX's main benchmark indices (KSE-100, KSE-30, KSE
+ * All Share, KMI-30, KMI All Share). Only indices that fetched
+ * successfully appear in `indices`; session `status` and `asOf` reflect
+ * the freshest tick across the returned set.
+ */
+export interface MarketIndicesResponse {
+  indices: MarketIndexQuote[];
+  status: MarketStatus;
+  /** ISO time of the freshest underlying PSX tick in the set. */
+  asOf: string;
+  /** Where the payload came from. */
+  source: "psx" | "cache";
+  /** True when serving the last known-good values during an outage. */
+  stale?: boolean;
+}
+
+/**
  * The index snapshot payload. Session stats are not part of this
  * shape — they come live from MarketWatchResponse; the panel composes
  * the two so no stat can ever be fabricated here.

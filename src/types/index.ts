@@ -1,6 +1,8 @@
 export type {
   Direction,
   MarketIndex,
+  MarketIndexQuote,
+  MarketIndicesResponse,
   MarketSnapshot,
   MarketStat,
   MarketStatus,
