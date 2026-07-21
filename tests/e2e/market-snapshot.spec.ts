@@ -37,6 +37,42 @@ test.describe("PSX Market Snapshot panel", () => {
     await expect(panel).toContainText("Decliners");
   });
 
+  test("renders the other PSX benchmark indices with live values", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const panel = page.locator(PANEL);
+    await expect(panel).toContainText("KSE-100 Index");
+
+    // The multi-index strip (KSE-100 is the panel's hero, so it is not
+    // repeated here). Every other benchmark index the feed returns shows
+    // by name; the production feed reliably returns all five.
+    await expect(panel).toContainText("Other Indices");
+    for (const name of ["KSE-30", "KSE All Share", "KMI-30", "KMI All Share"]) {
+      await expect(panel).toContainText(name);
+    }
+
+    // Scope to the strip via its label's parent, then read the first
+    // row's value (the leading number, before the change arrow). Real
+    // data → assert a sane range, not an exact value.
+    const strip = panel
+      .getByText("Other Indices", { exact: true })
+      .locator("xpath=..");
+    await expect
+      .poll(
+        async () => {
+          const txt = await strip.locator("p.tabular-nums").first().innerText();
+          const m = txt.replace(/,/g, "").match(/^[\d.]+/);
+          return m ? Number.parseFloat(m[0]) : 0;
+        },
+        { timeout: 20_000 },
+      )
+      .toBeGreaterThan(1000);
+
+    // KSE-100 is the hero value and is never duplicated into the strip.
+    expect(await strip.innerText()).not.toContain("KSE-100");
+  });
+
   test("contains no fabricated placeholder stats (M4 regression guard)", async ({
     page,
   }) => {

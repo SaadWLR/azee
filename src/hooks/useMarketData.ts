@@ -1,5 +1,6 @@
 import {
   getAllMarketQuotes,
+  getMarketIndices,
   getMarketSnapshot,
   getMarketWatchStats,
   getTickerQuotes,
@@ -18,6 +19,16 @@ export function useMarketSnapshot() {
    * count-up glides from the displayed value rather than resetting.
    */
   return useAsyncData(getMarketSnapshot, { intervalMs: 75_000 });
+}
+
+/**
+ * The five PSX benchmark indices, on the same 75s cadence as
+ * useMarketSnapshot — /api/market/indices shares the snapshot endpoint's
+ * cache-window reasoning (s-maxage=60 in-session), and background
+ * refetches glide the panel's values in place with no flicker.
+ */
+export function useMarketIndices() {
+  return useAsyncData(getMarketIndices, { intervalMs: 75_000 });
 }
 
 /**

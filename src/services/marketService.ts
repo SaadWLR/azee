@@ -1,5 +1,7 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type {
+  MarketIndexQuote,
+  MarketIndicesResponse,
   MarketSnapshot,
   MarketStat,
   MarketWatchResponse,
@@ -25,6 +27,20 @@ const MARKET_SNAPSHOT: MarketSnapshot = {
   status: "OPEN",
   timestamp: "Karachi · PKT",
 };
+
+/**
+ * Development fixture for /api/market/indices — the five PSX benchmark
+ * indices (KSE-100 matches MARKET_SNAPSHOT above). Production always
+ * serves live PSX data; these plausible values only exist so the panel
+ * renders under `vite dev`, where the serverless route doesn't run.
+ */
+const MARKET_INDICES: MarketIndexQuote[] = [
+  { code: "KSE100", name: "KSE-100", value: 187454.64, changePercent: 1.12, changePoints: 2082.49, direction: "up", asOf: "" },
+  { code: "KSE30", name: "KSE-30", value: 57340.12, changePercent: 0.94, changePoints: 534.6, direction: "up", asOf: "" },
+  { code: "ALLSHR", name: "KSE All Share", value: 117980.55, changePercent: 0.88, changePoints: 1029.3, direction: "up", asOf: "" },
+  { code: "KMI30", name: "KMI-30", value: 271560.4, changePercent: 1.04, changePoints: 2795.1, direction: "up", asOf: "" },
+  { code: "KMIALLSHR", name: "KMI All Share", value: 78420.18, changePercent: 0.71, changePoints: 553.0, direction: "up", asOf: "" },
+];
 
 /**
  * Development fixture mirroring /api/market/watch's stats array
@@ -93,6 +109,23 @@ export async function getMarketSnapshot(): Promise<MarketSnapshot> {
     return mockResponse({ ...MARKET_SNAPSHOT, asOf: new Date().toISOString() });
   }
   return apiGet<MarketSnapshot>("/api/market/snapshot");
+}
+
+/** Live values for the five PSX benchmark indices (multi-index feed). */
+export async function getMarketIndices(): Promise<MarketIndicesResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as getMarketSnapshot: the serverless route doesn't
+    // run under `vite dev`, so serve the fixture. asOf is stamped fresh
+    // per call to mirror the live endpoint's real timestamps.
+    const asOf = new Date().toISOString();
+    return mockResponse({
+      indices: MARKET_INDICES.map((index) => ({ ...index, asOf })),
+      status: "OPEN",
+      asOf,
+      source: "psx",
+    });
+  }
+  return apiGet<MarketIndicesResponse>("/api/market/indices");
 }
 
 /**

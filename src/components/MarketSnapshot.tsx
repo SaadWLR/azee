@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { FadeIn } from "./FadeIn";
 import { IconExternalLink } from "./Icons";
 import {
+  useMarketIndices,
   useMarketSnapshot,
   useMarketWatchStats,
 } from "../hooks/useMarketData";
 import { useLatestNews } from "../hooks/useNews";
-import type { Direction, MarketStat } from "../types";
+import type { Direction, MarketIndexQuote, MarketStat } from "../types";
 
 /**
  * Which live market-watch stats the panel shows, in display order.
@@ -102,10 +103,45 @@ function DirectionArrow({ direction }: { direction: Direction }) {
   );
 }
 
+/**
+ * One compact row in the "Other Indices" strip. Reuses the session-stat
+ * row layout and the KSE-100 hero's green/red change convention and
+ * count-up glide, so a background poll updates the value in place rather
+ * than flickering. No new visual language — same classes as the panel's
+ * existing rows.
+ */
+function IndexRow({ index, delay }: { index: MarketIndexQuote; delay: number }) {
+  const value = useCountUp(index.value, 1400, delay);
+  const up = index.direction === "up";
+  return (
+    <div className="flex items-center justify-between border-b border-blue-200/10 py-2.5 last:border-b-0">
+      <p className="text-xs text-gray-400">{index.name}</p>
+      <p className="flex items-baseline gap-2 text-sm font-medium text-white tabular-nums">
+        <span>
+          {value.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+        <span className={up ? "text-emerald-400" : "text-rose-400"}>
+          {up ? "▲ +" : "▼ "}
+          {index.changePercent.toFixed(2)}%
+        </span>
+      </p>
+    </div>
+  );
+}
+
 export function MarketSnapshot() {
   const { data: snapshot } = useMarketSnapshot();
+  const { data: indices } = useMarketIndices();
   const { data: watchStats } = useMarketWatchStats();
   const { data: news } = useLatestNews();
+  // KSE-100 is already the panel's hero value, so the strip shows only
+  // the OTHER benchmark indices. Whatever the feed omits simply isn't
+  // rendered — never a fabricated placeholder.
+  const otherIndices =
+    indices?.indices.filter((index) => index.code !== "KSE100") ?? [];
   const sessionStats = SESSION_STAT_LABELS.map((label) =>
     watchStats?.find((stat) => stat.label === label),
   ).filter((stat): stat is MarketStat => stat !== undefined);
@@ -191,6 +227,22 @@ export function MarketSnapshot() {
             </p>
           )}
         </div>
+
+        {/* Other PSX benchmark indices — live from /api/market/indices.
+            Reuses the session-stat sub-section pattern (label + rows);
+            renders only the indices the feed actually returned. */}
+        {otherIndices.length > 0 && (
+          <div className="mt-6 border-t border-blue-200/15 pt-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+              Other Indices
+            </p>
+            <div className="mt-3">
+              {otherIndices.map((index, i) => (
+                <IndexRow key={index.code} index={index} delay={1600 + i * 90} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Session stats — live market-watch data; the block renders
             only once real stats exist (no placeholder slots). */}
