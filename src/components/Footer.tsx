@@ -3,6 +3,8 @@ import {
   IconFacebook,
   IconInstagram,
   IconLinkedIn,
+  IconWhatsApp,
+  IconX,
   IconYouTube,
 } from "./Icons";
 import azeeLogo from "../assets/azee-logo.png";
@@ -54,11 +56,34 @@ const LIVE_ROUTES: Record<string, string> = {
   "Knowledge Centre": "/knowledge-centre",
 };
 
+/**
+ * Official AZEE social profiles. Real external URLs open in a new tab
+ * (same target/rel convention as the news article links). YouTube has
+ * no live channel URL yet, so it stays a placeholder "#" (not external).
+ */
 const SOCIALS = [
-  { label: "Facebook", icon: IconFacebook },
-  { label: "Instagram", icon: IconInstagram },
-  { label: "LinkedIn", icon: IconLinkedIn },
-  { label: "YouTube", icon: IconYouTube },
+  {
+    label: "Facebook",
+    icon: IconFacebook,
+    href: "https://www.facebook.com/share/1H73ELg6Dn/?mibextid=wwXIfr",
+  },
+  {
+    label: "Instagram",
+    icon: IconInstagram,
+    href: "https://www.instagram.com/azeetrade",
+  },
+  {
+    label: "LinkedIn",
+    icon: IconLinkedIn,
+    href: "https://www.linkedin.com/company/azeesecurities/",
+  },
+  {
+    label: "WhatsApp",
+    icon: IconWhatsApp,
+    href: "https://whatsapp.com/channel/0029Vas5ijgId7nHOoycqd47",
+  },
+  { label: "X (Twitter)", icon: IconX, href: "https://x.com/azeetrade" },
+  { label: "YouTube", icon: IconYouTube, href: "#" },
 ];
 
 export function Footer() {
@@ -114,16 +139,22 @@ export function Footer() {
             </address>
 
             <div className="mt-6 flex items-center gap-3">
-              {SOCIALS.map((social) => (
-                <a
-                  key={social.label}
-                  href="#"
-                  aria-label={social.label}
-                  className="liquid-glass flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-all duration-500 hover:scale-110 hover:bg-white/20 hover:text-white hover:shadow-[0_0_20px_rgb(var(--azee-blue)/0.25)]"
-                >
-                  <social.icon className="h-4 w-4" />
-                </a>
-              ))}
+              {SOCIALS.map((social) => {
+                const external = social.href.startsWith("http");
+                return (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    aria-label={social.label}
+                    {...(external
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
+                    className="liquid-glass flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-all duration-500 hover:scale-110 hover:bg-white/20 hover:text-white hover:shadow-[0_0_20px_rgb(var(--azee-blue)/0.25)]"
+                  >
+                    <social.icon className="h-4 w-4" />
+                  </a>
+                );
+              })}
             </div>
           </div>
 
