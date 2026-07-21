@@ -18,13 +18,18 @@ export const HERO_VIDEO_URL =
 /**
  * Background video for the Knowledge Centre hero.
  *
- * A moonlit night sky (Pexels, free license) — a calm, cool-toned,
- * blue/moonlight aesthetic for the investor-education hub, deliberately
- * distinct from the homepage's markets footage. Same technical setup as
- * HERO_VIDEO_URL: full-screen, object-cover, autoplay/muted/loop.
+ * A blue-hour city dusk (Pexels, free license, ID 16384304): the sun
+ * has already set, leaving a stable band of warm amber low on the
+ * horizon beneath a deep-blue sky — a calm, atmospheric afterglow that
+ * carries the brand's navy-and-orange contrast without a vivid sunset.
+ * Sampled across the full clip, the sky reads deep blue (RGB ~40/59/91)
+ * and the horizon warm amber (~63/44/28) throughout, so it never races
+ * to full night. 1920×1080, ~7 MB — light enough for the above-the-fold
+ * hero's immediate load. Same technical setup as HERO_VIDEO_URL:
+ * full-screen, object-cover, autoplay/muted/loop.
  */
 export const KNOWLEDGE_HERO_VIDEO_URL =
-  "https://videos.pexels.com/video-files/11533576/11533576-hd_1920_1080_30fps.mp4";
+  "https://videos.pexels.com/video-files/16384304/16384304-hd_1920_1080_30fps.mp4";
 
 /**
  * Background video for the homepage's closing CTA section.
