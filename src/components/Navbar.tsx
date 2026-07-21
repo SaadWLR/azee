@@ -1,6 +1,29 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FadeIn } from "./FadeIn";
+import azeeLogo from "../assets/azee-logo.png";
+
+/*
+ * The real AZEE Securities mark (dark-background variant, transparent
+ * PNG). Rendered at h-9 (36px) — proportional to the nav rhythm the
+ * former two-line text lockup set, and crisp: the 316×123 source has
+ * enough pixels for a 36px render even at 3× DPR (needs 108px tall).
+ * w-auto keeps its 2.57:1 aspect; intrinsic width/height attrs reserve
+ * space to avoid layout shift. Per the brand decision the logo stands
+ * alone — the "PSX Trading & Research" tagline is dropped since the
+ * mark already names the company.
+ */
+function BrandMark() {
+  return (
+    <img
+      src={azeeLogo}
+      alt="AZEE Securities"
+      width={316}
+      height={123}
+      className="h-9 w-auto"
+    />
+  );
+}
 
 /** Homepage in-page section anchors (hash targets on "/"). */
 const NAV_LINKS = [
@@ -287,22 +310,12 @@ export function Navbar() {
           {/* Identity — scrolls to top on the homepage, returns home
               from any other route. */}
           {onHome ? (
-            <a href="#" className="shrink-0">
-              <p className="text-sm font-bold leading-tight tracking-[0.2em] text-white">
-                AZEE TRADE
-              </p>
-              <p className="text-[10px] font-medium leading-tight tracking-wide text-gray-400">
-                PSX Trading &amp; Research
-              </p>
+            <a href="#" className="shrink-0" aria-label="AZEE Securities — home">
+              <BrandMark />
             </a>
           ) : (
-            <Link to="/" className="shrink-0">
-              <p className="text-sm font-bold leading-tight tracking-[0.2em] text-white">
-                AZEE TRADE
-              </p>
-              <p className="text-[10px] font-medium leading-tight tracking-wide text-gray-400">
-                PSX Trading &amp; Research
-              </p>
+            <Link to="/" className="shrink-0" aria-label="AZEE Securities — home">
+              <BrandMark />
             </Link>
           )}
 
