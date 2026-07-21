@@ -18,6 +18,7 @@ function buildSitemap(): string {
   const routes = [
     { path: "/", changefreq: "daily", priority: "1.0" },
     { path: "/market-watch", changefreq: "hourly", priority: "0.9" },
+    { path: "/indices", changefreq: "hourly", priority: "0.9" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },
     { path: "/knowledge-centre", changefreq: "weekly", priority: "0.7" },
     ...KNOWLEDGE_MODULES.map((module) => ({

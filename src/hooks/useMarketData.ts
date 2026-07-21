@@ -1,5 +1,6 @@
 import {
   getAllMarketQuotes,
+  getFullIndices,
   getMarketIndices,
   getMarketSnapshot,
   getMarketWatchStats,
@@ -29,6 +30,20 @@ export function useMarketSnapshot() {
  */
 export function useMarketIndices() {
   return useAsyncData(getMarketIndices, { intervalMs: 75_000 });
+}
+
+/**
+ * The full 10-index benchmark table for the /indices page.
+ *
+ * 75s: /api/market/indices-full's edge cache is s-maxage=60 in-session,
+ * so — same reasoning as useTickerQuotes/useMarketSnapshot — polling
+ * slightly above the 60s window lands on freshly-revalidated edge
+ * entries without defeating the cache. It matters a touch more here
+ * because each origin miss costs two PSX fetches (indices + market-
+ * watch), so staying just past the window avoids stampeding them.
+ */
+export function useFullIndices() {
+  return useAsyncData(getFullIndices, { intervalMs: 75_000 });
 }
 
 /**

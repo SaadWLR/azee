@@ -1,5 +1,7 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type {
+  FullIndexQuote,
+  FullIndicesResponse,
   MarketIndexQuote,
   MarketIndicesResponse,
   MarketSnapshot,
@@ -40,6 +42,27 @@ const MARKET_INDICES: MarketIndexQuote[] = [
   { code: "ALLSHR", name: "KSE All Share", value: 117980.55, changePercent: 0.88, changePoints: 1029.3, direction: "up", asOf: "" },
   { code: "KMI30", name: "KMI-30", value: 271560.4, changePercent: 1.04, changePoints: 2795.1, direction: "up", asOf: "" },
   { code: "KMIALLSHR", name: "KMI All Share", value: 78420.18, changePercent: 0.71, changePoints: 553.0, direction: "up", asOf: "" },
+];
+
+/**
+ * Development fixture for /api/market/indices-full — the 10 PSX
+ * benchmark indices with high/low/change/volume (plausible values from
+ * a real Jul 2026 session). Production always serves live PSX data;
+ * these exist only so the /indices page renders under `vite dev`, where
+ * the serverless route doesn't run. No value/turnover field — it isn't
+ * a real PSX metric (see the endpoint).
+ */
+const FULL_INDICES: FullIndexQuote[] = [
+  { code: "KSE100", name: "KSE-100 Index", value: 176133.56, high: 178370.45, low: 176062.69, changePoints: 205.83, changePercent: 0.12, direction: "up", volume: 448767016 },
+  { code: "KSE30", name: "KSE-30 Index", value: 52663.9, high: 53395.41, low: 52629.57, changePoints: 48.09, changePercent: 0.09, direction: "up", volume: 106374502 },
+  { code: "ALLSHR", name: "KSE All Share Index", value: 106568.82, high: 107857.74, low: 106600, changePoints: 149.03, changePercent: 0.14, direction: "up", volume: 1000676668 },
+  { code: "KMI30", name: "KMI-30 Index", value: 247838.41, high: 251801.8, low: 247707.33, changePoints: 22.06, changePercent: 0.01, direction: "up", volume: 145607022 },
+  { code: "KMIALLSHR", name: "KMI All Share Index", value: 68255.8, high: 69163.33, low: 68237.33, changePoints: 23.11, changePercent: 0.03, direction: "up", volume: 586069192 },
+  { code: "PSXDIV20", name: "PSX Dividend 20 Index", value: 81542, high: 82487.88, low: 81508.55, changePoints: 211.13, changePercent: 0.26, direction: "up", volume: 35260948 },
+  { code: "BKTI", name: "Banking Tradable Index", value: 50243.89, high: 50808.59, low: 50154.2, changePoints: 158.69, changePercent: 0.32, direction: "up", volume: 28247537 },
+  { code: "OGTI", name: "Oil & Gas Tradable Index", value: 34622.41, high: 35221.12, low: 34589.95, changePoints: -120.21, changePercent: -0.35, direction: "down", volume: 7250801 },
+  { code: "UPP9", name: "UBL Pakistan Enterprise Index", value: 62973.32, high: 63796.74, low: 62922.37, changePoints: 197.4, changePercent: 0.31, direction: "up", volume: 12436207 },
+  { code: "NITPGI", name: "NIT Pakistan Gateway Index", value: 46622.29, high: 47201.51, low: 46577.3, changePoints: 96, changePercent: 0.21, direction: "up", volume: 20403831 },
 ];
 
 /**
@@ -126,6 +149,20 @@ export async function getMarketIndices(): Promise<MarketIndicesResponse> {
     });
   }
   return apiGet<MarketIndicesResponse>("/api/market/indices");
+}
+
+/** The full PSX benchmark-index table (10 indices, derived volume). */
+export async function getFullIndices(): Promise<FullIndicesResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as the other services: the serverless route
+    // doesn't run under `vite dev`, so serve the fixture.
+    return mockResponse({
+      indices: FULL_INDICES,
+      asOf: new Date().toISOString(),
+      source: "psx",
+    });
+  }
+  return apiGet<FullIndicesResponse>("/api/market/indices-full");
 }
 
 /**

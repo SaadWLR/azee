@@ -18,6 +18,12 @@ const MarketWatchPage = lazy(() =>
   })),
 );
 
+const IndicesPage = lazy(() =>
+  import("./components/IndicesPage").then((m) => ({
+    default: m.IndicesPage,
+  })),
+);
+
 const CorporateCalendarPage = lazy(() =>
   import("./components/CorporateCalendarPage").then((m) => ({
     default: m.CorporateCalendarPage,
@@ -78,6 +84,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <MarketWatchPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/indices",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <IndicesPage />
           </Suspense>
         ),
       },

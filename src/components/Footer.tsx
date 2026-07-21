@@ -14,6 +14,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
     heading: "Markets",
     links: [
       "PSX Equities",
+      "PSX Indices",
       "KMI-30 Stocks",
       "PMEX Commodities",
       "Currencies & Futures",
@@ -49,6 +50,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
 /** Footer labels that have a real in-app destination. */
 const LIVE_ROUTES: Record<string, string> = {
   "Market Watch": "/market-watch",
+  "PSX Indices": "/indices",
   // The KMI-30 / KMI All-Share index-membership filter on Market Watch
   // is the closest real destination for this label.
   "KMI-30 Stocks": "/market-watch",

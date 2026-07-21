@@ -9,6 +9,7 @@ export type {
   MarketWatchResponse,
   StockQuote,
 } from "./market";
+export type { FullIndexQuote, FullIndicesResponse } from "./indices-full";
 export type { CompanyInfo, RegulatoryInfo } from "./company";
 export type { NewsFeedItem, NewsFeedResponse } from "./news";
 export type { CorporateMeeting, MeetingCalendarResponse } from "./calendar";
