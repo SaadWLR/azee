@@ -82,9 +82,14 @@ function StatCard({ stat, delay }: { stat: Stat; delay: number }) {
         ref={ref}
         className="liquid-glass glass-sheen card-glow h-full rounded-3xl p-8 text-center hover:bg-white/[0.12]"
       >
-        <p className="text-4xl font-bold tracking-tight text-white tabular-nums sm:text-5xl">
+        {/* The number itself carries the one warm accent — these are the
+            firm's real, static achievement figures (not live gain/loss
+            data), so orange here is a deliberate brand touch, not a
+            financial-color signal. Label, sub-text, card, and layout are
+            unchanged; every other section stays blue. */}
+        <p className="text-4xl font-bold tracking-tight text-[rgb(var(--azee-orange))] tabular-nums sm:text-5xl">
           {value.toLocaleString("en-US")}
-          <span className="text-white/70">{stat.suffix}</span>
+          <span className="text-[rgb(var(--azee-orange)/0.7)]">{stat.suffix}</span>
         </p>
         <p className="mt-3 text-sm font-semibold text-white">{stat.label}</p>
         <p className="mt-1.5 text-xs text-gray-400">{stat.sub}</p>
