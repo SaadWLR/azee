@@ -2,6 +2,8 @@ import { apiGet, mockResponse } from "../lib/apiClient";
 import type {
   FullIndexQuote,
   FullIndicesResponse,
+  IndexConstituent,
+  IndexConstituentsResponse,
   MarketIndexQuote,
   MarketIndicesResponse,
   MarketSnapshot,
@@ -163,6 +165,40 @@ export async function getFullIndices(): Promise<FullIndicesResponse> {
     });
   }
   return apiGet<FullIndicesResponse>("/api/market/indices-full");
+}
+
+/**
+ * Development fixture for /api/market/index-constituents — a handful of
+ * real large-cap names so the drill-down sub-table renders under `vite
+ * dev`. Production serves each index's true constituents from PSX.
+ */
+const CONSTITUENTS_FIXTURE: IndexConstituent[] = [
+  { symbol: "OGDC", name: "Oil & Gas Development Company Limited", ldcp: 315.83, current: 314.5, change: -1.33, changePercent: -0.42, indexWeight: 6.12, indexPoints: -8.4, volume: 922098, freeFloat: 1075000000, marketCap: 1352000000000 },
+  { symbol: "MARI", name: "Mari Energies Limited", ldcp: 650.27, current: 650, change: -0.27, changePercent: -0.04, indexWeight: 5.41, indexPoints: -0.5, volume: 229628, freeFloat: 240000000, marketCap: 156000000000 },
+  { symbol: "HBL", name: "Habib Bank Limited", ldcp: 142.75, current: 145.1, change: 2.35, changePercent: 1.65, indexWeight: 4.87, indexPoints: 6.2, volume: 8901200, freeFloat: 900000000, marketCap: 213000000000 },
+  { symbol: "LUCK", name: "Lucky Cement Limited", ldcp: 1148, current: 1160.5, change: 12.5, changePercent: 1.09, indexWeight: 4.12, indexPoints: 5.1, volume: 3120800, freeFloat: 190000000, marketCap: 341000000000 },
+  { symbol: "FFC", name: "Fauji Fertilizer Company Limited", ldcp: 550.2, current: 548.83, change: -1.37, changePercent: -0.25, indexWeight: 3.9, indexPoints: -1.2, volume: 208087, freeFloat: 640000000, marketCap: 697000000000 },
+  { symbol: "ENGRO", name: "Engro Holdings Limited", ldcp: 318.5, current: 316.4, change: -2.1, changePercent: -0.66, indexWeight: 3.44, indexPoints: -1.8, volume: 2450900, freeFloat: 340000000, marketCap: 182000000000 },
+];
+
+/** On-demand constituents of one index (drill-down). */
+export async function getIndexConstituents(
+  code: string,
+): Promise<IndexConstituentsResponse> {
+  if (import.meta.env.DEV) {
+    // The serverless route doesn't run under `vite dev`; serve the
+    // fixture so the drill-down renders locally.
+    return mockResponse({
+      code,
+      count: CONSTITUENTS_FIXTURE.length,
+      constituents: CONSTITUENTS_FIXTURE,
+      asOf: new Date().toISOString(),
+      source: "psx",
+    });
+  }
+  return apiGet<IndexConstituentsResponse>(
+    `/api/market/index-constituents?code=${encodeURIComponent(code)}`,
+  );
 }
 
 /**

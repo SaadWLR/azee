@@ -96,3 +96,85 @@ test("column sort reorders the rows", async ({ page }) => {
   const sorted = [...values].sort((a, b) => a - b);
   expect(values).toEqual(sorted);
 });
+
+/** The index row whose code cell is EXACTLY `code` (so "ALLSHR" never
+ *  also matches "KMIALLSHR"). */
+function indexRow(page: import("@playwright/test").Page, code: string) {
+  return page
+    .locator('main table tbody tr[role="button"]')
+    .filter({ has: page.getByText(code, { exact: true }) });
+}
+
+const SUBTABLE = "main table tbody td[colspan] table";
+
+test("expands a small index (OGTI) to its real constituents, and collapses", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(String(e)));
+
+  await page.goto("/indices");
+  const row = indexRow(page, "OGTI");
+  await expect(row).toHaveCount(1);
+  await row.click();
+
+  // On-demand constituents render: OGTI is a 3-stock index, with real
+  // company names (not symbols alone, not fabricated).
+  const sub = page.locator(SUBTABLE);
+  await expect(sub).toBeVisible();
+  await expect(sub.locator("tbody tr")).toHaveCount(3);
+  await expect(sub).toContainText("Oil & Gas Development Company Limited");
+  // Compact view includes the drill-down-unique Weight % column.
+  expect((await sub.locator("thead").innerText()).toLowerCase()).toContain(
+    "weight",
+  );
+
+  // Collapsing removes the panel cleanly.
+  await row.click();
+  await expect(page.locator(SUBTABLE)).toHaveCount(0);
+
+  expect(errors).toEqual([]);
+});
+
+test("expands the largest index (ALLSHR) without breaking layout", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("pageerror", (e) => errors.push(String(e)));
+
+  await page.goto("/indices");
+  await indexRow(page, "ALLSHR").click();
+
+  const sub = page.locator(SUBTABLE);
+  await expect(sub).toBeVisible();
+  // Hundreds of real constituents (ALLSHR ~550).
+  expect(await sub.locator("tbody tr").count()).toBeGreaterThan(300);
+
+  // The list is bounded in a fixed-height scroll container: it genuinely
+  // scrolls (scrollHeight exceeds the clamped clientHeight), so it can
+  // never push the page into an unbounded-height expansion.
+  const metrics = await page
+    .locator("main table tbody td[colspan] .max-h-96")
+    .evaluate((el) => ({
+      clientH: el.clientHeight,
+      scrollH: el.scrollHeight,
+      maxH: getComputedStyle(el).maxHeight,
+    }));
+  expect(metrics.maxH).toBe("384px");
+  expect(metrics.clientH).toBeLessThanOrEqual(384);
+  expect(metrics.scrollH).toBeGreaterThan(metrics.clientH);
+
+  // No horizontal page overflow from the wide sub-table.
+  const overflow = await page.evaluate(
+    () => document.body.scrollWidth > window.innerWidth + 1,
+  );
+  expect(overflow).toBe(false);
+
+  expect(errors).toEqual([]);
+});
