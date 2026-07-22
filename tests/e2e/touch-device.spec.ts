@@ -22,6 +22,12 @@ async function filterIsReachable(
   page: import("@playwright/test").Page,
   name: string,
 ) {
+  // Wait for the pill to be visible and the layout to settle first, so
+  // the hit-test below isn't racing the initial render / checkpoint
+  // redirect.
+  const pill = page.getByRole("button", { name, exact: true });
+  await pill.waitFor({ state: "visible" });
+  await page.waitForTimeout(400);
   const topmost = await page.evaluate((label) => {
     const btn = [...document.querySelectorAll("main button")].find(
       (b) => b.textContent?.trim() === label,
@@ -36,7 +42,7 @@ async function filterIsReachable(
   }, name);
   expect(topmost, `filter "${name}" must be the topmost element at its centre (not under the header)`).toBe(true);
   // Actually tap it — throws/times out if obscured.
-  await page.getByRole("button", { name, exact: true }).tap();
+  await pill.tap();
 }
 
 test("Market Watch filter pills are tappable (no header overlay)", async ({
