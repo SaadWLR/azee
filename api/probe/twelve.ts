@@ -3,7 +3,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 /** TEMPORARY Step-1 probe for Twelve Data. Returns diagnostics only —
  *  NEVER the key value. Deleted before the real endpoint commit. */
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  const key = process.env.TWELVE_DATA_API_KEY;
+  // The var is set lowercase in Vercel; tolerate both for the probe.
+  const key =
+    process.env.TWELVE_DATA_API_KEY ?? process.env.twelve_data_api_key;
   if (!key) {
     // Diagnostics only — env var NAMES, never values. Distinguishes
     // "env injection broken" from "var not set for this environment".
