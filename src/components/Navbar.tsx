@@ -299,12 +299,22 @@ export function Navbar() {
   return (
     <header
       ref={headerRef}
-      className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 sm:pt-5"
+      /*
+       * pointer-events-none on the fixed header container is essential:
+       * below lg the closed MobileMenu still sits in the flow (just
+       * opacity-0), which inflates this fixed box to ~620px tall. With
+       * pointer-events auto it would intercept every tap/swipe in the
+       * top ~620px of the page — blocking the filter pills, the top of
+       * the Market Watch / Corporate Calendar tables, and homepage CTAs
+       * on tablet/phone. The interactive children (the nav, and the
+       * MobileMenu when open) re-enable pointer events on themselves.
+       */
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 sm:pt-5"
     >
       <FadeIn delay={100}>
         <nav
           ref={navRef}
-          className={`nav-glass mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full px-5 py-2.5 sm:px-7 ${
+          className={`nav-glass pointer-events-auto mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full px-5 py-2.5 sm:px-7 ${
             scrolled ? "nav-glass-scrolled" : ""
           }`}
         >

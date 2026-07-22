@@ -501,6 +501,44 @@ body {
   }
 }
 
+/*
+ * ── Touch-device entrance: no animated blur ───────────────────────
+ * Real-device reports of stuttering entrances on iPad. An animated
+ * filter: blur() is re-rasterised every frame and is notably expensive
+ * on iOS/Safari's GPU in particular. On coarse-pointer (touch) devices
+ * the two blur-fade-up entrances drop the blur and keep only the cheap,
+ * compositor-friendly opacity + translate — a visually near-identical
+ * entrance without the per-frame blur cost. Desktop (fine pointer) is
+ * untouched and keeps the full blur-in. Redefining the keyframes (not
+ * just the class) is required because the blur lives inside them.
+ *
+ * Precautionary: the stutter could not be reproduced under Playwright's
+ * WebKit iPad emulation (desktop-class GPU), so this targets the most
+ * likely real-hardware cause and still needs on-device confirmation.
+ */
+@media (pointer: coarse) {
+  @keyframes kc-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes closing-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
 /* Footer identity: deep navy grounding the end of the page. */
 .footer-navy {
   background: linear-gradient(

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 /*
  * Tests target the deployed production site by default: this project
@@ -102,8 +102,27 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
   },
-  projects: Object.entries(VIEWPORTS).map(([name, viewport]) => ({
-    name,
-    use: { browserName: "chromium" as const, viewport },
-  })),
+  projects: [
+    // The existing Chromium viewport projects run every spec EXCEPT the
+    // touch-device suite (which needs a real engine + touch emulation).
+    ...Object.entries(VIEWPORTS).map(([name, viewport]) => ({
+      name,
+      use: { browserName: "chromium" as const, viewport },
+      testIgnore: /touch-device\.spec\.ts/,
+    })),
+    // Real-engine touch coverage for the iPad/mobile bug classes. Only
+    // touch-device.spec.ts runs here — WebKit is Safari's actual engine
+    // (the closest signal to iPad without hardware), and an iPhone
+    // Chromium profile covers non-Safari mobile.
+    {
+      name: "webkit-ipad",
+      use: { ...devices["iPad Pro 11"] },
+      testMatch: /touch-device\.spec\.ts/,
+    },
+    {
+      name: "chromium-iphone",
+      use: { ...devices["iPhone 14"] },
+      testMatch: /touch-device\.spec\.ts/,
+    },
+  ],
 });
