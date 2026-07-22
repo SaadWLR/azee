@@ -5,7 +5,19 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   const key = process.env.TWELVE_DATA_API_KEY;
   if (!key) {
-    res.status(200).json({ keyPresent: false, note: "TWELVE_DATA_API_KEY not set" });
+    // Diagnostics only — env var NAMES, never values. Distinguishes
+    // "env injection broken" from "var not set for this environment".
+    const related = Object.keys(process.env).filter((n) =>
+      /twelve|twelvedata|td_|_data_api|api_key/i.test(n),
+    );
+    res.status(200).json({
+      keyPresent: false,
+      vercelEnv: process.env.VERCEL_ENV ?? null,
+      vercelEnvVarsInjected: Boolean(process.env.VERCEL || process.env.VERCEL_ENV),
+      relatedEnvVarNames: related,
+      totalEnvVarCount: Object.keys(process.env).length,
+      note: "TWELVE_DATA_API_KEY not visible to this Production function",
+    });
     return;
   }
 
