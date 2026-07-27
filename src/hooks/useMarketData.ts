@@ -1,5 +1,6 @@
 import {
   getAllMarketQuotes,
+  getCommodities,
   getFullIndices,
   getGlobalFutures,
   getMarketIndices,
@@ -59,6 +60,23 @@ export function useFullIndices() {
  */
 export function useGlobalFutures() {
   return useAsyncData(getGlobalFutures, { intervalMs: 75_000 });
+}
+
+/**
+ * PMEX commodity futures for the /commodities page.
+ *
+ * 75s: /api/market/commodities uses the same freshness-derived caching
+ * as global-futures — 60s while the underlying contracts are live,
+ * 1800s once they have gone quiet — so the same reasoning carries over:
+ * polling just above the 60s live window (as useFullIndices /
+ * useTickerQuotes do) lands on freshly revalidated edge entries during
+ * a session without defeating the cache, and once the commodity
+ * sessions close the long server cache makes those polls cheap edge
+ * hits. The cadence is deliberately identical to useGlobalFutures
+ * because both read the same PMEX feed on the same server TTLs.
+ */
+export function useCommodities() {
+  return useAsyncData(getCommodities, { intervalMs: 75_000 });
 }
 
 /**

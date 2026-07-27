@@ -54,6 +54,7 @@ const LIVE_ROUTES: Record<string, string> = {
   // The KMI-30 / KMI All-Share index-membership filter on Market Watch
   // is the closest real destination for this label.
   "KMI-30 Stocks": "/market-watch",
+  "PMEX Commodities": "/commodities",
   "Corporate Calendar": "/corporate-calendar",
   "Knowledge Centre": "/knowledge-centre",
 };

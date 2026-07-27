@@ -45,6 +45,7 @@ const NAV_LINKS = [
 const TOOL_LINKS = [
   { label: "Market Watch", to: "/market-watch" },
   { label: "Indices", to: "/indices" },
+  { label: "Commodities", to: "/commodities" },
   { label: "Calendar", to: "/corporate-calendar" },
   { label: "Knowledge Centre", to: "/knowledge-centre" },
 ];

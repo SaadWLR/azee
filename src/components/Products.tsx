@@ -1,4 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
+import { Link } from "react-router-dom";
 import { Reveal } from "./Reveal";
 import { SectionHeading } from "./SectionHeading";
 import {
@@ -14,6 +15,12 @@ interface Product {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   title: string;
   text: string;
+  /**
+   * In-app destination, for the tiles that now have a real page behind
+   * them. Tiles without one stay placeholders (same convention as the
+   * Footer's LIVE_ROUTES map).
+   */
+  to?: string;
 }
 
 const PRODUCTS: Product[] = [
@@ -26,6 +33,7 @@ const PRODUCTS: Product[] = [
     icon: IconIngots,
     title: "PMEX Commodities",
     text: "Gold, silver, crude oil, and currency futures on the Pakistan Mercantile Exchange — hedge or trade with exchange-cleared contracts.",
+    to: "/commodities",
   },
   {
     icon: IconRocket,
@@ -66,12 +74,9 @@ export function Products() {
         />
 
         <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {PRODUCTS.map((product, i) => (
-            <Reveal key={product.title} delay={(i % 3) * 100}>
-              <a
-                href="#"
-                className="liquid-glass glass-sheen card-glow group flex h-full flex-col rounded-3xl p-8 hover:bg-white/[0.12]"
-              >
+          {PRODUCTS.map((product, i) => {
+            const inner = (
+              <>
                 <div className="flex items-start justify-between">
                   <div className="liquid-glass flex h-12 w-12 items-center justify-center rounded-2xl text-white transition-transform duration-500 group-hover:scale-110">
                     <product.icon className="h-6 w-6" />
@@ -90,9 +95,26 @@ export function Products() {
                   Explore
                   <span aria-hidden="true">→</span>
                 </span>
-              </a>
-            </Reveal>
-          ))}
+              </>
+            );
+            const cardClass =
+              "liquid-glass glass-sheen card-glow group flex h-full flex-col rounded-3xl p-8 hover:bg-white/[0.12]";
+            return (
+              <Reveal key={product.title} delay={(i % 3) * 100}>
+                {/* Tiles with a real page render as router links; the
+                    rest remain placeholders until their pages exist. */}
+                {product.to ? (
+                  <Link to={product.to} className={cardClass}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <a href="#" className={cardClass}>
+                    {inner}
+                  </a>
+                )}
+              </Reveal>
+            );
+          })}
         </div>
       </div>
     </section>

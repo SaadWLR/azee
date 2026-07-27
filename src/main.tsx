@@ -24,6 +24,12 @@ const IndicesPage = lazy(() =>
   })),
 );
 
+const CommoditiesPage = lazy(() =>
+  import("./components/CommoditiesPage").then((m) => ({
+    default: m.CommoditiesPage,
+  })),
+);
+
 const CorporateCalendarPage = lazy(() =>
   import("./components/CorporateCalendarPage").then((m) => ({
     default: m.CorporateCalendarPage,
@@ -92,6 +98,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <IndicesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/commodities",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <CommoditiesPage />
           </Suspense>
         ),
       },

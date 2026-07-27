@@ -4,6 +4,8 @@ import type {
   FullIndicesResponse,
   GlobalFuturesQuote,
   GlobalFuturesResponse,
+  PmexCommoditiesResponse,
+  PmexCommodityQuote,
   IndexConstituent,
   IndexConstituentsResponse,
   MarketIndexQuote,
@@ -196,6 +198,48 @@ export async function getGlobalFutures(): Promise<GlobalFuturesResponse> {
     });
   }
   return apiGet<GlobalFuturesResponse>("/api/market/global-futures");
+}
+
+/**
+ * Development fixture for /api/market/commodities — PMEX commodity
+ * FUTURES across Energy, Metals and Agriculture, one standard contract
+ * per commodity. Values are from a real Jul 2026 PMEX session (captured
+ * live from the endpoint), so the local page reads like production.
+ * Aluminum's high/low are null exactly as PMEX reported them for that
+ * thinly-traded contract — never back-filled with a fabricated number.
+ */
+const COMMODITIES: PmexCommodityQuote[] = [
+  { contract: "CRUDE1-SE26", commodity: "Crude Oil (WTI)", group: "Energy", bid: 82.2, ask: 82.62, open: 85.92, previousClose: 90.26, changePoints: -7.59, changePercent: -8.35, direction: "down", volume: 7719, high: 86.32, low: 81.86 },
+  { contract: "BRENT10-SE26", commodity: "Brent Crude", group: "Energy", bid: 88.09, ask: 88.25, open: 92.95, previousClose: 98.33, changePoints: -9.75, changePercent: -9.89, direction: "down", volume: 1326, high: 93.67, low: 87.53 },
+  { contract: "NGAS1K-AU26", commodity: "Natural Gas", group: "Energy", bid: 2.752, ask: 2.757, open: 2.818, previousClose: 2.88, changePoints: -0.12, changePercent: -4.2, direction: "down", volume: 122, high: 2.826, low: 2.74 },
+  { contract: "GO1OZ-AU26", commodity: "Gold", group: "Metals", bid: 4077.1, ask: 4077.6, open: 4055.4, previousClose: 4055.3, changePoints: 21.8, changePercent: 0.52, direction: "up", volume: 6073, high: 4118.7, low: 4067.1 },
+  { contract: "SL1-SE26", commodity: "Silver", group: "Metals", bid: 58.512, ask: 58.543, open: 58.44, previousClose: 58.417, changePoints: 0.1, changePercent: 0.17, direction: "up", volume: 6185, high: 60.408, low: 58.533 },
+  { contract: "COPPER-SE26", commodity: "Copper", group: "Metals", bid: 6.3845, ask: 6.388, open: 6.3465, previousClose: 6.3365, changePoints: 0.05, changePercent: 0.73, direction: "up", volume: 111, high: 6.4065, low: 6.344 },
+  { contract: "PLATINUM1-OC26", commodity: "Platinum", group: "Metals", bid: 1626.3, ask: 1628.3, open: 1620.5, previousClose: 1598.9, changePoints: 27.7, changePercent: 1.65, direction: "up", volume: 298, high: 1653.4, low: 1620 },
+  { contract: "PALDIUM100-SE26", commodity: "Palladium", group: "Metals", bid: 1288, ask: 1290.5, open: 1271, previousClose: 1244.5, changePoints: 43.5, changePercent: 3.42, direction: "up", volume: 1, high: 1271, low: 1271 },
+  { contract: "ALUMINUM1-OC26", commodity: "Aluminum", group: "Metals", bid: 3463, ask: 3478.75, open: 3450.25, previousClose: 3450.25, changePoints: 12.75, changePercent: 0.37, direction: "up", volume: 1, high: null, low: null },
+  { contract: "IWHEAT-SE26", commodity: "Wheat", group: "Agriculture", bid: 661.25, ask: 662.5, open: 668.25, previousClose: 675.25, changePoints: -14, changePercent: -2.07, direction: "down", volume: 10, high: 676.5, low: 668.25 },
+  { contract: "ICORN-SE26", commodity: "Corn", group: "Agriculture", bid: 450.25, ask: 452, open: 451.25, previousClose: 461.25, changePoints: -11, changePercent: -2.38, direction: "down", volume: 1, high: 452, low: 451.25 },
+  { contract: "ISOYBEAN-NO26", commodity: "Soybean", group: "Agriculture", bid: 1212, ask: 1213.25, open: 1216, previousClose: 1252.75, changePoints: -40.75, changePercent: -3.25, direction: "down", volume: 12, high: 1239.75, low: 1216 },
+  { contract: "ICOTTON-DE26", commodity: "Cotton", group: "Agriculture", bid: 80.74, ask: 80.89, open: 79.59, previousClose: 80.03, changePoints: 0.71, changePercent: 0.89, direction: "up", volume: 89, high: 81.11, low: 79.59 },
+];
+
+/**
+ * Live PMEX commodity-FUTURES quotes (one standard contract per
+ * commodity, grouped Energy / Metals / Agriculture).
+ */
+export async function getCommodities(): Promise<PmexCommoditiesResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as the other services: the serverless route
+    // doesn't run under `vite dev`, so serve the fixture.
+    return mockResponse({
+      commodities: COMMODITIES,
+      unavailable: [],
+      asOf: new Date().toISOString(),
+      source: "pmex",
+    });
+  }
+  return apiGet<PmexCommoditiesResponse>("/api/market/commodities");
 }
 
 /**
