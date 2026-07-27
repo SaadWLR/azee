@@ -60,10 +60,11 @@ test("commodities page deep-links and shows real PMEX futures grouped by categor
   const count = await rows.count();
   expect(count).toBeGreaterThanOrEqual(8);
 
-  // Honest framing: EVERY data row is labelled "PMEX futures".
-  expect(count).toBe(
-    await page.locator("main table tbody tr td", { hasText: /^PMEX futures$/ }).count(),
-  );
+  // Honest framing: EVERY data row is labelled "PMEX futures" — one
+  // label per quoted row, no row presented as a bare commodity price.
+  expect(
+    await table.getByText("PMEX futures", { exact: true }).count(),
+  ).toBe(count);
 
   // Real, sane values — gold's bid is a four-figure number, not a stub.
   const goldBid = await rows
@@ -94,10 +95,16 @@ test("commodities page states the futures-not-spot distinction and PMEX membersh
   await expect(main).toContainText(/not the spot price of the commodity/i);
   await expect(main).toContainText(/Pakistan Mercantile Exchange/);
   await expect(main).toContainText(/futures contracts/i);
-  // Never framed as spot commodity prices.
-  const text = await main.innerText();
-  expect(text).not.toMatch(/Commodity Prices/i);
-  expect(text).not.toMatch(/\bSpot (Gold|Price)\b/i);
+
+  /*
+   * The page never PRESENTS the table as spot prices. Checked on the
+   * headings rather than the body copy, because the body deliberately
+   * uses the phrase "not spot commodity prices" to draw the very
+   * distinction being asserted here.
+   */
+  const headings = await main.getByRole("heading").allInnerTexts();
+  expect(headings).toContain("Commodity Futures");
+  for (const h of headings) expect(h).not.toMatch(/commodity prices/i);
 });
 
 test("Tools dropdown, Footer and the Products tile all reach /commodities", async ({
