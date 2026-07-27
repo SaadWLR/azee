@@ -13,6 +13,28 @@ test.beforeEach(() => {
 
 const ROWS = "main table tbody tr";
 
+/**
+ * "Today" for PSX is a Pakistan Standard Time day (UTC+05:00, no DST),
+ * matching the cutoff api/calendar/agm.ts filters on. Derived here
+ * rather than taken from the runner's own midnight, which disagreed
+ * with the endpoint for the five hours after PKT midnight and made
+ * this spec fail nightly on a PKT machine.
+ */
+function pktToday(): string {
+  return new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * A rendered cell ("Mon, Jul 27, 2026") back to YYYY-MM-DD. The page
+ * builds each date at local midnight, so reading the local components
+ * returns the meeting's own date in any timezone.
+ */
+function cellToIsoDate(text: string): string {
+  const d = new Date(text);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 test("loads directly via URL (SPA rewrite) with real upcoming meetings", async ({
   page,
 }) => {
@@ -30,11 +52,13 @@ test("loads directly via URL (SPA rewrite) with real upcoming meetings", async (
   // Real entries: at least one row, every date today-or-future,
   // real-looking symbols and non-empty company names.
   await expect.poll(async () => page.locator(ROWS).count()).toBeGreaterThan(0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = pktToday();
   const dates = await page.locator(`${ROWS} td:first-child`).allInnerTexts();
   for (const d of dates) {
-    expect(new Date(d).getTime()).toBeGreaterThanOrEqual(today.getTime());
+    // YYYY-MM-DD strings compare lexicographically as dates.
+    expect(cellToIsoDate(d) >= today, `${d} should be on or after ${today}`).toBe(
+      true,
+    );
   }
   const firstCompany = await page
     .locator(`${ROWS} td:nth-child(2)`)

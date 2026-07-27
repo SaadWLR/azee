@@ -60,8 +60,27 @@ interface PsxCalendarResponse {
   data: PsxCalendarEntry[];
 }
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+/**
+ * PSX trades in Pakistan Standard Time (UTC+05:00, no DST), so the
+ * exchange's "today" — the day a meeting stops being upcoming — turns
+ * over at PKT midnight, not UTC midnight. Deriving it from UTC (what
+ * toISOString does) put the cutoff up to five hours late: between
+ * 00:00 and 05:00 PKT the UTC date is still yesterday, so yesterday's
+ * meetings kept being served as upcoming.
+ */
+const PKT_OFFSET_MS = 5 * 3600_000;
+
+/** The PKT calendar date `offsetDays` from now, as YYYY-MM-DD. */
+function pktDate(offsetDays = 0, now: Date = new Date()): string {
+  return new Date(now.getTime() + PKT_OFFSET_MS + offsetDays * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** Seconds until the next PKT midnight — when "today" rolls over. */
+function secondsUntilPktMidnight(now: Date = new Date()): number {
+  const intoDay = (now.getTime() + PKT_OFFSET_MS) % 86400_000;
+  return Math.ceil((86400_000 - intoDay) / 1000);
 }
 
 function normalize(entry: PsxCalendarEntry): CorporateMeeting | null {
@@ -80,8 +99,7 @@ function normalize(entry: PsxCalendarEntry): CorporateMeeting | null {
 
 /** Fetches and normalizes the live calendar; raw PSX payload stays here. */
 async function fetchMeetings(): Promise<MeetingCalendarResponse> {
-  const today = new Date();
-  const to = new Date(today.getTime() + WINDOW_DAYS * 86400_000);
+  const today = pktDate();
 
   const response = await fetch(CALENDAR_URL, {
     method: "POST",
@@ -90,7 +108,7 @@ async function fetchMeetings(): Promise<MeetingCalendarResponse> {
       "X-Requested-With": "XMLHttpRequest",
       "User-Agent": "azee-trade-web/1.0 (agm calendar)",
     },
-    body: `from=${isoDate(today)}&to=${isoDate(to)}`,
+    body: `from=${today}&to=${pktDate(WINDOW_DAYS)}`,
   });
   if (!response.ok) {
     throw new Error(`PSX calendar responded ${response.status}`);
@@ -104,7 +122,10 @@ async function fetchMeetings(): Promise<MeetingCalendarResponse> {
   const meetings: CorporateMeeting[] = [];
   for (const entry of body.data) {
     const meeting = normalize(entry);
-    if (meeting) meetings.push(meeting);
+    // PSX honors `from`, but filter on the way out too so the payload
+    // can never carry a past-dated meeting even if it doesn't. Dates
+    // are YYYY-MM-DD, so a string compare is a date compare.
+    if (meeting && meeting.date >= today) meetings.push(meeting);
   }
   if (meetings.length < MIN_MEETINGS) {
     throw new Error(
@@ -130,6 +151,16 @@ export default async function handler(
   _req: VercelRequest,
   res: VercelResponse,
 ) {
+  /*
+   * How long this payload stays true. A cached body is served by the
+   * edge WITHOUT re-running this function, so any window that outlived
+   * the PKT day the payload was built for would keep serving meetings
+   * that are now in the past — the same boundary bug as the UTC cutoff,
+   * reintroduced by the cache. Capping every window at PKT midnight
+   * forces one revalidation just after it (~1 extra origin fetch/day).
+   */
+  const boundary = secondsUntilPktMidnight();
+
   try {
     const calendar = await fetchMeetings();
     lastGood = calendar;
@@ -137,23 +168,34 @@ export default async function handler(
      * 1 hour + a day of stale-while-revalidate: meeting notices are
      * filed days-to-weeks ahead of the meeting, so hourly freshness
      * is already generous, and it caps PSX's load at ~24 origin
-     * fetches/day regardless of site traffic.
+     * fetches/day regardless of site traffic — both clamped to the
+     * day boundary above.
      */
     res.setHeader(
       "Cache-Control",
-      "s-maxage=3600, stale-while-revalidate=86400",
+      `s-maxage=${Math.min(3600, boundary)}, stale-while-revalidate=${Math.min(86400, boundary)}`,
     );
     res.status(200).json(calendar);
   } catch (error) {
     console.error("PSX calendar fetch failed:", error);
     if (lastGood) {
-      // Serve the last verified calendar, clearly labelled — never
-      // fabricate meeting data.
+      /*
+       * Serve the last verified calendar, clearly labelled — never
+       * fabricate meeting data. Re-filtered to the current PKT day so
+       * a payload captured before midnight can't resurface meetings
+       * that have since passed.
+       */
+      const today = pktDate();
       res.setHeader(
         "Cache-Control",
-        "s-maxage=300, stale-while-revalidate=86400",
+        `s-maxage=${Math.min(300, boundary)}, stale-while-revalidate=${Math.min(86400, boundary)}`,
       );
-      res.status(200).json({ ...lastGood, stale: true, source: "cache" });
+      res.status(200).json({
+        ...lastGood,
+        meetings: lastGood.meetings.filter((m) => m.date >= today),
+        stale: true,
+        source: "cache",
+      });
       return;
     }
     res.setHeader("Cache-Control", "no-store");
