@@ -2,6 +2,8 @@ import { apiGet, mockResponse } from "../lib/apiClient";
 import type {
   FullIndexQuote,
   FullIndicesResponse,
+  GlobalFuturesQuote,
+  GlobalFuturesResponse,
   IndexConstituent,
   IndexConstituentsResponse,
   MarketIndexQuote,
@@ -165,6 +167,35 @@ export async function getFullIndices(): Promise<FullIndicesResponse> {
     });
   }
   return apiGet<FullIndicesResponse>("/api/market/indices-full");
+}
+
+/**
+ * Development fixture for /api/market/global-futures — PMEX index
+ * FUTURES (S&P 500 / Nasdaq-100 / Dow Jones / Japan Equity), one
+ * standard-size contract per benchmark, values from a real Jul 2026
+ * session. Production always serves live PMEX data; these plausible
+ * values only exist so the Global Futures tab renders under `vite dev`.
+ * High/Low are null (PMEX reports 0 out-of-session) — never fabricated.
+ */
+const GLOBAL_FUTURES: GlobalFuturesQuote[] = [
+  { contract: "SP500-SE26", benchmark: "S&P 500", bid: 7443, ask: 7445.25, open: 7442, previousClose: 7442, changePoints: 1, changePercent: 0.01, direction: "up", volume: 9, high: null, low: null },
+  { contract: "NSDQ100-SE26", benchmark: "Nasdaq-100", bid: 28305, ask: 28309, open: 28300.25, previousClose: 28300.25, changePoints: 4.75, changePercent: 0.02, direction: "up", volume: 28, high: null, low: null },
+  { contract: "DJ-SE26", benchmark: "Dow Jones", bid: 52086, ask: 52096, open: 52076, previousClose: 52075, changePoints: 11, changePercent: 0.02, direction: "up", volume: 22, high: null, low: null },
+  { contract: "JPYEQTY1-SE26", benchmark: "Japan Equity", bid: 64330, ask: 64355, open: 64540, previousClose: 64540, changePoints: -210, changePercent: -0.33, direction: "down", volume: 19, high: null, low: null },
+];
+
+/** Live PMEX global index-futures quotes (one standard contract per benchmark). */
+export async function getGlobalFutures(): Promise<GlobalFuturesResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as the other services: the serverless route
+    // doesn't run under `vite dev`, so serve the fixture.
+    return mockResponse({
+      futures: GLOBAL_FUTURES,
+      asOf: new Date().toISOString(),
+      source: "pmex",
+    });
+  }
+  return apiGet<GlobalFuturesResponse>("/api/market/global-futures");
 }
 
 /**

@@ -1,6 +1,7 @@
 import {
   getAllMarketQuotes,
   getFullIndices,
+  getGlobalFutures,
   getMarketIndices,
   getMarketSnapshot,
   getMarketWatchStats,
@@ -44,6 +45,20 @@ export function useMarketIndices() {
  */
 export function useFullIndices() {
   return useAsyncData(getFullIndices, { intervalMs: 75_000 });
+}
+
+/**
+ * PMEX global index futures for the /indices "Global Futures" tab.
+ *
+ * 75s: /api/market/global-futures caches 60s while its data is live and
+ * 1800s once the PMEX session is closed — same freshness-derived scheme
+ * as indices-full. Polling just above the 60s live-window (same
+ * reasoning as useFullIndices / useTickerQuotes) lands on freshly
+ * revalidated edge entries during a session; when PMEX is closed the
+ * long server cache means those polls are cheap edge hits.
+ */
+export function useGlobalFutures() {
+  return useAsyncData(getGlobalFutures, { intervalMs: 75_000 });
 }
 
 /**

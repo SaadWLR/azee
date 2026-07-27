@@ -11,6 +11,10 @@ export type {
 } from "./market";
 export type { FullIndexQuote, FullIndicesResponse } from "./indices-full";
 export type {
+  GlobalFuturesQuote,
+  GlobalFuturesResponse,
+} from "./global-futures";
+export type {
   IndexConstituent,
   IndexConstituentsResponse,
 } from "./index-constituents";
