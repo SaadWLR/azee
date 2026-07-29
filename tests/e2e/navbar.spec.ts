@@ -27,10 +27,10 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
-  // Open on click → all five tools present.
+  // Open on click → all six tools present.
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await expect(menu.getByRole("menuitem")).toHaveCount(5);
+  await expect(menu.getByRole("menuitem")).toHaveCount(6);
   await expect(
     menu.getByRole("menuitem", { name: "Knowledge Centre" }),
   ).toBeVisible();
@@ -40,6 +40,7 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
   await expect(
     menu.getByRole("menuitem", { name: "Commodities" }),
   ).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "ETFs" })).toBeVisible();
   // Current route's item is highlighted inside the panel.
   await expect(
     menu.getByRole("menuitem", { name: "Market Watch" }),
