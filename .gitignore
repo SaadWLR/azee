@@ -9,3 +9,6 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+
+# Scratch file used to pass multi-line commit messages to git -F
+.git-msg-tmp

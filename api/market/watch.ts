@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   MarketStat,
@@ -50,6 +51,10 @@ import type {
  * (advancers / decliners / symbols traded). The rest waits for a
  * later milestone — never fabricated here.
  */
+
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const MARKET_WATCH_URL = "https://dps.psx.com.pk/market-watch";
 

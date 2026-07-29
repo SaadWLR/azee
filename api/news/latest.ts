@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/vercel-edge";
 import type { NewsFeedItem, NewsFeedResponse } from "../../src/types";
 
 /**
@@ -24,6 +25,16 @@ import type { NewsFeedItem, NewsFeedResponse } from "../../src/types";
  * for a future scraped source.
  */
 export const config = { runtime: "edge" };
+
+/*
+ * Sentry via @sentry/vercel-edge, NOT @sentry/node — this function runs
+ * on the Edge Runtime (see WHY EDGE above), which has no Node APIs, so
+ * the Node SDK would not work here. The packages are not
+ * interchangeable; if this function is ever moved to Node, this import
+ * has to move with it. No SENTRY_DSN → never initialized → silent
+ * no-op, same as the Node functions.
+ */
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 interface NewsSource {
   name: string;

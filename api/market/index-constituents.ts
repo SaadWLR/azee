@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   IndexConstituent,
@@ -32,6 +33,10 @@ import type {
  * counts to tolerate an occasional membership change without nuisance
  * failures.
  */
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
+
 const MIN_CONSTITUENTS: Record<string, number> = {
   KSE100: 80,
   KSE30: 24,

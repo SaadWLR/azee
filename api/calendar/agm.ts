@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   CorporateMeeting,
@@ -24,6 +25,15 @@ import type {
  * FUNCTION_INVOCATION_FAILED history). Type-only imports above are
  * erased at compile time and safe.
  */
+
+/*
+ * Sentry, initialized inline rather than from a shared api/ module:
+ * relative runtime imports between compiled functions are the known
+ * FUNCTION_INVOCATION_FAILED cause noted above, and a shared init
+ * module would be exactly that import. Bare package imports are fine.
+ * No SENTRY_DSN → never initialized → silent no-op.
+ */
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const CALENDAR_URL = "https://dps.psx.com.pk/calendar";
 

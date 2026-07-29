@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   FullIndexQuote,
@@ -34,6 +35,10 @@ import type {
  * pages, and market-watch), so it is omitted entirely rather than
  * carried as a misleading null — see src/types/indices-full.ts.
  */
+
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const INDICES_URL = "https://dps.psx.com.pk/indices";
 const MARKET_WATCH_URL = "https://dps.psx.com.pk/market-watch";

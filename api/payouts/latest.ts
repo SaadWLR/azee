@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   Payout,
@@ -26,6 +27,10 @@ import type {
  * FUNCTION_INVOCATION_FAILED history). Type-only imports above are
  * erased at compile time and safe.
  */
+
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const PAYOUTS_URL = "https://dps.psx.com.pk/payouts";
 

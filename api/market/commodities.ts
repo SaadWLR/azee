@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   CommodityGroup,
@@ -33,6 +34,10 @@ import type {
  *
  * RUNTIME: Node.
  */
+
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const PMEX_URL = "https://dportal.pmex.com.pk/MWatchNew/Home/GetJSONObject";
 

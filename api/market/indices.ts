@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   MarketIndexQuote,
@@ -35,6 +36,10 @@ import type {
  * (KSEALL / KMIALL / sector codes like BKTi return empty and are not
  * used.) Adding a future confirmed index is a one-line entry here.
  */
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
+
 const INDICES: { code: string; name: string }[] = [
   { code: "KSE100", name: "KSE-100" },
   { code: "KSE30", name: "KSE-30" },

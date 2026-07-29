@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { MarketSnapshot, MarketStatus } from "../../src/types";
 
@@ -27,6 +28,10 @@ import type { MarketSnapshot, MarketStatus } from "../../src/types";
  *   /timeseries/eod/KSE100 — daily [[epochSec, close, volume, …], …],
  *     newest first
  */
+
+// Inlined per the no-relative-runtime-imports rule above; a shared init
+// module would be exactly that import pattern. No DSN → silent no-op.
+if (process.env.SENTRY_DSN) Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const INTRADAY_URL = "https://dps.psx.com.pk/timeseries/int/KSE100";
 const EOD_URL = "https://dps.psx.com.pk/timeseries/eod/KSE100";

@@ -1,3 +1,6 @@
+// FIRST import on purpose: initializes Sentry before any app module is
+// evaluated (see src/instrument.ts). Keep it at the top of this list.
+import "./instrument";
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";

@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { KNOWLEDGE_MODULES } from "./src/data/knowledge";
 
 const SITE_ORIGIN = "https://azee.vercel.app";
@@ -57,6 +58,53 @@ function sitemapPlugin(): Plugin {
   };
 }
 
+/*
+ * Sentry source-map upload. Enabled only when all three credentials are
+ * present, so a build without them (a contributor's laptop, a fork, a
+ * preview with the vars unset) simply produces no source maps and
+ * uploads nothing — it must never fail the build over a missing
+ * credential, which on this project would take the whole site down.
+ *
+ * Maps are uploaded and then DELETED from dist: Sentry gets what it
+ * needs to render readable stack traces without the built site serving
+ * the full unminified source to anyone who asks for the .map.
+ */
+const { SENTRY_ORG, SENTRY_PROJECT, SENTRY_AUTH_TOKEN } = process.env;
+const sentryUploadEnabled = Boolean(
+  SENTRY_ORG && SENTRY_PROJECT && SENTRY_AUTH_TOKEN,
+);
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), sitemapPlugin()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    sitemapPlugin(),
+    ...(sentryUploadEnabled
+      ? [
+          sentryVitePlugin({
+            org: SENTRY_ORG,
+            project: SENTRY_PROJECT,
+            authToken: SENTRY_AUTH_TOKEN,
+            telemetry: false,
+            sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+            /*
+             * A failed upload (expired token, Sentry outage, rate
+             * limit) must degrade to "stack traces are minified",
+             * never to "the deploy fails". Swallowing the error here
+             * is the difference between losing symbolication and
+             * losing the site.
+             */
+            errorHandler: (err) => {
+              console.warn(
+                "[sentry] source-map upload failed; continuing build:",
+                err.message,
+              );
+            },
+          }),
+        ]
+      : []),
+  ],
+  // Source maps exist only to be uploaded; without upload credentials
+  // there is nothing to produce them for.
+  build: { sourcemap: sentryUploadEnabled },
 });
