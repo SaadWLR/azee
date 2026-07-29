@@ -33,6 +33,12 @@ const CommoditiesPage = lazy(() =>
   })),
 );
 
+const EtfsPage = lazy(() =>
+  import("./components/EtfsPage").then((m) => ({
+    default: m.EtfsPage,
+  })),
+);
+
 const CorporateCalendarPage = lazy(() =>
   import("./components/CorporateCalendarPage").then((m) => ({
     default: m.CorporateCalendarPage,
@@ -109,6 +115,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <CommoditiesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/etfs",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <EtfsPage />
           </Suspense>
         ),
       },

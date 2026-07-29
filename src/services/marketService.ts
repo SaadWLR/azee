@@ -1,5 +1,7 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type {
+  EtfQuote,
+  EtfsResponse,
   FullIndexQuote,
   FullIndicesResponse,
   GlobalFuturesQuote,
@@ -240,6 +242,38 @@ export async function getCommodities(): Promise<PmexCommoditiesResponse> {
     });
   }
   return apiGet<PmexCommoditiesResponse>("/api/market/commodities");
+}
+
+/**
+ * Development fixture for /api/market/etfs — the nine PSX-listed ETFs
+ * (sector 0837), values captured from a real Jul 2026 session so the
+ * local page reads like production. Production always serves live PSX
+ * data; the serverless route doesn't run under `vite dev`.
+ */
+const ETFS: EtfQuote[] = [
+  { symbol: "JSMFETF", name: "JS Momentum Factor Exchange Traded Fund", price: 9.82, ldcp: 9.96, high: 9.99, low: 9.77, changePoints: -0.14, changePercent: -1.41, direction: "down", volume: 1046000 },
+  { symbol: "MZNPETF", name: "Meezan Pakistan ETF", price: 17.64, ldcp: 17.76, high: 17.79, low: 17.55, changePoints: -0.12, changePercent: -0.68, direction: "down", volume: 813500 },
+  { symbol: "MIIETF", name: "Mahaana Islamic Index ETF", price: 16.51, ldcp: 16.65, high: 16.66, low: 16.45, changePoints: -0.14, changePercent: -0.84, direction: "down", volume: 521500 },
+  { symbol: "UBLPETF", name: "UBLPakistan Enterprise ETF", price: 29.5, ldcp: 29.67, high: 29.74, low: 29.21, changePoints: -0.17, changePercent: -0.57, direction: "down", volume: 178500 },
+  { symbol: "NBPGETF", name: "NBP Pakistan Growth ETF", price: 26.7, ldcp: 26.95, high: 26.7, low: 26.47, changePoints: -0.25, changePercent: -0.93, direction: "down", volume: 20500 },
+  { symbol: "HBLTETF", name: "HBL Total Treasury (ETF)", price: 104.6, ldcp: 104.63, high: 104.65, low: 104.6, changePoints: -0.03, changePercent: -0.03, direction: "down", volume: 15300 },
+  { symbol: "JSGBETF", name: "JS Global Banking Sector(ETF)", price: 41.25, ldcp: 41.5, high: 41.5, low: 41.04, changePoints: -0.25, changePercent: -0.6, direction: "down", volume: 9000 },
+  { symbol: "ACIETF", name: "Alfalah Consumer Index (ETF)", price: 17.12, ldcp: 17.55, high: 17.35, low: 17.12, changePoints: -0.43, changePercent: -2.45, direction: "down", volume: 5000 },
+  { symbol: "NITGETF", name: "NIT Pakistan Gateway ETF", price: 34.27, ldcp: 34.38, high: 34.27, low: 34.27, changePoints: -0.11, changePercent: -0.32, direction: "down", volume: 1000 },
+];
+
+/** Live quotes for every PSX-listed ETF (PSX sector code 0837). */
+export async function getEtfs(): Promise<EtfsResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as the other services: the serverless route
+    // doesn't run under `vite dev`, so serve the fixture.
+    return mockResponse({
+      etfs: ETFS,
+      asOf: new Date().toISOString(),
+      source: "psx",
+    });
+  }
+  return apiGet<EtfsResponse>("/api/market/etfs");
 }
 
 /**

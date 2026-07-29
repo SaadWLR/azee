@@ -10,6 +10,7 @@ export type {
   StockQuote,
 } from "./market";
 export type { FullIndexQuote, FullIndicesResponse } from "./indices-full";
+export type { EtfQuote, EtfsResponse } from "./etfs";
 export type {
   CommodityGroup,
   PmexCommoditiesResponse,

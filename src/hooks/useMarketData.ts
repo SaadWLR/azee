@@ -1,6 +1,7 @@
 import {
   getAllMarketQuotes,
   getCommodities,
+  getEtfs,
   getFullIndices,
   getGlobalFutures,
   getMarketIndices,
@@ -77,6 +78,20 @@ export function useGlobalFutures() {
  */
 export function useCommodities() {
   return useAsyncData(getCommodities, { intervalMs: 75_000 });
+}
+
+/**
+ * PSX-listed ETFs for the /etfs page.
+ *
+ * 75s: /api/market/etfs reads the same PSX market-watch page as
+ * /api/market/watch and shares its cache scheme (s-maxage=60 in
+ * session, 1800s outside), so the same reasoning as useTickerQuotes
+ * applies — polling just above the 60s window lands on freshly
+ * revalidated edge entries without defeating the cache, and outside
+ * the PKT session those polls are cheap edge hits.
+ */
+export function useEtfs() {
+  return useAsyncData(getEtfs, { intervalMs: 75_000 });
 }
 
 /**

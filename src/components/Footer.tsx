@@ -50,6 +50,10 @@ const LIVE_ROUTES: Record<string, string> = {
   "Market Watch": "/market-watch",
   "PSX Indices": "/indices",
   "PMEX Commodities": "/commodities",
+  // Covers the ETF half of this label today; a later milestone adds
+  // mutual funds (separate instrument, separate source) and may split
+  // this entry in two.
+  "Mutual Funds & ETFs": "/etfs",
   "Corporate Calendar": "/corporate-calendar",
   "Knowledge Centre": "/knowledge-centre",
 };
