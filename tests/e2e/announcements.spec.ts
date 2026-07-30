@@ -167,6 +167,20 @@ test("GET /api/announcements/latest honours count/offset and shape", async ({
     }
   }
 
+  /*
+   * Small counts must work. A flat sanity floor once made count<5
+   * return 503, treating a legitimately short page as a broken parse —
+   * the same shape of bug would hit the last page of the corpus.
+   */
+  for (const count of [1, 3, 5]) {
+    const small = await request.get(
+      `/api/announcements/latest?count=${count}&offset=0`,
+    );
+    expect(small.status(), `count=${count}`).toBe(200);
+    const body = await small.json();
+    expect(body.announcements.length, `count=${count} rows`).toBe(count);
+  }
+
   // A different offset returns different filings.
   const second = await request.get("/api/announcements/latest?count=10&offset=10");
   const other = await second.json();

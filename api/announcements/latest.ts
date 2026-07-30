@@ -62,8 +62,12 @@ const DEFAULT_COUNT = 50;
  * Sanity floor. PSX holds 221k+ company announcements, so a page that
  * parses almost nothing means the fragment changed shape — fall
  * through to lastGood rather than serve a misleadingly empty list.
- * Deliberately low (not `count`) because the LAST page of a filtered
- * query legitimately returns a short page.
+ *
+ * Applied as min(count, MIN_ROWS), never as a flat 5: a caller asking
+ * for count=3 must get 3 rows, not a 503, and the last page of the
+ * corpus legitimately returns fewer rows than requested. Comparing a
+ * fixed floor against a deliberately small page would report healthy
+ * data as broken.
  */
 const MIN_ROWS = 5;
 
@@ -238,9 +242,10 @@ async function fetchAnnouncements(
     const parsed = parseRow(row);
     if (parsed) announcements.push(parsed);
   }
-  if (announcements.length < MIN_ROWS) {
+  const expectedRows = Math.min(count, MIN_ROWS);
+  if (announcements.length < expectedRows) {
     throw new Error(
-      `PSX announcements parse yielded only ${announcements.length} rows — fragment structure may have changed`,
+      `PSX announcements parse yielded only ${announcements.length} of an expected ${expectedRows} rows — fragment structure may have changed`,
     );
   }
 
