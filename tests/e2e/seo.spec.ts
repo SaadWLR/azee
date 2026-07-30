@@ -22,6 +22,10 @@ const ROUTE_TITLES: [path: string, title: RegExp][] = [
   ],
   ["/etfs", /^PSX ETFs — Live Exchange Traded Fund Prices \| AZEE Trade$/],
   [
+    "/announcements",
+    /^PSX Company Announcements — Live Corporate Disclosures \| AZEE Trade$/,
+  ],
+  [
     "/corporate-calendar",
     /^Corporate Calendar — PSX AGM\/EOGM Meetings & Payouts \| AZEE Trade$/,
   ],
@@ -76,6 +80,7 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     "/indices",
     "/commodities",
     "/etfs",
+    "/announcements",
     "/corporate-calendar",
     "/knowledge-centre",
     "/knowledge-centre/stock-market-basics",
@@ -91,6 +96,6 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     // The trailing "<" ensures an exact <loc> match, not a prefix.
     expect(body).toContain(`<loc>https://azee.vercel.app${path}</loc>`);
   }
-  // 15 URLs total — the seven top routes plus the eight modules.
-  expect(body.match(/<loc>/g)?.length).toBe(15);
+  // 16 URLs total — the eight top routes plus the eight modules.
+  expect(body.match(/<loc>/g)?.length).toBe(16);
 });

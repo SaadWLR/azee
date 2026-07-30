@@ -1,4 +1,9 @@
-import { getCorporateCalendar, getPayouts } from "../services/calendarService";
+import { useCallback } from "react";
+import {
+  getAnnouncements,
+  getCorporateCalendar,
+  getPayouts,
+} from "../services/calendarService";
 import { useAsyncData } from "./useAsyncData";
 
 export function useCorporateCalendar() {
@@ -21,4 +26,22 @@ export function usePayouts() {
    * data changes.
    */
   return useAsyncData(getPayouts);
+}
+
+/**
+ * One page of PSX company announcements.
+ *
+ * No polling, matching the two above: the endpoint's edge cache is 15
+ * minutes and a visitor reading a page of disclosures is not watching
+ * a live tape. The fetcher is memoized on count/offset because
+ * useAsyncData restarts on fetcher identity — that is exactly the
+ * desired behaviour here (turning the page refetches), but an
+ * unmemoized closure would refetch on every render.
+ */
+export function useAnnouncements(count: number, offset: number) {
+  const fetcher = useCallback(
+    () => getAnnouncements(count, offset),
+    [count, offset],
+  );
+  return useAsyncData(fetcher);
 }

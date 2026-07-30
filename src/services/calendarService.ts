@@ -1,6 +1,7 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type { MeetingCalendarResponse } from "../types";
 import type { PayoutsResponse } from "../types/payouts";
+import type { AnnouncementsResponse } from "../types/announcements";
 
 /**
  * Development fixture mirroring /api/calendar/agm. Every entry is a
@@ -190,4 +191,48 @@ export async function getPayouts(): Promise<PayoutsResponse> {
     return mockResponse(PAYOUTS_FIXTURE);
   }
   return apiGet<PayoutsResponse>("/api/payouts/latest");
+}
+
+/**
+ * Development fixture mirroring /api/announcements/latest — real rows
+ * captured from a live PSX session so the page reads like production
+ * under `vite dev`, where the serverless route doesn't run. Includes an
+ * image-only filing (SKRS) because ~7% of real rows have no PDF, and a
+ * hyphenated fund ticker, so both edge cases are exercised locally.
+ */
+const ANNOUNCEMENTS_FIXTURE: AnnouncementsResponse = {
+  announcements: [
+    { id: "280587", announcedAt: "2026-07-30T11:30:00.000Z", dateText: "Jul 30, 2026", timeText: "4:30 PM", symbol: "JLICL", companyName: "Jubilee Life Insurance Company Limited", title: "JLICL | Jubilee Life Insurance Company Limited - UNUSUAL MOVEMENT IN VOLUME OF THE SHARES OF JUBILEE LIFE INSURANCE COMPANY LIMITED (JLICL)", documentUrl: "https://dps.psx.com.pk/download/attachment/280587-1.pdf", documentType: "pdf" },
+    { id: "280583", announcedAt: "2026-07-30T10:26:00.000Z", dateText: "Jul 30, 2026", timeText: "3:26 PM", symbol: "SIBL", companyName: "Security Investment Bank Limited", title: "Appointment of Director to Fill the Casual Vacancy", documentUrl: "https://dps.psx.com.pk/download/document/280583.pdf", documentType: "pdf" },
+    { id: "280582", announcedAt: "2026-07-30T10:25:00.000Z", dateText: "Jul 30, 2026", timeText: "3:25 PM", symbol: "SASML", companyName: "Sindh Abadgars Sugar Mills Limited", title: "Financial Results for the Quarter Ended", documentUrl: "https://dps.psx.com.pk/download/document/280582.pdf", documentType: "pdf" },
+    { id: "280581", announcedAt: "2026-07-30T10:25:00.000Z", dateText: "Jul 30, 2026", timeText: "3:25 PM", symbol: "GGL", companyName: "Ghani Global Holdings Limited", title: "NOTICE OF POSTAL BALLOT PAPER AND E-VOTING PROVISION - GHANI GLOBAL HOLDINGS LIMITED", documentUrl: "https://dps.psx.com.pk/download/document/280581.pdf", documentType: "pdf" },
+    { id: "280580", announcedAt: "2026-07-30T10:18:00.000Z", dateText: "Jul 30, 2026", timeText: "3:18 PM", symbol: "FCCL", companyName: "Fauji Cement Company Limited", title: "Rescheduling of 172nd Board Meeting of FCCL to 11th Aug 2026", documentUrl: "https://dps.psx.com.pk/download/document/280580.pdf", documentType: "pdf" },
+    { id: "280554", announcedAt: "2026-07-30T08:45:00.000Z", dateText: "Jul 30, 2026", timeText: "1:45 PM", symbol: "SKRS", companyName: "Shakarganj Limited", title: "Transmission of Annual Report for the year ended", documentUrl: "https://dps.psx.com.pk/download/image/280554-1.gif", documentType: "image" },
+    { id: "280528", announcedAt: "2026-07-29T10:45:00.000Z", dateText: "Jul 29, 2026", timeText: "3:45 PM", symbol: "MCBIM-FUNDS", companyName: "MCB Investment Management Limited", title: "Dividend Announcement", documentUrl: "https://dps.psx.com.pk/download/document/280528.pdf", documentType: "pdf" },
+  ],
+  count: 50,
+  offset: 0,
+  totalAvailable: 221831,
+  asOf: "2026-07-30T11:30:00.000Z",
+  source: "psx",
+};
+
+/**
+ * One page of PSX company announcements. `count`/`offset` map straight
+ * onto PSX's own pagination — no client-side slicing of a bigger fetch,
+ * since the real corpus is 221k+ filings.
+ */
+export async function getAnnouncements(
+  count = 50,
+  offset = 0,
+): Promise<AnnouncementsResponse> {
+  if (import.meta.env.DEV) {
+    // Vercel serverless routes don't run under `vite dev`; the fixture
+    // keeps local development working. Deployed builds always fetch
+    // live disclosures from the API route.
+    return mockResponse({ ...ANNOUNCEMENTS_FIXTURE, count, offset });
+  }
+  return apiGet<AnnouncementsResponse>(
+    `/api/announcements/latest?count=${count}&offset=${offset}`,
+  );
 }

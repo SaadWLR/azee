@@ -16,6 +16,7 @@ const COLUMNS: { heading: string; links: string[] }[] = [
       "PSX Indices",
       "PMEX Commodities",
       "Currencies & Futures",
+      "Company Announcements",
       "Corporate Calendar",
       "IPO Calendar",
       "Mutual Funds & ETFs",
@@ -54,6 +55,7 @@ const LIVE_ROUTES: Record<string, string> = {
   // mutual funds (separate instrument, separate source) and may split
   // this entry in two.
   "Mutual Funds & ETFs": "/etfs",
+  "Company Announcements": "/announcements",
   "Corporate Calendar": "/corporate-calendar",
   "Knowledge Centre": "/knowledge-centre",
 };

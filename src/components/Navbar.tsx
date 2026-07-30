@@ -47,6 +47,7 @@ const TOOL_LINKS = [
   { label: "Indices", to: "/indices" },
   { label: "Commodities", to: "/commodities" },
   { label: "ETFs", to: "/etfs" },
+  { label: "Announcements", to: "/announcements" },
   { label: "Calendar", to: "/corporate-calendar" },
   { label: "Knowledge Centre", to: "/knowledge-centre" },
 ];

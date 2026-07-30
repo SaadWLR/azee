@@ -27,10 +27,10 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
-  // Open on click → all six tools present.
+  // Open on click → all seven tools present.
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await expect(menu.getByRole("menuitem")).toHaveCount(6);
+  await expect(menu.getByRole("menuitem")).toHaveCount(7);
   await expect(
     menu.getByRole("menuitem", { name: "Knowledge Centre" }),
   ).toBeVisible();
