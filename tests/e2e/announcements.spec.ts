@@ -85,32 +85,40 @@ test("announcements page deep-links and lists real PSX disclosures", async ({
 test("pagination moves to genuinely different, older entries", async ({
   page,
 }) => {
+  /*
+   * Pages are compared by DOCUMENT LINK, not title. Announcement titles
+   * are emphatically not unique — routine filings share boilerplate
+   * wording across companies ("Financial Results for the Quarter Ended
+   * June 30, 2026", the standard "Disclosure of Interest by a
+   * Director…" text), so title overlap between pages is normal and
+   * proves nothing. PSX's document id is the real per-filing key.
+   */
+  const docLinks = () =>
+    page.locator(`${ROWS} td:nth-child(5) a`).evaluateAll((as) =>
+      as.map((a) => a.getAttribute("href")!),
+    );
+
   await page.goto("/announcements");
   await expect(page.locator(ROWS).first()).toBeVisible();
-  const firstPage = await page
-    .locator(`${ROWS} td:nth-child(5)`)
-    .allInnerTexts();
+  const firstPage = await docLinks();
+  expect(firstPage.length).toBeGreaterThan(10);
 
   await page.getByRole("button", { name: /Next/ }).click();
   await expect(page).toHaveURL(/[?&]page=2/);
   await expect(page.locator("main")).toContainText("Page 2");
-  await expect
-    .poll(async () => (await page.locator(`${ROWS} td:nth-child(5)`).allInnerTexts())[0])
-    .not.toBe(firstPage[0]);
-
-  const secondPage = await page
-    .locator(`${ROWS} td:nth-child(5)`)
-    .allInnerTexts();
-  // No overlap at all between the two pages.
-  expect(secondPage.filter((t) => firstPage.includes(t))).toEqual([]);
+  // Turning the page refetches, so wait for the new page's own count.
   await expect(page.locator("main")).toContainText(/Showing 51–/);
 
-  // Back to page 1 restores the original rows.
+  const secondPage = await docLinks();
+  expect(secondPage.length).toBeGreaterThan(10);
+  // Not one filing is repeated across the two pages.
+  expect(secondPage.filter((h) => firstPage.includes(h))).toEqual([]);
+
+  // Back to page 1 restores the original filings.
   await page.getByRole("button", { name: /Previous/ }).click();
   await expect(page.locator("main")).toContainText("Page 1");
-  expect((await page.locator(`${ROWS} td:nth-child(5)`).allInnerTexts())[0]).toBe(
-    firstPage[0],
-  );
+  await expect(page.locator("main")).toContainText(/Showing 1–/);
+  expect((await docLinks())[0]).toBe(firstPage[0]);
 });
 
 test("Tools dropdown and Footer both reach /announcements", async ({ page }) => {
