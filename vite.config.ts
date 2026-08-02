@@ -26,6 +26,22 @@ function buildSitemap(): string {
     { path: "/announcements", changefreq: "hourly", priority: "0.8" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },
     { path: "/knowledge-centre", changefreq: "weekly", priority: "0.7" },
+    // Legal / compliance pages — rarely change, but must be indexable.
+    ...[
+      "privacy-policy",
+      "terms-of-use",
+      "risk-disclosure",
+      "regulatory-information",
+      "complaints",
+      "cookie-policy",
+      "forms-downloads",
+      "aml-kyc",
+      "fee-schedule",
+    ].map((slug) => ({
+      path: `/${slug}`,
+      changefreq: "yearly",
+      priority: "0.3",
+    })),
     ...KNOWLEDGE_MODULES.map((module) => ({
       path: `/knowledge-centre/${module.slug}`,
       changefreq: "monthly",

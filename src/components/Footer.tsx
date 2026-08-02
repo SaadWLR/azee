@@ -44,6 +44,16 @@ const COLUMNS: { heading: string; links: string[] }[] = [
       "Contact Us",
     ],
   },
+  {
+    heading: "Legal & Compliance",
+    links: [
+      "Regulatory Information",
+      "Complaints & Escalation",
+      "AML / KYC Policy",
+      "Schedule of Charges",
+      "Cookie Policy",
+    ],
+  },
 ];
 
 /** Footer labels that have a real in-app destination. */
@@ -61,6 +71,15 @@ const LIVE_ROUTES: Record<string, string> = {
   "Mutual Funds & ETFs": "/etfs",
   "Company Announcements": "/announcements",
   "Corporate Calendar": "/corporate-calendar",
+  // Legal & compliance. Regulatory Information, Complaints and Cookie
+  // Policy carry real approved content; AML/KYC and Schedule of
+  // Charges are real routes in an honest content-pending state.
+  "Regulatory Information": "/regulatory-information",
+  "Complaints & Escalation": "/complaints",
+  "AML / KYC Policy": "/aml-kyc",
+  "Schedule of Charges": "/fee-schedule",
+  "Cookie Policy": "/cookie-policy",
+  "Forms & Downloads": "/forms-downloads",
   "Knowledge Centre": "/knowledge-centre",
 };
 
@@ -107,7 +126,9 @@ export function Footer() {
       />
 
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-12 lg:py-20">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-5">
+        {/* Brand spans 2, then four link columns — 6 total since the
+            Legal & Compliance column was added. */}
+        <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-6">
           {/* Brand + contact */}
           <div className="lg:col-span-2">
             {/* Real AZEE mark (same asset as the navbar), sized a touch
@@ -223,18 +244,22 @@ export function Footer() {
             <p className="text-xs text-gray-300/80">
               © 2026 AZEE Securities (Pvt.) Ltd. All rights reserved.
             </p>
-            <div className="flex gap-6">
-              {["Privacy Policy", "Terms of Use", "Risk Disclosure"].map(
-                (link) => (
-                  <a
-                    key={link}
-                    href="#"
-                    className="text-xs text-gray-300/80 transition-colors duration-300 hover:text-white"
-                  >
-                    {link}
-                  </a>
-                ),
-              )}
+            {/* All three now carry real, approved content ported from
+                azeetrade.com — no longer placeholders. */}
+            <div className="flex flex-wrap gap-6">
+              {[
+                ["Privacy Policy", "/privacy-policy"],
+                ["Terms of Use", "/terms-of-use"],
+                ["Risk Disclosure", "/risk-disclosure"],
+              ].map(([label, to]) => (
+                <Link
+                  key={label}
+                  to={to}
+                  className="text-xs text-gray-300/80 transition-colors duration-300 hover:text-white"
+                >
+                  {label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

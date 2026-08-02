@@ -5,6 +5,7 @@ import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 import App from "./App";
+import { CookieConsent } from "./components/CookieConsent";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ScrollToHash } from "./components/ScrollToHash";
 import "./index.css";
@@ -32,6 +33,31 @@ const CommoditiesPage = lazy(() =>
     default: m.CommoditiesPage,
   })),
 );
+
+const LegalPage = lazy(() =>
+  import("./components/LegalPage").then((m) => ({
+    default: m.LegalPage,
+  })),
+);
+
+/*
+ * Legal / compliance routes. The path→slug pairs are listed here rather
+ * than imported from src/data/legal.ts on purpose: importing the
+ * registry would pull every page's body text into the main bundle that
+ * every homepage visitor downloads. The registry stays inside the
+ * lazy-loaded LegalPage chunk; these are just the addresses.
+ */
+const LEGAL_ROUTES = [
+  "privacy-policy",
+  "terms-of-use",
+  "risk-disclosure",
+  "regulatory-information",
+  "complaints",
+  "cookie-policy",
+  "forms-downloads",
+  "aml-kyc",
+  "fee-schedule",
+];
 
 const ForexPage = lazy(() =>
   import("./components/ForexPage").then((m) => ({
@@ -87,6 +113,9 @@ function RootLayout() {
     <>
       <ScrollToHash />
       <Outlet />
+      {/* Mounted once above every route so the consent choice is
+          offered and honoured site-wide, not per page. */}
+      <CookieConsent />
     </>
   );
 }
@@ -130,6 +159,14 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      ...LEGAL_ROUTES.map((slug) => ({
+        path: `/${slug}`,
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <LegalPage slug={slug} />
+          </Suspense>
+        ),
+      })),
       {
         path: "/forex",
         element: (
