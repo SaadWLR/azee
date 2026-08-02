@@ -1,4 +1,5 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
+import type { ForexResponse } from "../types/forex";
 import type {
   EtfQuote,
   EtfsResponse,
@@ -274,6 +275,39 @@ export async function getEtfs(): Promise<EtfsResponse> {
     });
   }
   return apiGet<EtfsResponse>("/api/market/etfs");
+}
+
+/**
+ * Development fixture for /api/market/forex — real values and a real
+ * source timestamp captured from a live ExchangeRate-API response, so
+ * the local page shows a genuine once-daily timestamp rather than a
+ * rolling "now" that would misrepresent how this data behaves.
+ */
+const FOREX_FIXTURE: ForexResponse = {
+  rates: [
+    { code: "USD", name: "US Dollar", pkrPerUnit: 277.4266 },
+    { code: "GBP", name: "British Pound", pkrPerUnit: 372.5697 },
+    { code: "EUR", name: "Euro", pkrPerUnit: 319.3381 },
+    { code: "AED", name: "UAE Dirham", pkrPerUnit: 75.5416 },
+    { code: "SAR", name: "Saudi Riyal", pkrPerUnit: 73.9804 },
+    { code: "AUD", name: "Australian Dollar", pkrPerUnit: 194.4125 },
+    { code: "CAD", name: "Canadian Dollar", pkrPerUnit: 197.9046 },
+    { code: "JPY", name: "Japanese Yen", pkrPerUnit: 1.7277 },
+  ],
+  sourceUpdatedAt: "Fri, 31 Jul 2026 00:02:31 +0000",
+  sourceNextUpdateAt: "Sat, 01 Aug 2026 00:06:21 +0000",
+  attribution: "Rates by ExchangeRate-API",
+  source: "er-api",
+};
+
+/** Mid-market PKR cross rates (not open-market / money changer rates). */
+export async function getForex(): Promise<ForexResponse> {
+  if (import.meta.env.DEV) {
+    // Same dev-gating as the other services: the serverless route
+    // doesn't run under `vite dev`, so serve the fixture.
+    return mockResponse(FOREX_FIXTURE);
+  }
+  return apiGet<ForexResponse>("/api/market/forex");
 }
 
 /**

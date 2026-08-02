@@ -51,6 +51,10 @@ const LIVE_ROUTES: Record<string, string> = {
   "Market Watch": "/market-watch",
   "PSX Indices": "/indices",
   "PMEX Commodities": "/commodities",
+  // Covers the currencies half of this label; the futures half lives
+  // on /indices?tab=global. Same approach as "Mutual Funds & ETFs"
+  // above — wire the half that exists rather than leave a dead link.
+  "Currencies & Futures": "/forex",
   // Covers the ETF half of this label today; a later milestone adds
   // mutual funds (separate instrument, separate source) and may split
   // this entry in two.

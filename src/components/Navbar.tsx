@@ -25,12 +25,26 @@ function BrandMark() {
   );
 }
 
-/** Homepage in-page section anchors (hash targets on "/"). */
-const NAV_LINKS = [
+/**
+ * Top-level nav. Most entries are homepage section anchors (hash
+ * targets on "/"); an entry with `to` instead is a real route link.
+ *
+ * "Forex" took the slot "Products" used to hold — the bar has a hard
+ * width budget at 1024px, and Forex earns a top-level place as a
+ * standalone page in a way an on-page section does not. The Products
+ * SECTION is untouched and still renders on the homepage; it simply
+ * lost its direct shortcut, and is still reached by scrolling or via
+ * the "Every market, one relationship." section itself.
+ */
+type NavLink =
+  | { label: string; hash: string; to?: undefined }
+  | { label: string; to: string; hash?: undefined };
+
+const NAV_LINKS: NavLink[] = [
   { label: "Markets", hash: "#markets" },
   { label: "Research", hash: "#research" },
   { label: "Trading", hash: "#trading" },
-  { label: "Products", hash: "#products" },
+  { label: "Forex", to: "/forex" },
   { label: "About", hash: "#about" },
 ];
 
@@ -175,8 +189,17 @@ function MobileMenu({
     >
       <ul>
         {NAV_LINKS.map((link) => (
-          <li key={link.hash} className="border-b border-white/10">
-            {onHome ? (
+          <li key={link.label} className="border-b border-white/10">
+            {link.to ? (
+              // Real route: always a router link, regardless of page.
+              <Link
+                to={link.to}
+                onClick={onNavigate}
+                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ) : onHome ? (
               // Same-page anchor: native browser scroll, untouched.
               <a
                 href={link.hash}
@@ -284,9 +307,11 @@ export function Navbar() {
   /* Scroll spy: highlight the section currently in view. */
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    const targets = NAV_LINKS.map((link) =>
-      document.getElementById(link.hash.slice(1)),
-    ).filter((el): el is HTMLElement => el !== null);
+    // Only the hash entries have a section to spy on; a route entry
+    // (Forex) has no homepage element and is skipped.
+    const targets = NAV_LINKS.filter((link) => link.hash !== undefined)
+      .map((link) => document.getElementById(link.hash!.slice(1)))
+      .filter((el): el is HTMLElement => el !== null);
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -335,14 +360,22 @@ export function Navbar() {
 
           <ul className="hidden items-center gap-7 lg:flex">
             {NAV_LINKS.map((link) => {
+              // A route entry is "active" on its own route; a hash
+              // entry is active when scroll-spy has it in view.
+              const isActive = link.to
+                ? pathname === link.to
+                : active === link.hash;
               const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                active === link.hash
-                  ? "text-white after:w-6"
-                  : "text-gray-300 after:w-0"
+                isActive ? "text-white after:w-6" : "text-gray-300 after:w-0"
               }`;
               return (
-                <li key={link.hash} className="flex items-center">
-                  {onHome ? (
+                <li key={link.label} className="flex items-center">
+                  {link.to ? (
+                    // Real route: always a router link.
+                    <Link to={link.to} className={linkClass}>
+                      {link.label}
+                    </Link>
+                  ) : onHome ? (
                     // Same-page anchor: native browser scroll, untouched.
                     <a href={link.hash} className={linkClass}>
                       {link.label}

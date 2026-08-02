@@ -2,6 +2,7 @@ import {
   getAllMarketQuotes,
   getCommodities,
   getEtfs,
+  getForex,
   getFullIndices,
   getGlobalFutures,
   getMarketIndices,
@@ -92,6 +93,22 @@ export function useCommodities() {
  */
 export function useEtfs() {
   return useAsyncData(getEtfs, { intervalMs: 75_000 });
+}
+
+/**
+ * Mid-market PKR forex rates for the /forex page.
+ *
+ * NO polling, deliberately — and this is the one hook where a fast
+ * cadence would be actively misleading. The source publishes once a
+ * day; re-fetching every 75s like the live-market hooks would burn
+ * requests to receive the identical payload and, worse, dress
+ * once-daily data in the trappings of a live tape. One fetch per page
+ * visit is already far fresher than the data changes, and the server
+ * cache (derived from the source's own next-update time, capped at an
+ * hour) is what guarantees a published update is picked up promptly.
+ */
+export function useForex() {
+  return useAsyncData(getForex);
 }
 
 /**

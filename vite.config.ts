@@ -21,6 +21,7 @@ function buildSitemap(): string {
     { path: "/market-watch", changefreq: "hourly", priority: "0.9" },
     { path: "/indices", changefreq: "hourly", priority: "0.9" },
     { path: "/commodities", changefreq: "hourly", priority: "0.9" },
+    { path: "/forex", changefreq: "daily", priority: "0.8" },
     { path: "/etfs", changefreq: "hourly", priority: "0.8" },
     { path: "/announcements", changefreq: "hourly", priority: "0.8" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },

@@ -73,13 +73,51 @@ test("same-page anchors on the homepage still work (no regression)", async ({
 }) => {
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
-  await page.locator('header nav ul a[href="#products"]').click();
+  /*
+   * Uses #trading: "Products" lost its top-level nav slot to Forex, so
+   * there is no #products anchor in the bar any more. The section
+   * itself is unaffected — that is asserted separately below.
+   */
+  await page.locator('header nav ul a[href="#trading"]').click();
+  await expect
+    .poll(async () => Math.abs((await sectionAtTop(page, "trading")).top), {
+      timeout: 10_000,
+    })
+    .toBeLessThan(250);
+  expect((await sectionAtTop(page, "trading")).scrollY).toBeGreaterThan(500);
+});
+
+test("Products section survives losing its nav link", async ({ page }) => {
+  await page.goto("/");
+  // The nav slot is gone...
+  await expect(page.locator('header nav ul a[href="#products"]')).toHaveCount(0);
+  await expect(
+    page.locator("header nav ul").getByRole("link", { name: "Forex" }),
+  ).toBeVisible();
+
+  // ...but the section itself still renders, in full.
+  const products = page.locator("#products");
+  await expect(products).toBeAttached();
+  await expect(products).toContainText("Every market, one relationship.");
+  // All six product tiles, each with its heading and body copy.
+  await expect(products.locator("a")).toHaveCount(6);
+  for (const title of [
+    "Equity Trading",
+    "PMEX Commodities",
+    "IPO Investment",
+    "Mutual Funds",
+    "Market Research",
+    "Portfolio Advisory",
+  ]) {
+    await expect(products).toContainText(title);
+  }
+  // And it is still reachable by direct hash navigation.
+  await page.goto("/#products");
   await expect
     .poll(async () => Math.abs((await sectionAtTop(page, "products")).top), {
       timeout: 10_000,
     })
     .toBeLessThan(250);
-  expect((await sectionAtTop(page, "products")).scrollY).toBeGreaterThan(500);
 });
 
 test("direct navigation to /#research loads home scrolled to the section", async ({

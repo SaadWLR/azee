@@ -33,6 +33,12 @@ const CommoditiesPage = lazy(() =>
   })),
 );
 
+const ForexPage = lazy(() =>
+  import("./components/ForexPage").then((m) => ({
+    default: m.ForexPage,
+  })),
+);
+
 const EtfsPage = lazy(() =>
   import("./components/EtfsPage").then((m) => ({
     default: m.EtfsPage,
@@ -121,6 +127,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <CommoditiesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/forex",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <ForexPage />
           </Suspense>
         ),
       },
