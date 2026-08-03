@@ -10,6 +10,20 @@ test.beforeEach(() => {
   );
 });
 
+/**
+ * Dismisses the consent banner, which is fixed to the bottom of the
+ * viewport and therefore sits over the footer until a choice is made —
+ * exactly as it does for a real visitor. Anything interacting with the
+ * footer has to get past it first, the same way a person would.
+ */
+async function acceptConsent(page: import("@playwright/test").Page) {
+  const banner = page.getByRole("dialog", { name: /consent/i });
+  if (await banner.isVisible().catch(() => false)) {
+    await banner.getByRole("button", { name: "Accept" }).click();
+    await banner.waitFor({ state: "hidden" });
+  }
+}
+
 /** Pages carrying real, approved content ported from azeetrade.com. */
 const REAL: [slug: string, heading: string, marker: RegExp][] = [
   ["privacy-policy", "Privacy Policy", /Information We Collect/i],
@@ -82,7 +96,12 @@ test("pending pages are honest and say exactly what is missing", async ({
 
 test("forms page links to real, downloadable PDFs", async ({ page, request }) => {
   await page.goto("/forms-downloads");
+  // The page is a lazy chunk; wait for it to render before counting.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Forms & Downloads" }),
+  ).toBeVisible();
   const links = page.locator('main a[href$=".pdf"]');
+  await expect(links.first()).toBeAttached();
   expect(await links.count()).toBeGreaterThanOrEqual(10);
 
   const hrefs = await links.evaluateAll((as) =>
@@ -106,6 +125,7 @@ test("the three previously-dead footer legal links now resolve", async ({
     ["Risk Disclosure", "/risk-disclosure"],
   ]) {
     await page.goto("/");
+    await acceptConsent(page);
     const link = page.locator("footer").getByRole("link", { name: label, exact: true });
     await expect(link).toHaveAttribute("href", path);
     await link.click();
