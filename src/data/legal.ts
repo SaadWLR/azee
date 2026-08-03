@@ -315,11 +315,14 @@ export const LEGAL_PAGES: LegalPage[] = [
           "Fulfil margin requirements only via the CDC pledge process.",
         ],
       },
-      { kind: "heading", text: "Beware of Fraudulent Activities" },
-      {
-        kind: "paragraph",
-        text: "Azee Securities does not provide trading tips or signals via WhatsApp, Telegram, or social media. Any such claims are fraudulent and should be reported to info@azeetrade.com.",
-      },
+      /*
+       * azeetrade.com's site-wide footer also carries a "Beware of
+       * Fraudulent Activities" warning about trading tips/signals on
+       * WhatsApp, Telegram and social media. It is deliberately NOT
+       * reproduced on this site — excluded by instruction. Do not
+       * re-add it here or on any other page when porting further
+       * content from azeetrade.com, where it appears on every page.
+       */
     ],
   },
 
