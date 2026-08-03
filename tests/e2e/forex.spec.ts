@@ -12,7 +12,16 @@ test.beforeEach(() => {
 });
 
 const TARGETS = ["USD", "GBP", "EUR", "AED", "SAR", "AUD", "CAD", "JPY"];
-const ROWS = "main table tbody tr";
+/*
+ * The page carries two tables — currencies, then the local gold
+ * estimate. They sit in separate wrappers, so a CSS nth-of-type would
+ * match the first table in EACH wrapper; the tables have to be picked
+ * off the list positionally instead.
+ */
+const currencyRows = (page: import("@playwright/test").Page) =>
+  page.locator("main table").first().locator("tbody tr");
+const goldRows = (page: import("@playwright/test").Page) =>
+  page.locator("main table").nth(1).locator("tbody tr");
 
 test("forex page deep-links and shows all eight PKR rates", async ({ page }) => {
   const errors: string[] = [];
@@ -28,13 +37,13 @@ test("forex page deep-links and shows all eight PKR rates", async ({ page }) => 
     page.getByRole("heading", { level: 1, name: "PKR Exchange Rates" }),
   ).toBeVisible();
 
-  const table = page.locator("main table");
+  const table = page.locator("main table").first();
   await expect(table).toBeVisible();
-  await expect(page.locator(ROWS)).toHaveCount(TARGETS.length);
+  await expect(currencyRows(page)).toHaveCount(TARGETS.length);
   for (const code of TARGETS) await expect(table).toContainText(code);
 
   // Real, sane values — USD/PKR is a three-figure number, JPY is ~1.7.
-  const cells = await page.locator(ROWS).evaluateAll((trs) =>
+  const cells = await currencyRows(page).evaluateAll((trs) =>
     trs.map((tr) => {
       const td = [...tr.querySelectorAll("td")].map((c) => c.textContent!.trim());
       return { code: td[1], rate: Number.parseFloat(td[2].replace(/,/g, "")) };
@@ -67,7 +76,11 @@ test("framing is explicitly mid-market, never a counter rate", async ({
    * The source publishes a single mid rate, so the page must never
    * present a spread — no buy/sell columns anywhere.
    */
-  const headers = await page.locator("main table thead th").allInnerTexts();
+  const headers = await page
+    .locator("main table")
+    .first()
+    .locator("thead th")
+    .allInnerTexts();
   for (const h of headers) {
     expect(h).not.toMatch(/\b(buy|sell|bid|ask)\b/i);
   }
@@ -86,7 +99,7 @@ test("the displayed timestamp is the source's own, not our fetch time", async ({
    */
   const stamp = async () => {
     await page.goto("/forex");
-    await expect(page.locator(ROWS).first()).toBeVisible();
+    await expect(currencyRows(page).first()).toBeVisible();
     const text = await page.locator("main").innerText();
     return /Rates published by the source:\s*([^\n·]+)/.exec(text)?.[1]?.trim();
   };
@@ -123,9 +136,8 @@ test("local gold is presented as an estimated range, never a quote", async ({
    * precision the premium data does not support, so every gold row
    * has to carry a low–high pair.
    */
-  const goldTable = page.locator("main table").nth(1);
-  const cells = await goldTable
-    .locator("tbody tr td:last-child")
+  const cells = await goldRows(page)
+    .locator("td:last-child")
     .allInnerTexts();
   expect(cells.length).toBeGreaterThanOrEqual(2);
   for (const c of cells) {
