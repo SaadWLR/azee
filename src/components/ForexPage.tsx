@@ -52,6 +52,7 @@ export function ForexPage() {
   const { data, loading, error } = useForex();
   const rates = data?.rates;
   const stale = data?.stale;
+  const gold = data?.gold;
 
   return (
     <main className="min-h-screen text-white">
@@ -123,6 +124,104 @@ export function ForexPage() {
               </div>
             )}
           </div>
+
+          {/*
+           * Local gold estimate — a second table under the currency
+           * table rather than a tab or a separate route. It belongs on
+           * this page (both are "what is this worth in rupees today"),
+           * but it is a fundamentally weaker number than the currency
+           * rates above it, so it needs its own heading and its own
+           * caveats sitting directly against it. A tab would hide that
+           * distinction behind a click; stacking keeps the currency
+           * rates and the estimate visibly separate but adjacent.
+           */}
+          {gold && (
+            <div className="mt-14">
+              <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                Local Gold — Estimated
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
+                A calculated estimate, not a market quote. Pakistan&apos;s local
+                gold rate is set once daily by the Karachi Sarafa Bazaar; we do
+                not receive that rate. The figures below are worked out from the
+                international gold price and the US Dollar rate, so treat them
+                as a guide to roughly where the market sits, not as a price you
+                can transact at.
+              </p>
+
+              <div className="liquid-glass glass-sheen mt-6 overflow-hidden rounded-3xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-blue-200/15 text-left">
+                        {["Metal", "Unit", "Estimated range (PKR)"].map(
+                          (label, i) => (
+                            <th
+                              key={label}
+                              scope="col"
+                              className={`px-5 py-3.5 font-semibold text-gray-300 ${
+                                i === 2 ? "text-right" : "text-left"
+                              }`}
+                            >
+                              {label}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { unit: "1 tola", lo: gold.lowPkrPerTola, hi: gold.highPkrPerTola },
+                        {
+                          unit: "10 grams",
+                          lo: (gold.lowPkrPerTola / 11.6638) * 10,
+                          hi: (gold.highPkrPerTola / 11.6638) * 10,
+                        },
+                      ].map((row) => (
+                        <tr
+                          key={row.unit}
+                          className="border-b border-white/5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.04]"
+                        >
+                          <td className="px-5 py-3.5 text-gray-300">
+                            Gold (24K)
+                          </td>
+                          <td className="px-5 py-3.5 font-semibold tracking-wide text-white">
+                            {row.unit}
+                          </td>
+                          <td className="px-5 py-3.5 text-right tabular-nums text-white">
+                            {Math.round(row.lo).toLocaleString("en-US")}
+                            <span className="mx-1.5 text-gray-500">–</span>
+                            {Math.round(row.hi).toLocaleString("en-US")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p className="mt-4 max-w-3xl text-xs leading-relaxed text-gray-400/90">
+                <span className="font-semibold text-gray-300">
+                  How this is worked out:
+                </span>{" "}
+                international spot gold ({gold.spotUsdPerOz.toLocaleString("en-US")}{" "}
+                USD/oz as at {gold.spotAsOf}) × the US Dollar rate above ×
+                the troy-ounce-to-tola conversion, giving{" "}
+                {gold.basePkrPerTola.toLocaleString("en-US")} PKR/tola before any
+                local margin. Local dealers price above that: we measured{" "}
+                {gold.premiumLowPct}–{gold.premiumHighPct}% on the days we
+                checked, which is the range shown. That margin is not fixed and
+                we have not established it as stable, which is why this is shown
+                as a range and not a single figure.
+              </p>
+              <p className="mt-3 max-w-3xl text-xs leading-relaxed text-gray-400/90">
+                Actual Sarafa Bazaar and jewellers&apos; rates will differ, and
+                will also vary by city, by dealer, and with making charges. For a
+                rate you can act on, check with your local Sarafa market or
+                dealer.
+              </p>
+            </div>
+          )}
 
           {data && (
             <>

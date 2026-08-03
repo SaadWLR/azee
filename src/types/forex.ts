@@ -23,9 +23,46 @@ export interface ForexRate {
   pkrPerUnit: number;
 }
 
+/**
+ * A COMPUTED estimate of the local Karachi Sarafa gold rate.
+ *
+ * This is not a quote. Nobody publishes this number to us: it is
+ * arithmetic on an international gold price and a currency rate, plus
+ * an assumed local premium — two layers of approximation stacked. The
+ * real Sarafa Bazaar rate is set by APSGJA once daily and is not
+ * obtainable from any source we were able to verify.
+ *
+ * It is therefore expressed as a RANGE, not a figure. The local
+ * premium was measured at 1.18–1.85% over spot across two separate
+ * days and is explicitly not established as stable, so publishing a
+ * single number would assert a precision the data does not support.
+ * The type has no single `value` field on purpose.
+ */
+export interface GoldEstimate {
+  /** Low end of the estimated range, PKR per tola. */
+  lowPkrPerTola: number;
+  /** High end of the estimated range, PKR per tola. */
+  highPkrPerTola: number;
+  /** The zero-premium arithmetic result, before any local premium. */
+  basePkrPerTola: number;
+  /** International spot gold used, USD per troy ounce. */
+  spotUsdPerOz: number;
+  /** The premium band applied, as percentages. */
+  premiumLowPct: number;
+  premiumHighPct: number;
+  /** Source's own date for the spot price, passed through verbatim. */
+  spotAsOf: string;
+}
+
 /** Response for GET /api/market/forex. */
 export interface ForexResponse {
   rates: ForexRate[];
+  /**
+   * Absent when the gold input could not be fetched or validated —
+   * the currency rates are unaffected, and the page simply omits the
+   * estimate rather than showing a stale or half-derived figure.
+   */
+  gold?: GoldEstimate;
   /**
    * The SOURCE's own last-update time, passed through verbatim — never
    * the time we fetched, and never regenerated. The source publishes

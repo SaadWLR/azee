@@ -101,6 +101,75 @@ test("the displayed timestamp is the source's own, not our fetch time", async ({
   expect(second, "timestamp is stable across loads").toBe(first);
 });
 
+test("local gold is presented as an estimated range, never a quote", async ({
+  page,
+}) => {
+  await page.goto("/forex");
+  const main = page.locator("main");
+  await expect(
+    page.getByRole("heading", { name: "Local Gold — Estimated" }),
+  ).toBeVisible();
+
+  // It must never read as a market price a visitor could transact at.
+  await expect(main).toContainText(/not a market quote/i);
+  await expect(main).toContainText(/Karachi Sarafa Bazaar/i);
+  await expect(main).toContainText(/Actual Sarafa Bazaar and jewellers/i);
+  // The workings must be shown, not hidden.
+  await expect(main).toContainText(/How this is worked out/i);
+  await expect(main).toContainText(/not fixed and we have not established it as stable/i);
+
+  /*
+   * The figure must be a RANGE. A single number here would assert a
+   * precision the premium data does not support, so every gold row
+   * has to carry a low–high pair.
+   */
+  const goldTable = page.locator("main table").nth(1);
+  const cells = await goldTable
+    .locator("tbody tr td:last-child")
+    .allInnerTexts();
+  expect(cells.length).toBeGreaterThanOrEqual(2);
+  for (const c of cells) {
+    expect(c, "gold figure is a range").toMatch(
+      /^[\d,]+\s*–\s*[\d,]+$/,
+    );
+    const [lo, hi] = c.split("–").map((s) => Number(s.replace(/[^\d]/g, "")));
+    expect(hi).toBeGreaterThan(lo);
+  }
+
+  // Sanity: a tola of gold is a six-figure rupee number.
+  const tola = cells[0].split("–").map((s) => Number(s.replace(/[^\d]/g, "")));
+  expect(tola[0]).toBeGreaterThan(100_000);
+  expect(tola[0]).toBeLessThan(2_000_000);
+
+  // Silver and platinum are deliberately absent this milestone.
+  const text = await main.innerText();
+  expect(text).not.toMatch(/\bSilver\b/i);
+  expect(text).not.toMatch(/\bPlatinum\b/i);
+});
+
+test("GET /api/market/forex carries a gold range, not a point figure", async ({
+  request,
+}) => {
+  const response = await request.get("/api/market/forex");
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+
+  // Gold is optional by design — it must never break the currencies.
+  if (!body.gold) {
+    expect(Array.isArray(body.rates)).toBe(true);
+    return;
+  }
+  const g = body.gold;
+  expect(g.highPkrPerTola).toBeGreaterThan(g.lowPkrPerTola);
+  expect(g.lowPkrPerTola).toBeGreaterThan(g.basePkrPerTola);
+  expect(g.premiumHighPct).toBeGreaterThan(g.premiumLowPct);
+  expect(g.spotUsdPerOz).toBeGreaterThan(500);
+  expect(Number.isNaN(Date.parse(g.spotAsOf))).toBe(false);
+  // No single headline value that could be mistaken for a quote.
+  expect(g).not.toHaveProperty("value");
+  expect(g).not.toHaveProperty("pkrPerTola");
+});
+
 test("Forex is a top-level nav link and Products left the bar", async ({
   page,
 }) => {
