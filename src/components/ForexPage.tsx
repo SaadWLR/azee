@@ -63,8 +63,10 @@ export function ForexPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300/90">
             Foreign Exchange
           </p>
+          {/* Matches the top-level nav label: the page carries both
+              currency rates and the local gold estimate below. */}
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            PKR Exchange Rates
+            Forex &amp; Commodities
           </h1>
           {/* Brand-signature stripe — same motif as the other page
               headings (mt-4 under this 3xl/4xl heading). */}

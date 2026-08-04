@@ -92,7 +92,7 @@ test("Products section survives losing its nav link", async ({ page }) => {
   // The nav slot is gone...
   await expect(page.locator('header nav ul a[href="#products"]')).toHaveCount(0);
   await expect(
-    page.locator("header nav ul").getByRole("link", { name: "Forex" }),
+    page.locator("header nav ul").getByRole("link", { name: "Forex & Commodities" }),
   ).toBeVisible();
 
   // ...but the section itself still renders, in full.

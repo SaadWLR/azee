@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FadeIn } from "./FadeIn";
 import azeeLogo from "../assets/azee-logo.png";
@@ -29,9 +29,9 @@ function BrandMark() {
  * Top-level nav. Most entries are homepage section anchors (hash
  * targets on "/"); an entry with `to` instead is a real route link.
  *
- * "Forex" took the slot "Products" used to hold — the bar has a hard
- * width budget at 1024px, and Forex earns a top-level place as a
- * standalone page in a way an on-page section does not. The Products
+ * "Forex & Commodities" took the slot "Products" used to hold — the bar
+ * has a hard width budget at 1024px, and it earns a top-level place as
+ * a standalone page in a way an on-page section does not. The Products
  * SECTION is untouched and still renders on the homepage; it simply
  * lost its direct shortcut, and is still reached by scrolling or via
  * the "Every market, one relationship." section itself.
@@ -44,27 +44,57 @@ const NAV_LINKS: NavLink[] = [
   { label: "Markets", hash: "#markets" },
   { label: "Research", hash: "#research" },
   { label: "Trading", hash: "#trading" },
-  { label: "Forex", to: "/forex" },
+  // Named for what the page holds: currency rates AND a local gold
+  // estimate. Route stays /forex.
+  { label: "Forex & Commodities", to: "/forex" },
   { label: "About", hash: "#about" },
 ];
 
 /**
- * Standalone tool/resource pages, grouped under the desktop "Tools"
- * dropdown (and listed flat on mobile). Adding a future tool page —
- * e.g. Forex & Commodities or an Economic Calendar — is a one-line
- * entry here; nothing else needs wiring. "Calendar" is deliberately
- * short (the desktop bar's width budget); the destination is the full
- * Corporate Calendar page.
+ * Standalone tool/resource pages under the single "Tools" trigger,
+ * organised into two labelled groups rather than one flat list.
+ *
+ * Two groups, one trigger — deliberately not two top-level dropdowns:
+ * at seven items a flat list is merely long, not confusing, and the
+ * desktop bar's 1024px width budget is the scarcer resource. Grouping
+ * inside the existing panel buys the clarity without spending a slot.
+ *
+ * "Markets" is live-price tooling; "Research" is reference, disclosure
+ * and macro. The same grouping renders on mobile, so the two surfaces
+ * describe the site identically.
+ *
+ * "Commodity Futures" is named in full to disambiguate it from the
+ * top-level "Forex & Commodities" — this one is PMEX futures
+ * contracts, not spot. "Calendar" stays short for width; it goes to
+ * the full Corporate Calendar page.
+ *
+ * Knowledge Centre is deliberately NOT here: it already has its own
+ * link in the footer's Research & News column, which is now its single
+ * nav path.
  */
-const TOOL_LINKS = [
-  { label: "Market Watch", to: "/market-watch" },
-  { label: "Indices", to: "/indices" },
-  { label: "Commodities", to: "/commodities" },
-  { label: "ETFs", to: "/etfs" },
-  { label: "Announcements", to: "/announcements" },
-  { label: "Calendar", to: "/corporate-calendar" },
-  { label: "Knowledge Centre", to: "/knowledge-centre" },
-];
+const TOOL_GROUPS: { heading: string; links: { label: string; to: string }[] }[] =
+  [
+    {
+      heading: "Markets",
+      links: [
+        { label: "Market Watch", to: "/market-watch" },
+        { label: "Indices", to: "/indices" },
+        { label: "Commodity Futures", to: "/commodities" },
+        { label: "ETFs", to: "/etfs" },
+      ],
+    },
+    {
+      heading: "Research",
+      links: [
+        { label: "Announcements", to: "/announcements" },
+        { label: "Calendar", to: "/corporate-calendar" },
+        { label: "Economic Dashboard", to: "/economic-dashboard" },
+      ],
+    },
+  ];
+
+/** Flattened, for active-route detection and any list rendering. */
+const TOOL_LINKS = TOOL_GROUPS.flatMap((g) => g.links);
 
 /**
  * Desktop "Tools" dropdown. Click-to-open (robust on touch/hybrid
@@ -148,21 +178,33 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        {TOOL_LINKS.map((tool) => (
-          <Link
-            key={tool.to}
-            to={tool.to}
-            role="menuitem"
-            tabIndex={open ? 0 : -1}
-            onClick={() => setOpen(false)}
-            className={`block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
-              pathname === tool.to
-                ? "bg-white/10 text-white"
-                : "text-gray-300 hover:bg-white/10 hover:text-white"
-            }`}
+        {TOOL_GROUPS.map((group, i) => (
+          <div
+            key={group.heading}
+            role="group"
+            aria-label={group.heading}
+            className={i > 0 ? "mt-1.5 border-t border-white/10 pt-1.5" : ""}
           >
-            {tool.label}
-          </Link>
+            <p className="px-4 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+              {group.heading}
+            </p>
+            {group.links.map((tool) => (
+              <Link
+                key={tool.to}
+                to={tool.to}
+                role="menuitem"
+                tabIndex={open ? 0 : -1}
+                onClick={() => setOpen(false)}
+                className={`block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
+                  pathname === tool.to
+                    ? "bg-white/10 text-white"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {tool.label}
+              </Link>
+            ))}
+          </div>
         ))}
       </div>
     </li>
@@ -222,22 +264,30 @@ function MobileMenu({
             )}
           </li>
         ))}
-        {/* Tools group — same links as the desktop dropdown, listed
-            flat here (mobile's vertical list has no width pressure). A
-            small label groups them, mirroring the desktop grouping. */}
+        {/* Tools — the same two groups as the desktop dropdown, so both
+            surfaces describe the site identically. Mobile's vertical
+            list has no width pressure, so each group is simply a
+            sub-heading with its links beneath. */}
         <li className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
           Tools
         </li>
-        {TOOL_LINKS.map((tool) => (
-          <li key={tool.to} className="border-b border-white/10">
-            <Link
-              to={tool.to}
-              onClick={onNavigate}
-              className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-            >
-              {tool.label}
-            </Link>
-          </li>
+        {TOOL_GROUPS.map((group) => (
+          <Fragment key={group.heading}>
+            <li className="px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
+              {group.heading}
+            </li>
+            {group.links.map((tool) => (
+              <li key={tool.to} className="border-b border-white/10">
+                <Link
+                  to={tool.to}
+                  onClick={onNavigate}
+                  className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
+                >
+                  {tool.label}
+                </Link>
+              </li>
+            ))}
+          </Fragment>
         ))}
       </ul>
       <a

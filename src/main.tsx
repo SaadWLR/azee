@@ -59,6 +59,12 @@ const LEGAL_ROUTES = [
   "fee-schedule",
 ];
 
+const EconomicDashboardPage = lazy(() =>
+  import("./components/EconomicDashboardPage").then((m) => ({
+    default: m.EconomicDashboardPage,
+  })),
+);
+
 const ForexPage = lazy(() =>
   import("./components/ForexPage").then((m) => ({
     default: m.ForexPage,
@@ -167,6 +173,14 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       })),
+      {
+        path: "/economic-dashboard",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <EconomicDashboardPage />
+          </Suspense>
+        ),
+      },
       {
         path: "/forex",
         element: (

@@ -27,20 +27,29 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
-  // Open on click → all seven tools present.
+  // Open on click → seven tools across two labelled groups.
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await expect(menu.getByRole("menuitem")).toHaveCount(7);
+
+  // Two groups, in order, each holding its own links.
+  const groups = menu.getByRole("group");
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0)).toHaveAttribute("aria-label", "Markets");
+  await expect(groups.nth(1)).toHaveAttribute("aria-label", "Research");
+  await expect(groups.nth(0).getByRole("menuitem")).toHaveCount(4);
+  await expect(groups.nth(1).getByRole("menuitem")).toHaveCount(3);
+  for (const name of ["Market Watch", "Indices", "Commodity Futures", "ETFs"]) {
+    await expect(groups.nth(0).getByRole("menuitem", { name })).toBeVisible();
+  }
+  for (const name of ["Announcements", "Calendar", "Economic Dashboard"]) {
+    await expect(groups.nth(1).getByRole("menuitem", { name })).toBeVisible();
+  }
+
+  // Knowledge Centre left Tools; the footer is now its only nav path.
   await expect(
     menu.getByRole("menuitem", { name: "Knowledge Centre" }),
-  ).toBeVisible();
-  await expect(
-    menu.getByRole("menuitem", { name: "Indices" }),
-  ).toBeVisible();
-  await expect(
-    menu.getByRole("menuitem", { name: "Commodities" }),
-  ).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "ETFs" })).toBeVisible();
+  ).toHaveCount(0);
   // Current route's item is highlighted inside the panel.
   await expect(
     menu.getByRole("menuitem", { name: "Market Watch" }),

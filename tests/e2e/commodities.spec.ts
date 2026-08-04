@@ -141,7 +141,7 @@ test("Tools dropdown, Footer and the Products tile all reach /commodities", asyn
   await page.getByRole("button", { name: /tools/i }).click();
   await page
     .getByRole("menu", { name: /tools/i })
-    .getByRole("menuitem", { name: "Commodities" })
+    .getByRole("menuitem", { name: "Commodity Futures" })
     .click();
   await expect(page).toHaveURL(/\/commodities$/);
 
