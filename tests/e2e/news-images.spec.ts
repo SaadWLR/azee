@@ -74,17 +74,28 @@ test("shows ≥5 stories by default and 'See more' reveals the rest without fabr
   // Every card is an external <a target="_blank">; the "See more"
   // control is a <button>, so this counts stories only.
   const stories = page.locator('#research a[target="_blank"]');
-  await expect.poll(async () => stories.count()).toBeGreaterThanOrEqual(5);
-  const defaultCount = await stories.count();
 
-  // Nothing shown is invented: the visible set never exceeds what the
-  // API actually returned.
+  /*
+   * What the feed actually returned, read first so the expectation
+   * tracks reality. A flat ">= 5" floor used to live here and failed
+   * on a genuinely thin day (the publishers returned 4), which was the
+   * page correctly showing everything it had rather than padding —
+   * i.e. the test failed the no-fabrication rule for holding.
+   */
   const apiCount = await page.evaluate(async () => {
     const r = await fetch("/api/news/latest", {
       headers: { Accept: "application/json" },
     });
     return (await r.json()).items.length as number;
   });
+  expect(apiCount, "the feed returned at least one story").toBeGreaterThan(0);
+
+  // The default view shows up to five, or the whole feed if shorter.
+  const expectedDefault = Math.min(apiCount, 5);
+  await expect.poll(async () => stories.count()).toBe(expectedDefault);
+  const defaultCount = await stories.count();
+
+  // Nothing shown is invented: the visible set never exceeds the feed.
   expect(defaultCount).toBeLessThanOrEqual(apiCount);
 
   // The live feed returns well over the default set, so the control is

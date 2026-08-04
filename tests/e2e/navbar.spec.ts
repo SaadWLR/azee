@@ -83,10 +83,12 @@ test("dropdown link navigates, closes the menu, and highlights Tools on the new 
   const trigger = page.getByRole("button", { name: /^tools$/i });
 
   await trigger.click();
-  await page.getByRole("menuitem", { name: "Knowledge Centre" }).click();
+  // Uses a Research-group item: Knowledge Centre left Tools for the
+  // footer, and this also exercises the newer of the two groups.
+  await page.getByRole("menuitem", { name: "Economic Dashboard" }).click();
 
-  await expect(page).toHaveURL(/\/knowledge-centre$/);
-  await expect(trigger).toHaveClass(/after:w-6/); // Tools active on KC page
+  await expect(page).toHaveURL(/\/economic-dashboard$/);
+  await expect(trigger).toHaveClass(/after:w-6/); // Tools active on that route
   await expect(trigger).toHaveAttribute("aria-expanded", "false"); // closed after nav
 });
 
