@@ -90,8 +90,18 @@ test("shows ≥5 stories by default and 'See more' reveals the rest without fabr
   });
   expect(apiCount, "the feed returned at least one story").toBeGreaterThan(0);
 
-  // The default view shows up to five, or the whole feed if shorter.
-  const expectedDefault = Math.min(apiCount, 5);
+  /*
+   * The default view shows 1 lead + 2 side + 3 grid cards, per
+   * Research.tsx's SIDE_HEADLINES and GRID_HEADLINES_DEFAULT — or the
+   * whole feed when it is shorter than that.
+   *
+   * This number is taken from those constants, not inferred: an
+   * earlier version of this assertion guessed 5 from the test's own
+   * name and passed only because the feed happened to be shorter than
+   * both figures that day.
+   */
+  const DEFAULT_VISIBLE = 1 + 2 + 3;
+  const expectedDefault = Math.min(apiCount, DEFAULT_VISIBLE);
   await expect.poll(async () => stories.count()).toBe(expectedDefault);
   const defaultCount = await stories.count();
 
