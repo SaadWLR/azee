@@ -79,16 +79,56 @@ test("etfs page deep-links and lists live PSX ETFs with full price detail", asyn
   expect(errors).toEqual([]);
 });
 
-test("the Footer 'Mutual Funds & ETFs' link reaches /etfs", async ({ page }) => {
+test("the Footer 'ETFs' link reaches /etfs", async ({ page }) => {
   await page.goto("/");
-  await page
-    .getByRole("navigation", { name: "Markets" })
-    .getByRole("link", { name: "Mutual Funds & ETFs" })
-    .click();
+  const markets = page.getByRole("navigation", { name: "Markets" });
+
+  /*
+   * "ETFs" and "Mutual Funds" are separate footer entries. They were
+   * one "Mutual Funds & ETFs" link pointing at /etfs, which implied
+   * mutual funds were covered when only ETFs were.
+   */
+  await expect(markets.getByRole("link", { name: "ETFs", exact: true })).toHaveAttribute(
+    "href",
+    "/etfs",
+  );
+  await expect(
+    markets.getByRole("link", { name: "Mutual Funds", exact: true }),
+  ).toHaveAttribute("href", "/mutual-funds");
+  // The combined label is gone entirely.
+  await expect(
+    page.locator("footer").getByText("Mutual Funds & ETFs"),
+  ).toHaveCount(0);
+
+  await markets.getByRole("link", { name: "ETFs", exact: true }).click();
   await expect(page).toHaveURL(/\/etfs$/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Exchange Traded Funds" }),
   ).toBeVisible();
+});
+
+test("mutual funds is a separate, honestly pending page", async ({ page }) => {
+  const response = await page.goto("/mutual-funds");
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Mutual Funds" }),
+  ).toBeVisible();
+
+  const main = page.locator("main");
+  await expect(main).toContainText("Content pending");
+  await expect(main).toContainText(/have not yet confirmed a verified source/i);
+  // It must state the distinction it exists to make.
+  await expect(main).toContainText(/Mutual funds are not ETFs/i);
+
+  /*
+   * Zero fabricated data: no NAV, return or fund figure may appear
+   * ahead of the sourcing milestone. Same mechanical scan used for the
+   * Economic Dashboard rather than a visual check.
+   */
+  const text = await main.innerText();
+  const numberShaped =
+    text.match(/\b\d+(\.\d+)?\s*%|\bRs\.?\s*[\d,]+|\b\d{1,3}(,\d{3})+\b|\b\d+\.\d{2,4}\b/g) ?? [];
+  expect(numberShaped, "no figure-shaped text on a pending page").toEqual([]);
 });
 
 test("GET /api/market/etfs returns only PSX sector-0837 instruments", async ({

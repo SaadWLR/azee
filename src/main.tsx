@@ -59,6 +59,12 @@ const LEGAL_ROUTES = [
   "fee-schedule",
 ];
 
+const MutualFundsPage = lazy(() =>
+  import("./components/MutualFundsPage").then((m) => ({
+    default: m.MutualFundsPage,
+  })),
+);
+
 const EconomicDashboardPage = lazy(() =>
   import("./components/EconomicDashboardPage").then((m) => ({
     default: m.EconomicDashboardPage,
@@ -173,6 +179,14 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       })),
+      {
+        path: "/mutual-funds",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <MutualFundsPage />
+          </Suspense>
+        ),
+      },
       {
         path: "/economic-dashboard",
         element: (

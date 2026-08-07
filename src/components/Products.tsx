@@ -43,7 +43,15 @@ const PRODUCTS: Product[] = [
   {
     icon: IconPie,
     title: "Mutual Funds",
-    text: "Access diversified funds and ETFs across equity, income, and money-market categories to complement direct shareholdings.",
+    /*
+     * Was "diversified funds and ETFs …" — dropped the ETF mention.
+     * A tile titled "Mutual Funds" that also claims ETFs blurs two
+     * different products, which is the conflation this milestone
+     * exists to undo. ETFs have their own page and their own footer
+     * entry.
+     */
+    text: "Access diversified open-end funds across equity, income, and money-market categories to complement direct shareholdings.",
+    to: "/mutual-funds",
   },
   {
     icon: IconResearch,

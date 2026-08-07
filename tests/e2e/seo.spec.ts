@@ -83,6 +83,7 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     "/etfs",
     "/forex",
     "/economic-dashboard",
+    "/mutual-funds",
     "/announcements",
     "/corporate-calendar",
     "/knowledge-centre",
@@ -99,6 +100,6 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     // The trailing "<" ensures an exact <loc> match, not a prefix.
     expect(body).toContain(`<loc>https://azee.vercel.app${path}</loc>`);
   }
-  // 27 URLs total — ten top routes, eight modules, nine legal pages.
-  expect(body.match(/<loc>/g)?.length).toBe(27);
+  // 28 URLs total — eleven top routes, eight modules, nine legal pages.
+  expect(body.match(/<loc>/g)?.length).toBe(28);
 });

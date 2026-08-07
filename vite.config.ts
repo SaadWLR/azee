@@ -23,6 +23,7 @@ function buildSitemap(): string {
     { path: "/commodities", changefreq: "hourly", priority: "0.9" },
     { path: "/forex", changefreq: "daily", priority: "0.8" },
     { path: "/economic-dashboard", changefreq: "monthly", priority: "0.5" },
+    { path: "/mutual-funds", changefreq: "monthly", priority: "0.5" },
     { path: "/etfs", changefreq: "hourly", priority: "0.8" },
     { path: "/announcements", changefreq: "hourly", priority: "0.8" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },

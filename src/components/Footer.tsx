@@ -19,7 +19,8 @@ const COLUMNS: { heading: string; links: string[] }[] = [
       "Company Announcements",
       "Corporate Calendar",
       "IPO Calendar",
-      "Mutual Funds & ETFs",
+      "ETFs",
+      "Mutual Funds",
     ],
   },
   {
@@ -62,13 +63,18 @@ const LIVE_ROUTES: Record<string, string> = {
   "PSX Indices": "/indices",
   "PMEX Commodities": "/commodities",
   // Covers the currencies half of this label; the futures half lives
-  // on /indices?tab=global. Same approach as "Mutual Funds & ETFs"
-  // above — wire the half that exists rather than leave a dead link.
+  // on /indices?tab=global — wire the half that exists rather than
+  // leave a dead link.
   "Currencies & Futures": "/forex",
-  // Covers the ETF half of this label today; a later milestone adds
-  // mutual funds (separate instrument, separate source) and may split
-  // this entry in two.
-  "Mutual Funds & ETFs": "/etfs",
+  /*
+   * Split apart deliberately. These were one "Mutual Funds & ETFs"
+   * entry pointing at /etfs, which implied mutual funds were already
+   * covered when only ETFs were. They are different products — an ETF
+   * trades intraday at a market price, an open-end fund is struck at a
+   * daily NAV — and only ETFs has real data today.
+   */
+  ETFs: "/etfs",
+  "Mutual Funds": "/mutual-funds",
   "Company Announcements": "/announcements",
   "Corporate Calendar": "/corporate-calendar",
   // Legal & compliance. Regulatory Information, Complaints and Cookie
