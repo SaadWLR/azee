@@ -101,7 +101,7 @@ Use this for pre-merge verification once CI wiring lands.
 | `homepage-smoke.spec.ts` | Load, title, nav/hero/footer, clean console — at 1920/1440/768/375 |
 | `market-snapshot.spec.ts` | Live KSE-100 plausibility; live stats present; **fabricated-stats regression guard** (Market Value / sectors / IPOs / Symbols Traded must never reappear in the panel) |
 | `ticker-tape.spec.ts` | Marquee renders ≥10 live quotes; old fixture-order leak guard; clean console |
-| `api-contracts.spec.ts` | `/api/market/snapshot` has no `stats` key; `/api/market/watch` row floor & shape; forbidden fabricated strings absent (runs once, desktop project) |
+| `api-contracts.spec.ts` | `/api/market/indices` (the KSE-100 feed) has no `stats` key and the retired `/api/market/snapshot` stays 404; `/api/market/watch` row floor & shape; forbidden fabricated strings absent (runs once, desktop project) |
 
 History note: this suite (added Jul 11, 2026) is the repo's first
 Playwright installation — earlier milestone verifications were ad-hoc

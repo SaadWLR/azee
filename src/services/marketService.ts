@@ -130,17 +130,69 @@ const MARKET_WATCH_FULL: StockQuote[] = [
   { symbol: "PPL", price: 189.6, changePercent: -0.88, changePoints: -1.68, volume: 7220900, isKmi30: true, isKmiAllShare: true },
 ];
 
-/** Index level, session statistics, and market status. */
+/**
+ * The label the KSE-100 panel shows. The indices feed publishes the
+ * bare index name ("KSE-100"); the hero panel has always shown the
+ * fuller "KSE-100 Index", so the suffix is applied here rather than
+ * changing what the API reports.
+ */
+const KSE100_PANEL_NAME = "KSE-100 Index";
+
+/**
+ * Index level and market status for the KSE-100.
+ *
+ * Sourced from /api/market/indices rather than a dedicated endpoint.
+ * There used to be an api/market/snapshot.ts, but it fetched the exact
+ * same PSX timeseries pair (/timeseries/int/KSE100 + /eod/KSE100) and
+ * ran the identical previous-close derivation as the indices endpoint's
+ * KSE100 entry — it was that endpoint hardcoded to one index, and cost
+ * a Vercel function slot to be so. Verified live before removal: both
+ * returned value 179846.68, changePercent -0.81, changePoints -1463.6.
+ *
+ * The panel already fetched BOTH endpoints and then discarded KSE100
+ * from the indices response, so this also removes a duplicate request.
+ *
+ * asOf comes from the KSE100 quote's own tick — not the response-level
+ * asOf, which is the freshest tick across all five indices — preserving
+ * exactly what the old endpoint reported.
+ */
 export async function getMarketSnapshot(): Promise<MarketSnapshot> {
   if (import.meta.env.DEV) {
     // Vercel serverless routes don't run under `vite dev`; the fixture
-    // keeps local development working. Deployed builds always fetch
-    // the live KSE-100 snapshot from the API route. asOf is stamped
+    // keeps local development working. Deployed builds always derive
+    // the live KSE-100 snapshot from the indices feed. asOf is stamped
     // fresh per call so the "updated Xs ago" indicator behaves like the
     // live endpoint (which always returns a real asOf) during dev.
     return mockResponse({ ...MARKET_SNAPSHOT, asOf: new Date().toISOString() });
   }
-  return apiGet<MarketSnapshot>("/api/market/snapshot");
+
+  const indices = await getMarketIndices();
+  const kse100 = indices.indices.find((index) => index.code === "KSE100");
+  if (!kse100) {
+    /*
+     * The indices endpoint omits an index it could not fetch rather
+     * than fabricating one, so a missing KSE100 is a real outage, not a
+     * shape change. Throwing routes it into useAsyncData's error path —
+     * the panel renders nothing — which is what the old endpoint's 503
+     * did. Never substitute another index for it.
+     */
+    throw new Error("PSX indices feed carried no KSE-100 entry");
+  }
+
+  return {
+    index: {
+      name: KSE100_PANEL_NAME,
+      value: kse100.value,
+      changePercent: kse100.changePercent,
+      changePoints: kse100.changePoints,
+      direction: kse100.direction,
+    },
+    status: indices.status,
+    timestamp: "Karachi · PKT",
+    asOf: kse100.asOf,
+    source: indices.source,
+    stale: indices.stale,
+  };
 }
 
 /** Live values for the five PSX benchmark indices (multi-index feed). */

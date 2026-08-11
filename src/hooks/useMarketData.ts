@@ -14,8 +14,8 @@ import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
   /*
-   * 75s: the snapshot endpoint's edge cache is s-maxage=60 during
-   * market hours (confirmed in api/market/snapshot.ts, same window as
+   * 75s: the KSE-100 snapshot is composed from /api/market/indices,
+   * whose edge cache is s-maxage=60 during market hours (same window as
    * /api/market/watch), so the same slightly-above-the-cache-window
    * reasoning as useTickerQuotes applies. Outside sessions the
    * endpoint serves a 30-minute cache, so those polls are cheap edge

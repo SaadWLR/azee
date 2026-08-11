@@ -38,8 +38,17 @@ const FORBIDDEN_FABRICATIONS = [
   "703.7M shares",
 ];
 
-test("GET /api/market/snapshot honours the M4 contract", async ({ request }) => {
-  const response = await request.get("/api/market/snapshot");
+/*
+ * The KSE-100 hero panel used to have its own /api/market/snapshot
+ * endpoint. It was retired once it was confirmed to fetch the identical
+ * PSX timeseries pair and run the identical derivation as the indices
+ * endpoint's KSE100 entry — the panel now composes its snapshot from
+ * that entry (see getMarketSnapshot in src/services/marketService.ts).
+ * The M4 contract it guarded still applies, so it is asserted here
+ * against the surviving source of those numbers.
+ */
+test("the KSE-100 feed honours the M4 contract", async ({ request }) => {
+  const response = await request.get("/api/market/indices");
   expect(response.status()).toBe(200);
   const body = await response.json();
 
@@ -47,18 +56,29 @@ test("GET /api/market/snapshot honours the M4 contract", async ({ request }) => 
   // means fabricated rows are being served again.
   expect(body).not.toHaveProperty("stats");
 
-  expect(body.index.name).toBe("KSE-100 Index");
-  expect(body.index.value).toBeGreaterThan(100_000);
-  expect(body.index.value).toBeLessThan(300_000);
+  const kse100 = body.indices.find(
+    (index: { code: string }) => index.code === "KSE100",
+  );
+  expect(kse100, "the indices feed carries a KSE-100 entry").toBeTruthy();
+  expect(kse100.value).toBeGreaterThan(100_000);
+  expect(kse100.value).toBeLessThan(300_000);
   expect(["OPEN", "CLOSED"]).toContain(body.status);
   expect(["psx", "cache"]).toContain(body.source);
 
   const raw = JSON.stringify(body);
   for (const forbidden of FORBIDDEN_FABRICATIONS) {
-    expect(raw, `snapshot payload must not contain "${forbidden}"`).not.toContain(
+    expect(raw, `indices payload must not contain "${forbidden}"`).not.toContain(
       forbidden,
     );
   }
+});
+
+/** The retired endpoint must stay retired — it costs a function slot. */
+test("/api/market/snapshot is gone, not silently restored", async ({
+  request,
+}) => {
+  const response = await request.get("/api/market/snapshot");
+  expect(response.status()).toBe(404);
 });
 
 test("GET /api/market/watch returns a real market table", async ({ request }) => {
