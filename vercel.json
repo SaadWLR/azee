@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/market/commodities",
+      "destination": "/api/market/pmex?feed=commodities"
+    },
+    {
+      "source": "/api/market/global-futures",
+      "destination": "/api/market/pmex?feed=global-futures"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
