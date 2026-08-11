@@ -17,6 +17,14 @@
       "destination": "/api/market/psx-watch?view=etfs"
     },
     {
+      "source": "/api/calendar/agm",
+      "destination": "/api/calendar/corporate?view=meetings"
+    },
+    {
+      "source": "/api/payouts/latest",
+      "destination": "/api/calendar/corporate?view=payouts"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
