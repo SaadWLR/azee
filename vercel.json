@@ -9,6 +9,14 @@
       "destination": "/api/market/pmex?feed=global-futures"
     },
     {
+      "source": "/api/market/watch",
+      "destination": "/api/market/psx-watch?view=watch"
+    },
+    {
+      "source": "/api/market/etfs",
+      "destination": "/api/market/psx-watch?view=etfs"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
