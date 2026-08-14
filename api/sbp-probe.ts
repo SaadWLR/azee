@@ -24,9 +24,13 @@ const TARGETS = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ?url= probes one extra target; ?full=1 returns whole bodies so a
+  // block page's own error code / Ray ID can be read.
   const extra = req.query.url ? [String(req.query.url)] : [];
+  const full = req.query.full === "1";
+  const only = req.query.only === "1";
   const results = [];
-  for (const url of [...TARGETS, ...extra]) {
+  for (const url of only && extra.length ? extra : [...TARGETS, ...extra]) {
     const started = Date.now();
     try {
       const r = await fetch(url, {
@@ -38,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       const buf = await r.arrayBuffer();
       const head = new TextDecoder("utf-8", { fatal: false }).decode(
-        buf.slice(0, 3000),
+        full ? buf : buf.slice(0, 3000),
       );
       results.push({
         url,
@@ -53,7 +57,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           (b, i) => b === [0x25, 0x50, 0x44, 0x46][i],
         ),
         denied: /Access Denied|Signature ID/i.test(head),
-        head: head.replace(/\s+/g, " ").slice(0, 900),
+        cfRay: r.headers.get("cf-ray"),
+        cfMitigated: r.headers.get("cf-mitigated"),
+        head: head.replace(/\s+/g, " ").slice(0, full ? 20000 : 900),
       });
     } catch (e) {
       results.push({ url, ok: false, ms: Date.now() - started, error: String(e) });
