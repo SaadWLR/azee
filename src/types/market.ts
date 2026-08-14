@@ -14,6 +14,20 @@ export interface MarketIndex {
 /** A single listed-symbol quote for tickers and watchlists. */
 export interface StockQuote {
   symbol: string;
+  /**
+   * Full company name from PSX's own symbol directory. Optional: the
+   * directory is a second, independent fetch, and a symbol it does not
+   * carry (or a directory outage) leaves this absent so the UI shows
+   * the bare ticker — never a guessed or prettified name.
+   */
+  name?: string;
+  /**
+   * PSX-published sector NAME (e.g. "COMMERCIAL BANKS"). The
+   * market-watch table itself carries only an unmapped 4-digit sector
+   * code, so this comes from the same directory as `name` and is
+   * optional for the same reasons.
+   */
+  sector?: string;
   price: number;
   changePercent: number;
   /** Change in currency points (live market-watch data only). */

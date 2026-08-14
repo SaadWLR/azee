@@ -6,13 +6,26 @@ import { usePageMeta } from "../hooks/usePageMeta";
 import type { StockQuote } from "../types";
 
 /*
- * Live Market Watch — the full PSX quote table. Data limits of the
- * source (see getAllMarketQuotes): symbols only (no company names),
- * no sector names, no fundamentals. The table shows exactly what the
- * StockQuote carries and never fabricates the rest.
+ * Live Market Watch — the full PSX quote table.
+ *
+ * Company name and sector name come from PSX's own symbol directory,
+ * joined to each quote by ticker server-side (api/market/psx-watch.ts).
+ * Both are OPTIONAL by design: a symbol the directory does not carry,
+ * or a directory outage, leaves the row showing its bare ticker — which
+ * is exactly what this page showed before the join existed. Nothing is
+ * ever guessed or prettified to fill the gap.
+ *
+ * Still not available from this source, and so still absent rather than
+ * fabricated: fundamentals of any kind.
  */
 
-type SortColumn = "symbol" | "price" | "changePercent" | "changePoints" | "volume";
+type SortColumn =
+  | "symbol"
+  | "sector"
+  | "price"
+  | "changePercent"
+  | "changePoints"
+  | "volume";
 type SortDir = "asc" | "desc";
 type Preset = "all" | "gainers" | "losers" | "active" | "kmi30" | "kmiAllShare";
 
@@ -29,6 +42,7 @@ const PRESETS: { id: Preset; label: string }[] = [
 
 const COLUMNS: { id: SortColumn; label: string; numeric: boolean }[] = [
   { id: "symbol", label: "Symbol", numeric: false },
+  { id: "sector", label: "Sector", numeric: false },
   { id: "price", label: "Price", numeric: true },
   { id: "changePercent", label: "Change %", numeric: true },
   { id: "changePoints", label: "Change", numeric: true },
@@ -38,6 +52,7 @@ const COLUMNS: { id: SortColumn; label: string; numeric: boolean }[] = [
 /** Each preset carries its natural default sort. */
 const PRESET_SORT: Record<Preset, { column: SortColumn; dir: SortDir }> = {
   all: { column: "symbol", dir: "asc" },
+  // Sector sorts A→Z like Symbol; the numeric columns default desc.
   gainers: { column: "changePercent", dir: "desc" },
   losers: { column: "changePercent", dir: "asc" },
   active: { column: "volume", dir: "desc" },
@@ -89,7 +104,7 @@ function ChangeCell({ value, suffix }: { value: number | undefined; suffix: stri
 export function MarketWatchPage() {
   usePageMeta(
     "Market Watch — Live PSX Stock Prices | AZEE Trade",
-    "Live prices for all ~490 Pakistan Stock Exchange symbols — sortable and searchable, with KMI-30, gainers, and losers filters, updated through the trading session.",
+    "Live prices for all ~490 Pakistan Stock Exchange symbols with company names and sectors — sortable and searchable, with KMI-30, gainers, and losers filters, updated through the trading session.",
   );
   const { data: quotes, loading, error } = useAllMarketQuotes();
   const [preset, setPreset] = useState<Preset>("all");
@@ -109,7 +124,10 @@ export function MarketWatchPage() {
     setSort((prev) =>
       prev.column === column
         ? { column, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { column, dir: column === "symbol" ? "asc" : "desc" },
+        : {
+            column,
+            dir: column === "symbol" || column === "sector" ? "asc" : "desc",
+          },
     );
     setPage(1);
   }
@@ -124,15 +142,40 @@ export function MarketWatchPage() {
     else if (preset === "kmiAllShare") rows = rows.filter((q) => q.isKmiAllShare);
     // "active" and "all" include every row; their difference is sort.
 
-    // Symbol text filter.
+    /*
+     * Text filter across ticker, company name and sector — now that the
+     * latter two are real, "searching" for a company by its name or a
+     * whole sector is the obvious expectation. Rows without a name or
+     * sector simply match on ticker, as they always did.
+     */
     const term = search.trim().toUpperCase();
-    if (term) rows = rows.filter((q) => q.symbol.includes(term));
+    if (term) {
+      rows = rows.filter(
+        (q) =>
+          q.symbol.includes(term) ||
+          q.name?.toUpperCase().includes(term) ||
+          q.sector?.toUpperCase().includes(term),
+      );
+    }
 
     // Sort.
     const { column, dir } = sort;
     const factor = dir === "asc" ? 1 : -1;
     rows = [...rows].sort((a, b) => {
       if (column === "symbol") return factor * a.symbol.localeCompare(b.symbol);
+      if (column === "sector") {
+        /*
+         * Rows with no sector sort last in BOTH directions rather than
+         * leading the ascending view with a block of blanks; ties fall
+         * back to ticker so the order is stable and readable.
+         */
+        const as = a.sector ?? "";
+        const bs = b.sector ?? "";
+        if (!as !== !bs) return as ? -1 : 1;
+        return (
+          factor * as.localeCompare(bs) || a.symbol.localeCompare(b.symbol)
+        );
+      }
       const av = (a[column] as number | undefined) ?? -Infinity;
       const bv = (b[column] as number | undefined) ?? -Infinity;
       return factor * (av - bv);
@@ -164,8 +207,8 @@ export function MarketWatchPage() {
           <div className="mt-4 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
             Live quotes for every symbol trading on the PSX ready board —
-            price, change, and volume, sortable and searchable. Data from the
-            Pakistan Stock Exchange.
+            company name, sector, price, change, and volume, sortable and
+            searchable. Data from the Pakistan Stock Exchange.
           </p>
 
           {/* Controls */}
@@ -187,7 +230,7 @@ export function MarketWatchPage() {
               ))}
             </div>
             <label className="relative block w-full sm:w-64">
-              <span className="sr-only">Search by symbol</span>
+              <span className="sr-only">Search by symbol, company or sector</span>
               <input
                 type="text"
                 inputMode="text"
@@ -196,7 +239,7 @@ export function MarketWatchPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search symbol…"
+                placeholder="Search symbol, company or sector…"
                 className="liquid-glass w-full rounded-full px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
               />
             </label>
@@ -226,7 +269,7 @@ export function MarketWatchPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] border-collapse text-sm">
+                <table className="w-full min-w-[820px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-blue-200/15 text-left">
                       {COLUMNS.map((col) => {
@@ -273,6 +316,24 @@ export function MarketWatchPage() {
                               </span>
                             )}
                           </span>
+                          {/* PSX's published company name. Omitted
+                              entirely when the directory has no entry —
+                              the ticker above already identifies the
+                              row, so a missing name costs nothing. */}
+                          {quote.name && (
+                            <span className="mt-0.5 block max-w-[22rem] truncate text-xs text-gray-400">
+                              {quote.name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {quote.sector ? (
+                            <span className="text-xs text-gray-300">
+                              {quote.sector}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums text-white">
                           {fmtNum(quote.price)}
@@ -294,7 +355,7 @@ export function MarketWatchPage() {
                           colSpan={COLUMNS.length}
                           className="px-5 py-16 text-center text-sm text-gray-400"
                         >
-                          No symbols match “{search}”.
+                          No symbols, companies or sectors match “{search}”.
                         </td>
                       </tr>
                     )}

@@ -107,6 +107,73 @@ async function fetchMarketWatchHtml(agent: string): Promise<string> {
   return response.text();
 }
 
+/* ── Symbol directory (company names + sector names) ───────────── */
+
+/**
+ * PSX's own symbol directory: the ONLY place on the portal that
+ * publishes a listed company's full name and its sector NAME. The
+ * market-watch table carries a bare 4-digit sector code with no name
+ * mapping, which is why the Screener showed tickers alone until now.
+ *
+ * Re-verified live from Vercel Node before wiring in (200, ~580 ms,
+ * 1002 entries, nginx — no Cloudflare in front, unlike the sources
+ * that went dark this session). Its isETF flag independently reports 9
+ * ETFs, exactly matching the sector-0837 set api/market/psx-watch's
+ * ETF view derives — two unrelated signals from PSX agreeing.
+ */
+const SYMBOLS_URL = "https://dps.psx.com.pk/symbols";
+
+interface PsxSymbolEntry {
+  symbol: string;
+  name: string;
+  sectorName: string;
+  isETF: boolean;
+  isDebt: boolean;
+}
+
+/** symbol → { name, sector }, or an empty map if the directory fails. */
+type SymbolDirectory = Map<string, { name: string; sector: string }>;
+
+/**
+ * Fetches the symbol directory. NEVER throws: this is enrichment on top
+ * of the quote table, so a directory outage must degrade the Screener
+ * to bare tickers — exactly what it showed before — rather than take
+ * the whole market-watch endpoint down with it. Returns an empty map on
+ * any failure, and the join below then simply finds no match.
+ */
+async function fetchSymbolDirectory(): Promise<SymbolDirectory> {
+  const directory: SymbolDirectory = new Map();
+  try {
+    const response = await fetch(SYMBOLS_URL, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "azee-trade-web/1.0 (symbol directory)",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`PSX responded ${response.status} for symbols`);
+    }
+    const entries = (await response.json()) as PsxSymbolEntry[];
+    if (!Array.isArray(entries)) {
+      throw new Error("PSX returned a non-array symbol directory");
+    }
+    for (const entry of entries) {
+      if (typeof entry?.symbol !== "string") continue;
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      const sector =
+        typeof entry.sectorName === "string" ? entry.sectorName.trim() : "";
+      // A blank field is left absent rather than stored as "" — the UI
+      // then falls back to the ticker instead of rendering a gap.
+      if (!name && !sector) continue;
+      directory.set(entry.symbol, { name, sector });
+    }
+  } catch (error) {
+    // Logged, not thrown. Quotes are the product; names are a bonus.
+    console.warn("PSX symbol directory unavailable; serving bare tickers:", error);
+  }
+  return directory;
+}
+
 /* ── View: full market watch ───────────────────────────────────── */
 
 /** Column positions within each row's numeric data-order sequence. */
@@ -193,13 +260,35 @@ function parseRow(row: string): StockQuote | null {
  * payload never leaves this function.
  */
 async function fetchMarketWatch(): Promise<MarketWatchResponse> {
-  const html = await fetchMarketWatchHtml("market watch");
+  /*
+   * Both upstreams in parallel so the directory costs no added latency
+   * on the critical path — the market-watch page is the slower of the
+   * two, and this settles in about the time that one takes alone. The
+   * directory is allSettled-style by construction (it never rejects),
+   * so only the quote table can fail the request.
+   */
+  const [html, directory] = await Promise.all([
+    fetchMarketWatchHtml("market watch"),
+    fetchSymbolDirectory(),
+  ]);
 
   const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) ?? [];
   const quotes: StockQuote[] = [];
   for (const row of rows) {
     const quote = parseRow(row);
-    if (quote) quotes.push(quote);
+    if (!quote) continue;
+    /*
+     * Join by ticker. A symbol present in one source but not the other
+     * is normal — the directory carries 1002 entries (including debt
+     * instruments that never appear on the ready board) against ~490
+     * quoted symbols — so an unmatched quote keeps its bare ticker and
+     * is never dropped, and a directory entry with no quote is simply
+     * not rendered. Absent fields stay absent; nothing is invented.
+     */
+    const entry = directory.get(quote.symbol);
+    if (entry?.name) quote.name = entry.name;
+    if (entry?.sector) quote.sector = entry.sector;
+    quotes.push(quote);
   }
   if (quotes.length < MIN_VALID_ROWS) {
     throw new Error(
