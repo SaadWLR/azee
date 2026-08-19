@@ -305,23 +305,45 @@ function PayoutsView() {
   const [dir, setDir] = useState<SortDir>("desc");
 
   const payouts = useMemo(() => {
-    let rows = data?.payouts ?? [];
+    /*
+     * Each row carries an identity assigned from the SOURCE order, used
+     * as its React key.
+     *
+     * symbol + announcedAt + announcement is NOT unique: PSX can
+     * publish two byte-identical announcements, and does — seen live
+     * with ASLCPS ("Rs. 8.25 (D)", same timestamp, same book closure,
+     * twice). Two rows sharing a key made React mis-reconcile them on
+     * re-sort: one row rendered out of order and the table showed 50
+     * rows for 49 records. Neither row can be dropped — a duplicate in
+     * the source is the source's to resolve, not ours to silently
+     * discard from a payout table.
+     *
+     * The index is taken before filtering or sorting, so a row keeps
+     * the same key as the view changes and React keeps reusing its DOM
+     * rather than remounting the table on every toggle.
+     */
+    let rows = (data?.payouts ?? []).map((payout, i) => ({
+      payout,
+      id: `${payout.symbol}-${payout.announcedAt}-${i}`,
+    }));
     if (kindFilter !== "all") {
       // A compound announcement can name more than one instrument, so
       // it legitimately appears under each kind it contains rather
       // than being forced into a single "primary" bucket.
-      rows = rows.filter((p) => p.kinds.includes(kindFilter));
+      rows = rows.filter(({ payout }) => payout.kinds.includes(kindFilter));
     }
     const term = search.trim().toUpperCase();
     if (term) {
       rows = rows.filter(
-        (p) =>
-          p.symbol.includes(term) || p.companyName.toUpperCase().includes(term),
+        ({ payout }) =>
+          payout.symbol.includes(term) ||
+          payout.companyName.toUpperCase().includes(term),
       );
     }
     const factor = dir === "desc" ? -1 : 1;
     return [...rows].sort(
-      (a, b) => factor * a.announcedAt.localeCompare(b.announcedAt),
+      (a, b) =>
+        factor * a.payout.announcedAt.localeCompare(b.payout.announcedAt),
     );
   }, [data, kindFilter, search, dir]);
 
@@ -400,9 +422,9 @@ function PayoutsView() {
                 </tr>
               </thead>
               <tbody>
-                {payouts.map((payout: Payout) => (
+                {payouts.map(({ payout, id }: { payout: Payout; id: string }) => (
                   <tr
-                    key={`${payout.symbol}-${payout.announcedAt}-${payout.announcement}`}
+                    key={id}
                     className="border-b border-white/5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.04]"
                   >
                     <td className="whitespace-nowrap px-5 py-3 tabular-nums text-white">
