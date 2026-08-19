@@ -87,7 +87,36 @@ const LIVE_ROUTES: Record<string, string> = {
   "Cookie Policy": "/cookie-policy",
   "Forms & Downloads": "/forms-downloads",
   "Knowledge Centre": "/knowledge-centre",
+  // Company. About and Contact carry real content sourced from
+  // azeetrade.com; Open an Account points at the honest interim page
+  // (online onboarding is not built — /get-started says so plainly
+  // rather than the label swallowing the click).
+  "About AZEE": "/about",
+  "Contact Us": "/contact",
+  "Open an Account": "/get-started",
 };
+
+/*
+ * Labels deliberately still unwired, and why. Each renders as an inert
+ * placeholder rather than pointing somewhere approximate — a footer
+ * link that lands on the wrong page is worse than one that waits.
+ *
+ *   IPO Calendar          — no IPO data source secured yet
+ *                           (eipo.psx.com.pk is JS-rendered).
+ *   Latest Market News    — the homepage Research section carries the
+ *                           live feed; a standalone /news page does not
+ *                           exist yet.
+ *   PSX Snapshot          — the homepage panel IS the snapshot; there
+ *                           is no separate page to point at.
+ *   Research Portal       — no research content of our own to publish.
+ *   Investor Resources    — overlaps Knowledge Centre; needs a scope
+ *                           decision before it earns its own route.
+ *   Careers               — azeetrade.com/career.php exists, but the
+ *                           listings are the company's to supply.
+ *   Help Centre           — azeetrade.com/help-centre.php exists;
+ *                           porting its FAQ content is its own
+ *                           milestone (and needs compliance review).
+ */
 
 /**
  * Official AZEE social profiles. All six point to real external URLs

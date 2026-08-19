@@ -1,4 +1,5 @@
 import { type MouseEvent } from "react";
+import { Link } from "react-router-dom";
 import { AnimatedHeading } from "./AnimatedHeading";
 import { FadeIn } from "./FadeIn";
 import { MarketSnapshot } from "./MarketSnapshot";
@@ -117,14 +118,18 @@ export function Hero() {
 
             <FadeIn delay={1200}>
               <div className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-                <a
-                  href="#"
+                {/* Both were dead href="#". The primary CTA now reaches
+                    the honest interim onboarding page; "View Research"
+                    reaches the homepage's own Research section, which
+                    already carries the live feed. */}
+                <Link
+                  to="/get-started"
                   className="rounded-full bg-[#f7f4ee] px-9 py-[1.125rem] text-center text-[15px] font-semibold text-black shadow-[0_10px_32px_rgba(0,0,0,0.4)] transition-all duration-500 hover:scale-[1.04] hover:bg-white hover:shadow-[0_12px_40px_rgb(var(--azee-orange)/0.35)] active:scale-[0.98] sm:w-auto"
                 >
                   Open a Trading Account
-                </a>
+                </Link>
                 <a
-                  href="#"
+                  href="#research"
                   className="glass-navy rounded-full px-9 py-[1.125rem] text-center text-[15px] font-semibold text-white transition-all duration-500 hover:scale-[1.04] hover:bg-white/10 hover:shadow-[0_0_32px_rgb(var(--azee-blue)/0.3)] active:scale-[0.98] sm:w-auto"
                 >
                   View Research

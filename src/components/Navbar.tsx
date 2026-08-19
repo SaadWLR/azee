@@ -380,12 +380,16 @@ function MobileMenu({
        * reachable without scrolling from either view — and stays put
        * rather than sliding away when you drill into Tools.
        */}
-      <a
-        href="#"
+      {/* Points at /get-started, not a dead "#": the client portal is
+          not built, and the honest interim page says so next to a real
+          phone number. */}
+      <Link
+        to="/get-started"
+        onClick={onNavigate}
         className="glass-navy mt-4 block rounded-full px-4 py-2.5 text-center text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98]"
       >
         Client Login
-      </a>
+      </Link>
     </div>
   );
 }
@@ -489,9 +493,21 @@ export function Navbar() {
           {/* Identity — scrolls to top on the homepage, returns home
               from any other route. */}
           {onHome ? (
-            <a href="#" className="shrink-0" aria-label="AZEE Securities — home">
+            /*
+             * On the homepage the mark scrolls to top — an action, not a
+             * navigation, so it is a button. It was an href="#", which
+             * did the same thing but read as a dead link in every audit
+             * of this file; a button states the intent and leaves no
+             * placeholder href behind.
+             */
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="shrink-0"
+              aria-label="AZEE Securities — back to top"
+            >
               <BrandMark />
-            </a>
+            </button>
           ) : (
             <Link to="/" className="shrink-0" aria-label="AZEE Securities — home">
               <BrandMark />
@@ -536,12 +552,13 @@ export function Navbar() {
             <ToolsDropdown pathname={pathname} />
           </ul>
 
-          <a
-            href="#"
+          {/* See the mobile counterpart: /get-started, not a dead "#". */}
+          <Link
+            to="/get-started"
             className="glass-navy hidden whitespace-nowrap rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98] lg:block"
           >
             Client Login
-          </a>
+          </Link>
 
           {/* Mobile menu toggle */}
           <button

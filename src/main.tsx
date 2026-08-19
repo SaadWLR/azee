@@ -107,6 +107,26 @@ const KnowledgeModulePage = lazy(() =>
   })),
 );
 
+const AboutPage = lazy(() =>
+  import("./components/AboutPage").then((m) => ({ default: m.AboutPage })),
+);
+
+const ContactPage = lazy(() =>
+  import("./components/ContactPage").then((m) => ({ default: m.ContactPage })),
+);
+
+const GetStartedPage = lazy(() =>
+  import("./components/GetStartedPage").then((m) => ({
+    default: m.GetStartedPage,
+  })),
+);
+
+const NotFoundPage = lazy(() =>
+  import("./components/NotFoundPage").then((m) => ({
+    default: m.NotFoundPage,
+  })),
+);
+
 function PageLoading() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-black text-sm text-gray-400">
@@ -240,6 +260,45 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <KnowledgeModulePage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/about",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <AboutPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/contact",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <ContactPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/get-started",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <GetStartedPage />
+          </Suspense>
+        ),
+      },
+      {
+        /*
+         * Catch-all, LAST on purpose — React Router matches in order,
+         * so anything above still wins. Without this an unknown path
+         * rendered nothing at all under the SPA rewrite (the host
+         * returns the shell with HTTP 200 for every path), which looks
+         * like a broken site rather than a wrong address.
+         */
+        path: "*",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <NotFoundPage />
           </Suspense>
         ),
       },

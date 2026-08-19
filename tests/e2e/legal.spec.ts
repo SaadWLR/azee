@@ -150,6 +150,10 @@ test("no footer link addressed by this milestone is still a dead '#'", async ({
     "AML / KYC Policy",
     "Schedule of Charges",
     "Cookie Policy",
+    // Company column, wired in the trust-pages milestone.
+    "About AZEE",
+    "Contact Us",
+    "Open an Account",
   ]) {
     expect(dead, `${label} should no longer be a dead link`).not.toContain(
       label,

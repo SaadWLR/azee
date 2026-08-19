@@ -28,6 +28,17 @@ function buildSitemap(): string {
     { path: "/announcements", changefreq: "hourly", priority: "0.8" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },
     { path: "/knowledge-centre", changefreq: "weekly", priority: "0.7" },
+    /*
+     * Company / trust pages. High priority despite rarely changing:
+     * "who is this broker and how do I reach them" is exactly what a
+     * prospective client searches for before opening an account.
+     * /get-started is included because it is a real destination with
+     * real contact routes, not a placeholder. The 404 route is
+     * deliberately NOT listed — it is marked noindex instead.
+     */
+    { path: "/about", changefreq: "monthly", priority: "0.7" },
+    { path: "/contact", changefreq: "monthly", priority: "0.7" },
+    { path: "/get-started", changefreq: "monthly", priority: "0.6" },
     // Legal / compliance pages — rarely change, but must be indexable.
     ...[
       "privacy-policy",

@@ -23,7 +23,11 @@ function setMeta(selector: string, content: string) {
  * static index.html defaults — a designed OG image plus prerendering
  * would be the next step there, out of scope here.
  */
-export function usePageMeta(title?: string, description?: string) {
+export function usePageMeta(
+  title?: string,
+  description?: string,
+  { noindex = false }: { noindex?: boolean } = {},
+) {
   const resolvedTitle = title ?? DEFAULT_TITLE;
   const resolvedDescription = description ?? DEFAULT_DESCRIPTION;
 
@@ -33,4 +37,22 @@ export function usePageMeta(title?: string, description?: string) {
     setMeta('meta[property="og:title"]', resolvedTitle);
     setMeta('meta[property="og:description"]', resolvedDescription);
   }, [resolvedTitle, resolvedDescription]);
+
+  /*
+   * robots=noindex, for pages that exist but should never appear in
+   * search results — today just the 404, which the host serves with
+   * HTTP 200 like every other path under the SPA rewrite, so the meta
+   * tag is the only signal available to say "this address is not a
+   * page". Added and removed rather than left behind: this is a SPA, so
+   * a tag set on one route would otherwise follow the visitor to the
+   * next one and quietly de-index a real page.
+   */
+  useEffect(() => {
+    if (!noindex) return;
+    const tag = document.createElement("meta");
+    tag.setAttribute("name", "robots");
+    tag.setAttribute("content", "noindex");
+    document.head.appendChild(tag);
+    return () => tag.remove();
+  }, [noindex]);
 }

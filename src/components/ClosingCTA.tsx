@@ -1,4 +1,5 @@
 import { type MouseEvent } from "react";
+import { Link } from "react-router-dom";
 import { CLOSING_VIDEO_URL } from "../config";
 import { useBackgroundVideo } from "../hooks/useBackgroundVideo";
 
@@ -91,12 +92,14 @@ export function ClosingCTA() {
           className="closing-fade-up mt-9 flex justify-center"
           style={{ animationDelay: "0.7s" }}
         >
-          <a
-            href="#"
+          {/* Was a dead href="#" — now the honest interim onboarding
+              page, same destination as the Hero's primary CTA. */}
+          <Link
+            to="/get-started"
             className="closing-glass rounded-full px-9 py-4 text-center text-[15px] font-semibold text-white transition-transform duration-300 hover:scale-[1.04] active:scale-[0.98]"
           >
             Open a Trading Account
-          </a>
+          </Link>
         </div>
       </div>
     </section>
