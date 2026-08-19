@@ -168,6 +168,68 @@ test("GET /api/announcements/latest honours count/offset and shape", async ({
   }
 
   /*
+   * A different offset returns different filings.
+   *
+   * Done immediately after the first read, before the small-count loop
+   * below, to keep the two paged reads as close together in time as
+   * possible — see the shift note further down.
+   */
+  const second = await request.get("/api/announcements/latest?count=10&offset=10");
+  const other = await second.json();
+  /*
+   * Bracket the pair with a re-read of page 0. PSX's feed is live and
+   * newest-first, so a filing landing between two reads pushes every
+   * row down and page 1 legitimately serves rows that page 0 held a
+   * moment earlier. This third read measures exactly how far the feed
+   * moved across the window, so the assertion can account for it
+   * instead of failing on correct source behaviour.
+   */
+  const reread = await request.get("/api/announcements/latest?count=10&offset=0");
+  const idsA = body.announcements.map((a: { id: string }) => a.id);
+  const idsB = other.announcements.map((a: { id: string }) => a.id);
+  const idsReread = (await reread.json()).announcements.map(
+    (a: { id: string }) => a.id,
+  );
+
+  /*
+   * Where page 0's old head sits in the fresh page 0 IS the number of
+   * filings that arrived: 0 if nothing moved, k if k landed. It brackets
+   * a strictly wider window than the A→B gap, so it is an upper bound on
+   * the shift those two reads actually saw.
+   */
+  const shift = idsReread.indexOf(idsA[0]);
+  const overlap = idsB.filter((i: string) => idsA.includes(i));
+
+  if (shift === -1) {
+    /*
+     * A full page of filings inside a few hundred ms — the window can no
+     * longer be reconstructed, so there is nothing sound to assert.
+     * Vanishingly rare, and skipping beats inventing a bound.
+     */
+    test.skip(true, "PSX feed advanced a full page mid-test; window unmeasurable");
+  }
+
+  /*
+   * With the feed still (the overwhelmingly common case) the pages must
+   * be strictly disjoint. Under a shift of k, page 1 has slid up to hold
+   * the last k rows page 0 used to end with — so the overlap can be at
+   * most k, and must be exactly page 0's tail meeting page 1's head.
+   *
+   * This still fails loudly if offset were ignored: page 1 would come
+   * back as page 0 — ten overlapping ids against a shift of 0 or 1 — and
+   * the overlap would sit at the START of page 0, not its tail.
+   */
+  expect(
+    overlap.length,
+    `offset=10 overlapped offset=0 by ${overlap.length} ids while the feed moved by only ${shift}`,
+  ).toBeLessThanOrEqual(shift);
+
+  if (overlap.length > 0) {
+    expect(idsA.slice(idsA.length - overlap.length)).toEqual(overlap);
+    expect(idsB.slice(0, overlap.length)).toEqual(overlap);
+  }
+
+  /*
    * Small counts must work. A flat sanity floor once made count<5
    * return 503, treating a legitimately short page as a broken parse —
    * the same shape of bug would hit the last page of the corpus.
@@ -177,14 +239,7 @@ test("GET /api/announcements/latest honours count/offset and shape", async ({
       `/api/announcements/latest?count=${count}&offset=0`,
     );
     expect(small.status(), `count=${count}`).toBe(200);
-    const body = await small.json();
-    expect(body.announcements.length, `count=${count} rows`).toBe(count);
+    const smallBody = await small.json();
+    expect(smallBody.announcements.length, `count=${count} rows`).toBe(count);
   }
-
-  // A different offset returns different filings.
-  const second = await request.get("/api/announcements/latest?count=10&offset=10");
-  const other = await second.json();
-  const idsA = body.announcements.map((a: { id: string }) => a.id);
-  const idsB = other.announcements.map((a: { id: string }) => a.id);
-  expect(idsB.filter((i: string) => idsA.includes(i))).toEqual([]);
 });
