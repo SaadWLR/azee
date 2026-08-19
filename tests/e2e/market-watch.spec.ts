@@ -17,9 +17,21 @@ const ROWS = "main table tbody tr";
 
 type Page = import("@playwright/test").Page;
 
-/** First data cell (symbol) of each visible row. */
+/**
+ * First data cell of each visible row. Since company names landed, this
+ * cell holds the ticker, any index badge AND the company name — use it
+ * for "contains" checks, and tickers() below when the bare ticker is
+ * what's being asserted.
+ */
 async function symbols(page: Page) {
   return page.locator(`${ROWS} td:first-child`).allInnerTexts();
+}
+
+/** Just the ticker text — the first span inside the symbol cell. */
+async function tickers(page: Page) {
+  return page
+    .locator(`${ROWS} td:first-child span span:first-child`)
+    .allInnerTexts();
 }
 
 /**
@@ -53,8 +65,10 @@ test("loads directly via URL (SPA rewrite) with real PSX data", async ({
 
   // Full first page of real symbols (PSX has hundreds; page size 50).
   await expect.poll(async () => (await symbols(page)).length).toBeGreaterThan(20);
-  const firstSymbol = (await symbols(page))[0];
-  expect(firstSymbol).toMatch(/^[A-Z0-9.\-]{1,12}$/);
+  // The ticker itself is still a bare ticker — asserted on the ticker
+  // element, since the cell around it now also carries the company name.
+  const firstTicker = (await tickers(page))[0];
+  expect(firstTicker).toMatch(/^[A-Z0-9.\-]{1,12}$/);
 
   // Real price, not a zero/placeholder.
   const firstPrice = Number.parseFloat(
@@ -117,8 +131,8 @@ test("search matches company name and sector, not just ticker", async ({
   await expect.poll(async () => (await symbols(page)).length).toBeGreaterThan(0);
   const sectors = await cellsUnder(page, "Sector");
   for (const s of sectors) expect(s.toUpperCase()).toContain("CEMENT");
-  const tickers = await symbols(page);
-  expect(tickers.some((t) => !t.toUpperCase().includes("CEMENT"))).toBe(true);
+  const matched = await tickers(page);
+  expect(matched.some((t) => !t.toUpperCase().includes("CEMENT"))).toBe(true);
 });
 
 test("GET /api/market/watch carries names/sectors without dropping rows", async ({
@@ -193,10 +207,7 @@ test("KMI-30 filter shows only Islamic-index constituents with badges + note", a
   const badges = await page.locator(`${ROWS} td:first-child`).allInnerTexts();
   for (const cell of badges) expect(cell).toContain("KMI-30");
 
-  // Symbol text is the first span in the cell (badge is a sibling span).
-  const visible = await page
-    .locator(`${ROWS} td:first-child span span:first-child`)
-    .allInnerTexts();
+  const visible = await tickers(page);
   for (const inc of ["MEBL", "OGDC", "LUCK", "MARI", "SYS"]) {
     expect(visible).toContain(inc);
   }
