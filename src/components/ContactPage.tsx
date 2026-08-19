@@ -136,9 +136,21 @@ function EnquiryForm() {
         </label>
       </div>
 
+      {/*
+       * href is always set, even while disabled: an <a> without one is
+       * not a link at all — it drops out of the accessibility tree, so
+       * a screen reader (and any role-based query) simply loses the
+       * control rather than hearing it is unavailable. Unusable state
+       * is carried by aria-disabled plus removal from the tab order and
+       * pointer events, which is what "disabled" should mean here.
+       */}
       <a
-        href={ready ? href : undefined}
+        href={href}
         aria-disabled={!ready}
+        tabIndex={ready ? undefined : -1}
+        onClick={(e) => {
+          if (!ready) e.preventDefault();
+        }}
         className={`glass-navy mt-5 block rounded-full px-6 py-3 text-center text-sm font-semibold text-white transition-all duration-500 ${
           ready
             ? "hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98]"
