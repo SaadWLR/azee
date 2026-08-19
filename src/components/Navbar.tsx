@@ -274,7 +274,7 @@ function MobileMenu({
        */}
       <div className="max-h-[calc(100dvh-var(--nav-height)-7rem)] overflow-y-auto overscroll-contain">
         {view === "main" ? (
-          <ul className="nav-drill-back">
+          <ul data-menu-view="main" className="nav-drill-back">
             {NAV_LINKS.map((link) => (
               <li key={link.label} className="border-b border-white/10">
                 {link.to ? (
@@ -326,7 +326,7 @@ function MobileMenu({
             </li>
           </ul>
         ) : (
-          <div className="nav-drill-forward">
+          <div data-menu-view="tools" className="nav-drill-forward">
             {/* Back first, and full-width: on a phone the top-left of
                 the panel is where a back control is looked for, and a
                 wide target is easier to hit than a bare chevron. */}

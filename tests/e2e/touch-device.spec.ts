@@ -147,11 +147,22 @@ async function openMobileMenu(page: import("@playwright/test").Page) {
   await expect(page.locator(MOBILE_MENU)).toBeVisible();
 }
 
-/** Visible, tappable rows of whichever menu view is showing. */
-async function menuRows(page: import("@playwright/test").Page) {
-  return page
-    .locator(`${MOBILE_MENU} ul >> css=a, ${MOBILE_MENU} ul >> css=button`)
-    .allInnerTexts();
+/** The view currently mounted in the menu's scroll area. */
+const VIEW = `${MOBILE_MENU} [data-menu-view]`;
+
+/**
+ * Navigation LINKS of whichever view is showing. Deliberately links
+ * only: the view's controls (Tools forward, Back) are buttons and are
+ * asserted by name where they matter, which keeps this list exactly
+ * "the places this view can take you".
+ */
+async function menuLinks(page: import("@playwright/test").Page) {
+  return (await page.locator(`${VIEW} a`).allInnerTexts()).map((t) => t.trim());
+}
+
+/** Which view is mounted — "main" or "tools". */
+async function currentView(page: import("@playwright/test").Page) {
+  return page.locator(VIEW).getAttribute("data-menu-view");
 }
 
 test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
@@ -162,23 +173,27 @@ test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
     "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
   );
   await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
 
-  const rows = (await menuRows(page)).map((t) => t.trim());
-  expect(rows).toEqual([
+  expect(await currentView(page)).toBe("main");
+  // The five nav links…
+  expect(await menuLinks(page)).toEqual([
     "Markets",
     "Research",
     "Trading",
     "Forex & Commodities",
     "About",
-    "Tools",
   ]);
+  // …plus exactly one Tools row, which is a control, not a link.
+  await expect(
+    menu.getByRole("button", { name: "Tools", exact: true }),
+  ).toBeVisible();
 
   /*
    * The regression itself: Tools' seven links used to render inline
    * here, pushing the panel past the screen. Not one of them may be
    * present at the top level now.
    */
-  const menu = page.locator(MOBILE_MENU);
   for (const tool of [
     "Market Watch",
     "Indices",
@@ -206,10 +221,10 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
   const menu = page.locator(MOBILE_MENU);
 
   await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+  expect(await currentView(page)).toBe("tools");
 
   // Exactly the seven tools, in their two groups, and nothing else.
-  const rows = (await menuRows(page)).map((t) => t.trim());
-  expect(rows).toEqual([
+  expect(await menuLinks(page)).toEqual([
     "Market Watch",
     "Indices",
     "Commodity Futures",
@@ -230,14 +245,13 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
 
   // Back returns to the top level.
   await menu.getByRole("button", { name: "Back", exact: true }).tap();
-  const back = (await menuRows(page)).map((t) => t.trim());
-  expect(back).toEqual([
+  expect(await currentView(page)).toBe("main");
+  expect(await menuLinks(page)).toEqual([
     "Markets",
     "Research",
     "Trading",
     "Forex & Commodities",
     "About",
-    "Tools",
   ]);
 });
 
