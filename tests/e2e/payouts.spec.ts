@@ -108,7 +108,17 @@ test("kind filter and search work", async ({ page }) => {
   await page.waitForTimeout(300);
   const rows = await page.locator(`${ROWS} td:nth-child(2)`).allInnerTexts();
   expect(rows.length).toBeGreaterThan(0);
-  for (const r of rows) expect(r).toContain(firstSymbol);
+  /*
+   * Case-insensitively, and against the whole company cell — the
+   * filter matches symbol OR company name without regard to case, so a
+   * result can match on the name alone. Searching "ABL" legitimately
+   * returns Allied Bank Limited (ABL), Faysal Bank Limited (FABL) AND
+   * Fast C-abl-es Limited; asserting a case-sensitive symbol match
+   * called that last one a failure when the filter was right.
+   */
+  for (const r of rows) {
+    expect(r.toUpperCase()).toContain(firstSymbol.toUpperCase());
+  }
 });
 
 test("payouts default to newest first and the sort toggles", async ({ page }) => {
