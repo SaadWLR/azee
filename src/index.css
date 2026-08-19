@@ -564,3 +564,56 @@ body {
     0 16px 48px 0 rgba(0, 0, 0, 0.4),
     0 0 36px 0 rgb(var(--azee-blue) / 0.07);
 }
+
+/*
+ * Mobile menu drill-down.
+ *
+ * The Tools sub-view slides in from the right and the main view slides
+ * back in from the left — the standard mobile drill-down direction
+ * cue, so "forward" and "back" are legible without reading the labels.
+ *
+ * Same easing as kc-fade-up / closing-fade-up so the menu moves in the
+ * site's existing motion language; only the distance and duration are
+ * shorter, because this is a control responding to a tap rather than a
+ * section arriving on scroll. No blur() here: this animates on every
+ * tap of Tools, and re-rasterising a blurred full-width panel each
+ * frame is exactly the cost the kc-fade-up note warns about.
+ */
+@keyframes nav-drill-forward {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-drill-back {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nav-drill-forward {
+  animation: nav-drill-forward 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nav-drill-back {
+  animation: nav-drill-back 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-drill-forward,
+  .nav-drill-back {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

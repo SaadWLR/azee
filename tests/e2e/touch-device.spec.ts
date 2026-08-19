@@ -4,11 +4,15 @@ import { expect, test } from "./fixtures";
  * Real-engine touch coverage. Runs ONLY on the webkit-ipad and
  * chromium-iphone projects (see playwright.config.ts) — WebKit is
  * Safari's actual engine, the closest signal to a real iPad without
- * hardware. Guards two real-device bug classes that Chromium-desktop
+ * hardware. Guards three real-device bug classes that Chromium-desktop
  * viewport tests never caught:
  *   B) a fixed header hit-box overlaying the top of the page, blocking
  *      filter taps and table scroll on tablet/phone;
- *   A) animated filter:blur() entrances stuttering on iOS.
+ *   A) animated filter:blur() entrances stuttering on iOS;
+ *   C) the mobile menu running past the bottom of the screen with no
+ *      way to scroll the rest into view (reported from a real device
+ *      screenshot, not from this suite — which is why the height guard
+ *      below exists at all).
  */
 
 /**
@@ -128,4 +132,177 @@ test("touch entrance animations drop the blur and still complete", async ({
       }),
     )
     .toBe(true);
+});
+
+/* ── C) Mobile menu drill-down ─────────────────────────────────── */
+
+/** The mobile panel — the toggle's aria-controls target. */
+const MOBILE_MENU = "#mobile-menu";
+
+async function openMobileMenu(page: import("@playwright/test").Page) {
+  await page.goto("/");
+  const toggle = page.getByRole("button", { name: "Open menu" });
+  await toggle.waitFor({ state: "visible" });
+  await toggle.tap();
+  await expect(page.locator(MOBILE_MENU)).toBeVisible();
+}
+
+/** Visible, tappable rows of whichever menu view is showing. */
+async function menuRows(page: import("@playwright/test").Page) {
+  return page
+    .locator(`${MOBILE_MENU} ul >> css=a, ${MOBILE_MENU} ul >> css=button`)
+    .allInnerTexts();
+}
+
+test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium-iphone",
+    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
+  );
+  await openMobileMenu(page);
+
+  const rows = (await menuRows(page)).map((t) => t.trim());
+  expect(rows).toEqual([
+    "Markets",
+    "Research",
+    "Trading",
+    "Forex & Commodities",
+    "About",
+    "Tools",
+  ]);
+
+  /*
+   * The regression itself: Tools' seven links used to render inline
+   * here, pushing the panel past the screen. Not one of them may be
+   * present at the top level now.
+   */
+  const menu = page.locator(MOBILE_MENU);
+  for (const tool of [
+    "Market Watch",
+    "Indices",
+    "Commodity Futures",
+    "ETFs",
+    "Announcements",
+    "Calendar",
+    "Economic Dashboard",
+  ]) {
+    await expect(menu.getByRole("link", { name: tool, exact: true })).toHaveCount(0);
+  }
+
+  // The primary action stays reachable from the top level.
+  await expect(menu.getByRole("link", { name: "Client Login" })).toBeVisible();
+});
+
+test("tapping Tools drills into a Tools-only view, and Back returns", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium-iphone",
+    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
+  );
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+
+  // Exactly the seven tools, in their two groups, and nothing else.
+  const rows = (await menuRows(page)).map((t) => t.trim());
+  expect(rows).toEqual([
+    "Market Watch",
+    "Indices",
+    "Commodity Futures",
+    "ETFs",
+    "Announcements",
+    "Calendar",
+    "Economic Dashboard",
+  ]);
+  // Group headings carried over from the desktop dropdown.
+  await expect(menu).toContainText("Markets");
+  await expect(menu).toContainText("Research");
+  // The top-level nav links are NOT also showing.
+  await expect(
+    menu.getByRole("link", { name: "Forex & Commodities", exact: true }),
+  ).toHaveCount(0);
+  // Client Login is pinned outside the swapped view, so it survives.
+  await expect(menu.getByRole("link", { name: "Client Login" })).toBeVisible();
+
+  // Back returns to the top level.
+  await menu.getByRole("button", { name: "Back", exact: true }).tap();
+  const back = (await menuRows(page)).map((t) => t.trim());
+  expect(back).toEqual([
+    "Markets",
+    "Research",
+    "Trading",
+    "Forex & Commodities",
+    "About",
+    "Tools",
+  ]);
+});
+
+test("closing the menu resets the drill-down to the top level", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium-iphone",
+    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
+  );
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+  await expect(menu.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+
+  // Close, then reopen — must land on the top level, not stay in Tools.
+  await page.getByRole("button", { name: "Close menu" }).tap();
+  await page.getByRole("button", { name: "Open menu" }).tap();
+
+  await expect(menu.getByRole("button", { name: "Tools", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+});
+
+test("the open mobile menu never extends past the viewport", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium-iphone",
+    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
+  );
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  /*
+   * The actual reported bug, asserted directly: the panel's bottom edge
+   * must sit inside the viewport in BOTH views. A drill-down that stays
+   * short today is not enough — the scroll container is what keeps this
+   * true when a group grows, so it is checked, not assumed.
+   */
+  for (const step of ["top level", "tools"] as const) {
+    if (step === "tools") {
+      await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+    }
+    const fits = await page.evaluate((sel) => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const scroller = el.querySelector("[class*=overflow-y-auto]") as HTMLElement | null;
+      return {
+        bottom: Math.round(r.bottom),
+        viewport: window.innerHeight,
+        hasScroller: !!scroller,
+        // A scroll container that can actually scroll when it needs to.
+        scrollable: scroller
+          ? getComputedStyle(scroller).overflowY === "auto"
+          : false,
+      };
+    }, MOBILE_MENU);
+    expect(fits, `menu measurable in ${step}`).not.toBeNull();
+    expect(fits!.hasScroller, `${step}: menu has a bounded scroll area`).toBe(true);
+    expect(fits!.scrollable, `${step}: that area scrolls on overflow`).toBe(true);
+    expect(
+      fits!.bottom,
+      `${step}: menu bottom (${fits!.bottom}px) must fit the ${fits!.viewport}px viewport`,
+    ).toBeLessThanOrEqual(fits!.viewport);
+  }
 });

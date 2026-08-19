@@ -211,7 +211,30 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
   );
 }
 
-/** Mobile dropdown: navigation links plus the client login action. */
+/** Shared row treatment for every tappable line in the mobile menu. */
+const MOBILE_ROW =
+  "block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
+
+/**
+ * Mobile dropdown: navigation links plus the client login action.
+ *
+ * Two views, not one list. Tools used to expand INLINE here — all seven
+ * links plus their two group headings rendered beneath the five nav
+ * links, in a container with no height bound at all. On a phone that
+ * ran past the bottom of the screen with nothing to scroll, so the last
+ * entries were simply unreachable.
+ *
+ * So Tools is now a drill-down: the top level shows six rows (five nav
+ * links + one "Tools" row), and tapping it swaps in a Tools-only view
+ * with a back action. Desktop is untouched — its dropdown has room to
+ * show both groups at once and always did.
+ *
+ * The scroll bound is kept as well, deliberately, even though the
+ * drill-down alone makes today's menu short enough. The bug was not
+ * "the list got long", it was "nothing stopped it getting long"; a
+ * height cap is what turns a future overflow into a scroll instead of
+ * a silent truncation.
+ */
 function MobileMenu({
   open,
   onHome,
@@ -221,75 +244,142 @@ function MobileMenu({
   onHome: boolean;
   onNavigate: () => void;
 }) {
+  const [view, setView] = useState<"main" | "tools">("main");
+
+  /*
+   * Reopening always starts at the top level. Reset on close rather
+   * than on open so it happens behind the closing fade, never as a
+   * visible flip while the panel is still on screen.
+   */
+  useEffect(() => {
+    if (!open) setView("main");
+  }, [open]);
+
   return (
     <div
+      id="mobile-menu"
+      aria-label="Site menu"
       className={`nav-glass mx-auto mt-2 max-w-6xl rounded-3xl p-5 transition-all duration-500 ease-out lg:hidden ${
         open
           ? "pointer-events-auto translate-y-0 opacity-100"
           : "pointer-events-none -translate-y-2 opacity-0"
       }`}
     >
-      <ul>
-        {NAV_LINKS.map((link) => (
-          <li key={link.label} className="border-b border-white/10">
-            {link.to ? (
-              // Real route: always a router link, regardless of page.
-              <Link
-                to={link.to}
-                onClick={onNavigate}
-                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-              >
-                {link.label}
-              </Link>
-            ) : onHome ? (
-              // Same-page anchor: native browser scroll, untouched.
-              <a
-                href={link.hash}
-                onClick={onNavigate}
-                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-              >
-                {link.label}
-              </a>
-            ) : (
-              // Cross-route: client-side navigation; ScrollToHash in
-              // the root layout scrolls to the section once home
-              // renders.
-              <Link
-                to={`/${link.hash}`}
-                onClick={onNavigate}
-                className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-              >
-                {link.label}
-              </Link>
-            )}
-          </li>
-        ))}
-        {/* Tools — the same two groups as the desktop dropdown, so both
-            surfaces describe the site identically. Mobile's vertical
-            list has no width pressure, so each group is simply a
-            sub-heading with its links beneath. */}
-        <li className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
-          Tools
-        </li>
-        {TOOL_GROUPS.map((group) => (
-          <Fragment key={group.heading}>
-            <li className="px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
-              {group.heading}
-            </li>
-            {group.links.map((tool) => (
-              <li key={tool.to} className="border-b border-white/10">
-                <Link
-                  to={tool.to}
-                  onClick={onNavigate}
-                  className="block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white"
-                >
-                  {tool.label}
-                </Link>
+      {/*
+       * The scroll bound. dvh (not vh) so mobile browser chrome
+       * collapsing does not leave the menu taller than the visible
+       * viewport; --nav-height is the bar above it and the remaining
+       * rem cover this panel's own margin, padding and the pinned
+       * action below.
+       */}
+      <div className="max-h-[calc(100dvh-var(--nav-height)-7rem)] overflow-y-auto overscroll-contain">
+        {view === "main" ? (
+          <ul className="nav-drill-back">
+            {NAV_LINKS.map((link) => (
+              <li key={link.label} className="border-b border-white/10">
+                {link.to ? (
+                  // Real route: always a router link, regardless of page.
+                  <Link to={link.to} onClick={onNavigate} className={MOBILE_ROW}>
+                    {link.label}
+                  </Link>
+                ) : onHome ? (
+                  // Same-page anchor: native browser scroll, untouched.
+                  <a href={link.hash} onClick={onNavigate} className={MOBILE_ROW}>
+                    {link.label}
+                  </a>
+                ) : (
+                  // Cross-route: client-side navigation; ScrollToHash in
+                  // the root layout scrolls to the section once home
+                  // renders.
+                  <Link
+                    to={`/${link.hash}`}
+                    onClick={onNavigate}
+                    className={MOBILE_ROW}
+                  >
+                    {link.label}
+                  </Link>
+                )}
               </li>
             ))}
-          </Fragment>
-        ))}
-      </ul>
+            {/* One row standing in for the whole Tools group. */}
+            <li className="border-b border-white/10">
+              <button
+                type="button"
+                aria-expanded={false}
+                onClick={() => setView("tools")}
+                className={`${MOBILE_ROW} flex w-full items-center justify-between`}
+              >
+                Tools
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M4.5 3 7.5 6 4.5 9" />
+                </svg>
+              </button>
+            </li>
+          </ul>
+        ) : (
+          <div className="nav-drill-forward">
+            {/* Back first, and full-width: on a phone the top-left of
+                the panel is where a back control is looked for, and a
+                wide target is easier to hit than a bare chevron. */}
+            <button
+              type="button"
+              onClick={() => setView("main")}
+              className={`${MOBILE_ROW} flex w-full items-center gap-2 border-b border-white/10 text-gray-400`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M7.5 3 4.5 6 7.5 9" />
+              </svg>
+              Back
+            </button>
+            <ul>
+              {/* The same two groups as the desktop dropdown, so both
+                  surfaces describe the site identically. */}
+              {TOOL_GROUPS.map((group) => (
+                <Fragment key={group.heading}>
+                  <li className="px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
+                    {group.heading}
+                  </li>
+                  {group.links.map((tool) => (
+                    <li key={tool.to} className="border-b border-white/10">
+                      <Link
+                        to={tool.to}
+                        onClick={onNavigate}
+                        className={MOBILE_ROW}
+                      >
+                        {tool.label}
+                      </Link>
+                    </li>
+                  ))}
+                </Fragment>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/*
+       * Pinned OUTSIDE the scroll area, so the primary action is
+       * reachable without scrolling from either view — and stays put
+       * rather than sliding away when you drill into Tools.
+       */}
       <a
         href="#"
         className="glass-navy mt-4 block rounded-full px-4 py-2.5 text-center text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98]"
@@ -458,6 +548,7 @@ export function Navbar() {
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
             onClick={() => setMenuOpen((v) => !v)}
             className="flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full border border-white/10 bg-white/[0.05] transition-all duration-500 hover:bg-white/10 active:scale-[0.95] lg:hidden"
           >
