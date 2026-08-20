@@ -35,7 +35,34 @@ const STATS: Stat[] = [
   },
 ];
 
-/** Counts from 0 to `target` the first time the element is visible. */
+/**
+ * Counts from 0 to `target` the first time the element is visible.
+ *
+ * THE FAILURE THIS GUARDS AGAINST: the displayed value used to start at
+ * 0 and only leave 0 once requestAnimationFrame began firing. rAF is
+ * throttled to zero in a backgrounded tab, and browsers also withhold
+ * it under low-power mode and in automated/hidden contexts — so the row
+ * could paint and sit at "0+ Years in Capital Markets" and "0+ Investors
+ * Served". That is not a cosmetic glitch on a licensed brokerage; it is
+ * a false statement about the firm rendered in its own trust section.
+ *
+ * The fix inverts the default. Animating is now the EXCEPTION, taken
+ * only when the frame clock can actually be trusted to run; every other
+ * path renders the true figure immediately. Three independent
+ * guarantees, so no single one has to hold:
+ *
+ *   1. Pre-flight — if rAF is missing, the visitor prefers reduced
+ *      motion, or the page is hidden at the moment the row scrolls into
+ *      view, the final value is set at once and no animation starts.
+ *   2. Watchdog — once animating, a timer set to the full duration plus
+ *      a grace period forces the final value. If rAF stalls midway
+ *      (tab backgrounded during the count) this still resolves it.
+ *   3. Visibility — if the tab is hidden mid-count, the value jumps to
+ *      final immediately rather than freezing at whatever it reached.
+ *
+ * The normal case is untouched: a visitor on a foreground tab with
+ * motion enabled sees exactly the same eased count-up as before.
+ */
 function useInViewCount(target: number, duration = 1800) {
   const ref = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState(0);
@@ -43,30 +70,74 @@ function useInViewCount(target: number, duration = 1800) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
     let raf = 0;
-    if (typeof IntersectionObserver === "undefined") {
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    let onVisibility: (() => void) | undefined;
+
+    /** The truth. Every non-animating path lands here. */
+    const settle = () => {
+      if (raf) cancelAnimationFrame(raf);
+      if (watchdog) clearTimeout(watchdog);
       setValue(target);
+    };
+
+    /** Can the frame clock be trusted to actually run right now? */
+    const canAnimate = () =>
+      typeof requestAnimationFrame === "function" &&
+      typeof document !== "undefined" &&
+      !document.hidden &&
+      !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (typeof IntersectionObserver === "undefined") {
+      settle();
       return;
     }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
         observer.disconnect();
+
+        // (1) Pre-flight: no trustworthy frame clock ⇒ show the figure.
+        if (!canAnimate()) {
+          settle();
+          return;
+        }
+
         const start = performance.now();
         const tick = (now: number) => {
           const t = Math.min((now - start) / duration, 1);
           const eased = 1 - Math.pow(1 - t, 3);
           setValue(Math.round(target * eased));
-          if (t < 1) raf = requestAnimationFrame(tick);
+          if (t < 1) {
+            raf = requestAnimationFrame(tick);
+          } else if (watchdog) {
+            clearTimeout(watchdog);
+          }
         };
         raf = requestAnimationFrame(tick);
+
+        // (2) Watchdog: a stalled rAF can never leave the value short.
+        watchdog = setTimeout(settle, duration + 400);
+
+        // (3) Backgrounded mid-count ⇒ resolve rather than freeze.
+        onVisibility = () => {
+          if (document.hidden) settle();
+        };
+        document.addEventListener("visibilitychange", onVisibility);
       },
       { threshold: 0.4 },
     );
     observer.observe(el);
+
     return () => {
       observer.disconnect();
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
+      if (watchdog) clearTimeout(watchdog);
+      if (onVisibility) {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
     };
   }, [target, duration]);
 
