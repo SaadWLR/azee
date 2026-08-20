@@ -1,4 +1,3 @@
-import { type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
@@ -16,12 +15,33 @@ const LEVEL_BADGE: Record<KnowledgeLevel, string> = {
 };
 
 /**
- * Knowledge Centre landing page: an animated, moonlit video hero over
- * the site's global Navbar, with the module grid scrolling in below.
- * The hero reuses Hero.tsx's video technique (playbackRate 0.75, muted
- * autoplay loop, soft mouse-parallax) but its own moonlight footage and
- * its own .kc-glass / .kc-fade-up styling — no second navbar, no
- * fabricated content.
+ * Knowledge Centre landing page: a typography-forward hero over the
+ * site's global Navbar, with the module grid scrolling in below.
+ *
+ * VIDEO DEMOTED, NOT REMOVED. The blue-hour footage used to be a
+ * full-bleed, full-viewport-height background — the dominant visual of
+ * the page. It is still here, still the same asset, still autoplaying
+ * muted on a loop, but now inside a small framed 16:9 panel beside the
+ * copy rather than behind everything.
+ *
+ * WHY: checked directly against Robinhood, Wise, Fidelity and Trading
+ * 212 — in every case the PRIMARY hero visual is something real (a
+ * product screenshot, a functional tool, real photography), never
+ * full-bleed decorative footage. The Hero on the homepage keeps its
+ * full-bleed treatment because it has a real anchor sitting beside it,
+ * the live Market Snapshot panel. This hero had no such anchor, so the
+ * footage was carrying the whole section on atmosphere alone.
+ *
+ * WHAT TAKES THE PRIMARY POSITION: the page's own real structural
+ * facts — the actual module count, the actual total hours, and the real
+ * level range, all read from KNOWLEDGE_MODULES rather than written into
+ * the markup — set in the site's existing typography-forward style (the
+ * same eyebrow / oversized heading / brand stripe used on every other
+ * page). The section also no longer occupies a full viewport height, so
+ * the real syllabus below reaches the reader sooner.
+ *
+ * The .kc-fade-up entrance is deliberately kept: it is a one-shot
+ * entrance, not ambient looping motion.
  */
 export function KnowledgeCentrePage() {
   usePageMeta(
@@ -30,55 +50,23 @@ export function KnowledgeCentrePage() {
   );
   const { videoRef, onError } = useBackgroundVideo();
 
-  // Soft parallax: the over-scaled video drifts a few pixels against
-  // the cursor (identical feel to the homepage hero).
-  const handleMouseMove = (event: MouseEvent<HTMLElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const x = (event.clientX / window.innerWidth - 0.5) * 12;
-    const y = (event.clientY / window.innerHeight - 0.5) * 8;
-    video.style.transform = `scale(1.06) translate(${-x}px, ${-y}px)`;
-  };
-
   return (
     <main className="min-h-screen text-white">
       <Navbar />
 
-      {/* ── Animated moonlit hero ─────────────────────────────────── */}
-      <section
-        className="relative flex min-h-screen w-full flex-col overflow-hidden bg-black"
-        onMouseMove={handleMouseMove}
-      >
-        <video
-          ref={videoRef}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out"
-          style={{ transform: "scale(1.06)" }}
-          src={KNOWLEDGE_HERO_VIDEO_URL}
-          onError={onError}
-          autoPlay
-          muted
-          loop
-          playsInline
+      {/* ── Typography-forward hero, video as a supporting panel ──── */}
+      <section className="relative w-full overflow-hidden bg-black">
+        {/* A single static navy bloom — the atmosphere the full-bleed
+            footage used to provide, at a fraction of its weight. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgb(var(--azee-royal)/0.28),transparent_70%)]"
         />
 
-        {/* Moonlight-blue wash + dark gradient so the bottom content
-            reads clearly over the footage. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgb(var(--azee-royal)/0.35),transparent_70%)]"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/35"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgb(var(--azee-navy)/0.55),transparent)]"
-        />
-
-        {/* Bottom-aligned content column. */}
-        <div className="relative z-10 flex flex-1 items-end px-4 pb-16 pt-[calc(var(--nav-height)+2rem)] sm:px-6 lg:px-12 lg:pb-24">
-          <div className="mx-auto w-full max-w-7xl">
+        <div className="relative z-10 px-4 pb-16 pt-[calc(var(--nav-height)+3rem)] sm:px-6 lg:px-12 lg:pb-20">
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-14">
+            {/* PRIMARY: the page's own real structure, in type. */}
+            <div>
             <p
               className="kc-fade-up text-xs font-semibold uppercase tracking-[0.25em] text-blue-300/90"
               style={{ animationDelay: "0.1s" }}
@@ -152,6 +140,37 @@ export function KnowledgeCentrePage() {
               >
                 View Research →
               </Link>
+            </div>
+            </div>
+
+            {/*
+             * SECONDARY: the same blue-hour footage this hero always
+             * used, kept and still playing — now a framed 16:9 panel
+             * beside the copy instead of a full-bleed background behind
+             * it. Decorative, so it stays aria-hidden; the section's
+             * meaning is carried entirely by the type to its left.
+             */}
+            <div
+              className="kc-fade-up relative aspect-video overflow-hidden rounded-3xl border border-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+              style={{ animationDelay: "0.95s" }}
+              aria-hidden="true"
+            >
+              <video
+                ref={videoRef}
+                className="h-full w-full object-cover"
+                src={KNOWLEDGE_HERO_VIDEO_URL}
+                onError={onError}
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+              {/* Slight navy tint so the panel sits in the palette
+                  rather than glowing out of it. */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-[linear-gradient(to_top,rgb(var(--azee-navy)/0.45),transparent_60%)]"
+              />
             </div>
           </div>
         </div>
