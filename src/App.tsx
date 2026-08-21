@@ -28,14 +28,34 @@ export default function App() {
       </ErrorBoundary>
       <WhyAzee />
       <Products />
+      {/*
+       * The conversion section sits FOURTH, directly after Products —
+       * it used to be last, reachable only after the entire page.
+       *
+       * WhyAzee and Products together answer "who are you" and "what do
+       * you offer". The question that follows is "show me", and this
+       * section answers it with a working lookup on live PSX prices,
+       * then asks for the account. Putting the ask at the moment of
+       * peak interest — about one screen of scrolling in — beats
+       * putting it after seven sections, where only the most patient
+       * visitor ever arrived.
+       *
+       * Research, AppShowcase and Stats still follow for anyone who
+       * wants more proof before deciding, and the Footer carries the
+       * same CTA for them.
+       *
+       * Wrapped in a boundary like the other live-data regions: it now
+       * reads the market-watch feed, so a crash here degrades to a
+       * local fallback instead of taking the homepage down.
+       */}
+      <ErrorBoundary label="the live symbol lookup">
+        <ClosingCTA />
+      </ErrorBoundary>
       <ErrorBoundary label="the market news section">
         <Research />
       </ErrorBoundary>
       <AppShowcase />
       <Stats />
-      {/* Closing cinematic CTA — the last moment before the footer,
-          bookending the opening hero video. */}
-      <ClosingCTA />
       <Footer />
     </main>
   );

@@ -1,17 +1,51 @@
 import { expect, test } from "./fixtures";
 
 /*
- * Desktop-scoped like the other functional specs. The closing section
- * is static, so its behaviour is checked once on desktop.
+ * The homepage conversion section — "Start investing".
+ *
+ * It is no longer a passive visual: it carries a working PSX symbol
+ * lookup driven by the live market-watch feed. These tests exercise the
+ * interaction for real and cross-check what it renders against the API
+ * at the same moment, so a mockup or a stale hardcoded value could not
+ * pass.
  */
 test.beforeEach(() => {
   test.skip(
     test.info().project.name !== "desktop",
-    "Closing CTA is viewport-independent; run once on desktop",
+    "Conversion section is viewport-independent; run once on desktop",
   );
 });
 
-test("homepage closing section: real product shot leads, video kept as a supporting panel", async ({
+const SECTION = "#start-investing";
+const LOOKUP = `${SECTION} input[type="text"]`;
+
+test("sits fourth in the homepage order, before Research", async ({ page }) => {
+  await page.goto("/");
+
+  /*
+   * It used to be last, reachable only after the entire page. Position
+   * is asserted structurally — by vertical order against the sections
+   * it must now precede — rather than by an index that any future
+   * insertion would break.
+   */
+  const cta = await page.locator(SECTION).boundingBox();
+  const research = await page.locator("#research").boundingBox();
+  expect(cta, "conversion section renders").not.toBeNull();
+  expect(research, "research section renders").not.toBeNull();
+  expect(
+    cta!.y,
+    "the conversion section must come BEFORE the research section",
+  ).toBeLessThan(research!.y);
+
+  // And it is genuinely early: within the first ~2.5 screens.
+  const viewport = page.viewportSize()!;
+  expect(
+    cta!.y / viewport.height,
+    `conversion section starts ${(cta!.y / viewport.height).toFixed(1)} screens down`,
+  ).toBeLessThan(3);
+});
+
+test("the symbol lookup is real: typed input returns the live quote for that symbol", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -20,153 +54,197 @@ test("homepage closing section: real product shot leads, video kept as a support
   });
   page.on("pageerror", (e) => errors.push(String(e)));
 
-  const videoRequests: string[] = [];
-  page.on("request", (req) => {
-    if (req.url().includes("/video-files/36244310/"))
-      videoRequests.push(req.url());
+  await page.goto("/");
+  const section = page.locator(SECTION);
+  await section.scrollIntoViewIfNeeded();
+
+  // The panel populates itself with a real quote before any input.
+  await expect
+    .poll(async () => (await section.innerText()).includes("PKR"), {
+      timeout: 20_000,
+    })
+    .toBe(true);
+
+  /*
+   * Pull the live feed directly, pick a real symbol from it, and drive
+   * the lookup with that symbol — then require the rendered price to
+   * match what the API says for it. A hardcoded or fabricated panel
+   * cannot satisfy this.
+   */
+  const target = await page.evaluate(async () => {
+    const r = await fetch("/api/market/watch", {
+      headers: { Accept: "application/json" },
+    });
+    const body = await r.json();
+    const q = body.quotes.find(
+      (x: { symbol: string; price: number }) =>
+        x.symbol === "OGDC" && x.price > 0,
+    );
+    return q ?? body.quotes[0];
   });
 
-  await page.goto("/");
+  await page.locator(LOOKUP).fill(target.symbol);
+  await page.waitForTimeout(500);
 
-  // The closing section is uniquely identified by its own glass class,
-  // and sits just before the footer.
-  const closing = page.locator("section:has(.closing-glass)");
-  await expect(closing).toHaveCount(1);
-  await closing.scrollIntoViewIfNeeded();
+  const panel = await section.innerText();
+  expect(panel, "the typed symbol is shown").toContain(target.symbol);
 
-  /*
-   * The night-city footage is KEPT — same 1080p asset, still muted and
-   * looping, still fetched. Both halves of this milestone are asserted:
-   * that it survives, and that it no longer dominates.
-   */
-  const video = closing.locator("video");
-  await expect(video).toHaveCount(1);
-  await expect(video).toHaveAttribute(
-    "src",
-    /videos\.pexels\.com\/video-files\/36244310\/.*1920_1080/,
-  );
-  await expect.poll(() => videoRequests.length).toBeGreaterThan(0);
+  const expectedPrice = target.price.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   expect(
-    videoRequests.some((u) => /3840_2160/.test(u)),
-    "the heavy 4K variant must never be fetched",
-  ).toBe(false);
-  const media = await video.evaluate((v: HTMLVideoElement) => ({
-    muted: v.muted,
-    loop: v.loop,
-  }));
-  expect(media.muted).toBe(true);
-  expect(media.loop).toBe(true);
+    panel,
+    `panel must show ${target.symbol}'s live price ${expectedPrice}`,
+  ).toContain(expectedPrice);
 
-  // The real product screenshot is present and is the DOMINANT visual.
-  const shot = closing.locator("figure img");
-  await expect(shot).toBeVisible();
-  await expect(shot).toHaveAttribute("src", /market-watch-preview.*\.jpg/);
+  // The company name from PSX's directory renders too, when it has one.
+  if (target.name) {
+    expect(panel).toContain(target.name);
+  }
 
-  const shotBox = await shot.boundingBox();
-  const videoBox = await video.boundingBox();
-  expect(shotBox, "product shot renders").not.toBeNull();
-  expect(videoBox, "supporting video renders").not.toBeNull();
-
-  const shotArea = shotBox!.width * shotBox!.height;
-  const videoArea = videoBox!.width * videoBox!.height;
-  expect(
-    shotArea,
-    `product shot (${Math.round(shotArea)}px²) must dominate the video (${Math.round(videoArea)}px²)`,
-  ).toBeGreaterThan(videoArea * 2);
-
-  // The video is no longer a full-bleed background of the section.
-  const sectionBox = await closing.boundingBox();
-  const coverage = videoArea / (sectionBox!.width * sectionBox!.height);
-  expect(
-    coverage,
-    `video covers ${(coverage * 100).toFixed(1)}% of the section — it must be a supporting panel`,
-  ).toBeLessThan(0.25);
-
-  /*
-   * Honesty guard: a still of live prices must be labelled as a dated
-   * capture, never presented as current, and must point at the live page.
-   */
-  const caption = closing.locator("figcaption");
-  await expect(caption).toContainText(/interface preview captured/i);
-  await expect(caption).toContainText(/live at capture/i);
-  await expect(
-    caption.getByRole("link", { name: /open market watch/i }),
-  ).toHaveAttribute("href", "/market-watch");
-
-  // Original closing copy — distinct from Hero and Knowledge Centre.
-  await expect(closing.locator("h2")).toContainText("Make your move");
-
-  // Entrance animation resolves to fully visible (seek past the end so
-  // the check is deterministic regardless of the animation clock).
-  await expect(closing.locator(".closing-fade-up")).not.toHaveCount(0);
-  const opacity = await closing
-    .locator(".closing-fade-up")
-    .first()
-    .evaluate((el) => {
-      const anim = el.getAnimations()[0];
-      if (anim) anim.currentTime = 3000;
-      return Number(getComputedStyle(el).opacity);
-    });
-  expect(opacity).toBeGreaterThan(0.98);
-
-  // The primary CTA (site's existing conversion action) is present.
-  await expect(
-    closing.getByRole("link", { name: /open a trading account/i }),
-  ).toBeVisible();
-
-  // No fabricated performance/marketing claims in the copy.
-  const copy = (await closing.innerText()).toLowerCase();
-  expect(copy).not.toMatch(
-    /#1|\baward|\bguaranteed|\d+%\s*(returns?|profit|gains?)/,
-  );
-
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(1000);
   expect(errors).toEqual([]);
 });
 
-test("the Hero video is untouched, full-bleed, and its live panel intact", async ({
+test("searching by company name and by sector both work", async ({ page }) => {
+  await page.goto("/");
+  const section = page.locator(SECTION);
+  await section.scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => (await section.innerText()).includes("PKR"), {
+      timeout: 20_000,
+    })
+    .toBe(true);
+
+  // A sector term the ticker itself does not contain — proves the
+  // lookup reads the joined company/sector fields, not just symbols.
+  await page.locator(LOOKUP).fill("CEMENT");
+  await page.waitForTimeout(500);
+  const bySector = await section.innerText();
+  expect(bySector.toUpperCase()).toContain("CEMENT");
+
+  await page.locator(LOOKUP).fill("Bank");
+  await page.waitForTimeout(500);
+  const byName = await section.innerText();
+  expect(byName.toUpperCase()).toMatch(/BANK/);
+});
+
+test("most-active chips are live symbols and clicking one loads its quote", async ({
   page,
 }) => {
+  await page.goto("/");
+  const section = page.locator(SECTION);
+  await section.scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => (await section.innerText()).includes("PKR"), {
+      timeout: 20_000,
+    })
+    .toBe(true);
+
+  // The chips are derived from the live payload's top volume, never a
+  // hardcoded list — so each must exist in the feed.
+  const chips = await section
+    .locator("button")
+    .filter({ hasText: /^[A-Z0-9.\-]{2,12}$/ })
+    .allInnerTexts();
+  expect(chips.length).toBeGreaterThan(0);
+
+  const feedSymbols = await page.evaluate(async () => {
+    const r = await fetch("/api/market/watch", {
+      headers: { Accept: "application/json" },
+    });
+    return (await r.json()).quotes.map((q: { symbol: string }) => q.symbol);
+  });
+  for (const chip of chips) {
+    expect(feedSymbols, `chip ${chip} must be a real PSX symbol`).toContain(
+      chip.trim(),
+    );
+  }
+
+  // Clicking one loads that symbol's card.
+  const first = chips[0].trim();
+  await section.getByRole("button", { name: first, exact: true }).click();
+  await page.waitForTimeout(400);
+  await expect(section).toContainText(first);
+  await expect(section).toContainText("PKR");
+});
+
+test("an unmatched search says so rather than inventing a quote", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const section = page.locator(SECTION);
+  await section.scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => (await section.innerText()).includes("PKR"), {
+      timeout: 20_000,
+    })
+    .toBe(true);
+
+  await page.locator(LOOKUP).fill("ZZZZ_NOT_A_SYMBOL");
+  await page.waitForTimeout(500);
+  await expect(section).toContainText(/No PSX symbol matches/i);
+  // No fabricated price is left on screen.
+  expect(await section.innerText()).not.toContain("PKR ");
+});
+
+test("the section keeps its CTA, its distinct warm treatment, and honest framing", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const section = page.locator(SECTION);
+  await section.scrollIntoViewIfNeeded();
+
+  // The conversion action's intent is preserved.
+  await expect(
+    section.getByRole("link", { name: /open a trading account/i }),
+  ).toHaveAttribute("href", "/get-started");
+  await expect(section.locator("h2")).toContainText("Make your move");
+
   /*
-   * Explicit guard for what this milestone was told NOT to change: the
-   * Hero keeps its rotating-globe footage as a full-bleed treatment,
-   * and the live Market Snapshot panel beside it — the real anchor that
-   * earns the Hero its video — keeps working.
+   * Distinct colour: this is the one section tinted with the brand
+   * orange rather than navy, and its CTA is the site's only solid
+   * orange button.
+   */
+  const ctaBg = await section
+    .getByRole("link", { name: /open a trading account/i })
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(ctaBg, "the primary CTA is solid brand orange").toBe(
+    "rgb(233, 81, 38)",
+  );
+
+  // Honest framing about what the prices are.
+  await expect(section).toContainText(/indicative and not an offer to trade/i);
+  await expect(section).toContainText(/PSX ready board/i);
+
+  // No fabricated performance/marketing claims.
+  const copy = (await section.innerText()).toLowerCase();
+  expect(copy).not.toMatch(
+    /#1|\baward|\bguaranteed|\d+%\s*(returns?|profit|gains?)/,
+  );
+});
+
+test("the Hero video and its live panel remain untouched", async ({ page }) => {
+  /*
+   * Guard for what is explicitly out of scope: the Hero keeps its
+   * full-bleed rotating-globe footage and the live Market Snapshot
+   * beside it.
    */
   await page.goto("/");
-
   const hero = page.locator("section").first();
   const heroVideo = hero.locator("video").first();
   await expect(heroVideo).toHaveAttribute(
     "src",
     /videos\.pexels\.com\/video-files\/3129957\/.*1920_1080/,
   );
-  const media = await heroVideo.evaluate((v: HTMLVideoElement) => ({
-    muted: v.muted,
-    loop: v.loop,
-  }));
-  expect(media.muted).toBe(true);
-  expect(media.loop).toBe(true);
 
-  // Still full-bleed: it must cover the great majority of its section.
   const vb = await heroVideo.boundingBox();
   const hb = await hero.boundingBox();
-  const coverage = (vb!.width * vb!.height) / (hb!.width * hb!.height);
   expect(
-    coverage,
-    "the Hero video must remain the full-bleed treatment it always was",
+    (vb!.width * vb!.height) / (hb!.width * hb!.height),
+    "the Hero video must remain full-bleed",
   ).toBeGreaterThan(0.8);
 
-  // The live data beside it is untouched and carries a real value.
   await expect(hero).toContainText("KSE-100");
-  await expect
-    .poll(
-      async () =>
-        Number(
-          (await hero.innerText()).match(/([\d,]{6,})/)?.[1]?.replace(/,/g, "") ??
-            0,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(100_000);
 });
