@@ -65,7 +65,14 @@ const STATS: Stat[] = [
  */
 function useInViewCount(target: number, duration = 1800) {
   const ref = useRef<HTMLDivElement>(null);
-  const [value, setValue] = useState(0);
+  /*
+   * Starts at the TRUE figure, not at 0. The count-up drops it to 0 and
+   * runs only once the animation is actually committed to (below), so
+   * "0+" is never the resting state of the markup — a full-page
+   * screenshot or a crawler reading the page before the row is scrolled
+   * to now finds "20+ Years in Capital Markets", not "0+".
+   */
+  const [value, setValue] = useState(target);
 
   useEffect(() => {
     const el = ref.current;
@@ -99,12 +106,21 @@ function useInViewCount(target: number, duration = 1800) {
         if (!entry.isIntersecting) return;
         observer.disconnect();
 
-        // (1) Pre-flight: no trustworthy frame clock ⇒ show the figure.
+        // (1) Pre-flight: no trustworthy frame clock ⇒ leave the figure
+        // exactly as it is. It already holds the true value.
         if (!canAnimate()) {
           settle();
           return;
         }
 
+        /*
+         * Committed to animating: only NOW does the value drop to 0.
+         * The observer's rootMargin fires this while the row is still
+         * below the fold, so the reset happens off-screen and the
+         * visitor scrolls into a count already in progress — never a
+         * flash of the final figure snapping back to zero.
+         */
+        setValue(0);
         const start = performance.now();
         const tick = (now: number) => {
           const t = Math.min((now - start) / duration, 1);
@@ -127,7 +143,13 @@ function useInViewCount(target: number, duration = 1800) {
         };
         document.addEventListener("visibilitychange", onVisibility);
       },
-      { threshold: 0.4 },
+      /*
+       * Fires ~240px BEFORE the row reaches the viewport, so the
+       * reset-to-zero and the first frames happen off-screen. threshold
+       * 0 because with a positive rootMargin the element is not visible
+       * yet — there is no fraction of it on screen to require.
+       */
+      { threshold: 0, rootMargin: "240px 0px" },
     );
     observer.observe(el);
 
