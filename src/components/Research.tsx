@@ -1,9 +1,61 @@
 import { useState } from "react";
 import { Reveal } from "./Reveal";
-import { SectionHeading } from "./SectionHeading";
 import { IconExternalLink } from "./Icons";
 import { useLatestNews } from "../hooks/useNews";
 import type { NewsFeedItem } from "../types";
+
+/**
+ * #research — News & Insights.
+ *
+ * ONE FOCAL POINT: the real headlines. The publishers' own article
+ * images are the section's visual, exactly as before — what changed is
+ * the presentation around them: flat ink ground instead of a patterned
+ * backdrop, outline-only cards at a large radius instead of filled
+ * glass tiles, and a serif display headline.
+ *
+ * BUILT FOR A BLOG THAT DOES NOT EXIST YET. The section is a channel
+ * switcher driven by the CHANNELS registry below. "News" is live and
+ * reads the real feed; "Blog" is present, visibly marked as not yet
+ * published, and says plainly that nothing has been written rather
+ * than showing invented posts.
+ *
+ * Adding the blog later is a data change, not a rework: give the blog
+ * channel a `status: "live"` and a renderer. The tab strip, the
+ * selection state, the empty/pending panel, the URL-free local state
+ * and the layout all already handle an arbitrary number of channels —
+ * nothing in this file assumes there is exactly one live channel.
+ */
+
+type ChannelStatus = "live" | "pending";
+
+interface Channel {
+  id: string;
+  label: string;
+  status: ChannelStatus;
+  /** Shown under the tabs when this channel is selected. */
+  blurb: string;
+  /** Shown in place of content while the channel is `pending`. */
+  pendingNote?: string;
+}
+
+const CHANNELS: Channel[] = [
+  {
+    id: "news",
+    label: "Market News",
+    status: "live",
+    blurb:
+      "Live coverage from Business Recorder and The Express Tribune — the PSX, SECP, the State Bank and the wider economy. Headlines link out to the publisher; AZEE does not author this news.",
+  },
+  {
+    id: "blog",
+    label: "AZEE Blog",
+    status: "pending",
+    blurb:
+      "Written commentary from our own research desk — market notes, sector views and explainers.",
+    pendingNote:
+      "Nothing has been published yet. When our desk starts writing, posts will appear here rather than anywhere else on the site.",
+  },
+];
 
 /**
  * The publisher's article image, hotlinked from their CDN.
@@ -28,19 +80,12 @@ import type { NewsFeedItem } from "../types";
 function ArticleImage({ src, className }: { src?: string; className: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return null;
-  return (
-    <img
-      src={src}
-      alt=""
-      onError={() => setFailed(true)}
-      className={className}
-    />
-  );
+  return <img src={src} alt="" onError={() => setFailed(true)} className={className} />;
 }
 
 function SourceTag({ source }: { source: string }) {
   return (
-    <span className="liquid-glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide text-white/90">
+    <span className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
       {source}
     </span>
   );
@@ -56,18 +101,13 @@ function formatDate(iso: string): string {
 
 function ArticleDate({ item }: { item: NewsFeedItem }) {
   return (
-    <p className="text-xs text-gray-300/80 tabular-nums">
+    <p className="text-xs tabular-nums text-white/40">
       {formatDate(item.publishedAt)}
     </p>
   );
 }
 
-/**
- * The compact headline card used both in the side column beside the
- * lead and in the full-width grid below it. `wrapperClassName` lets the
- * caller size the Reveal wrapper to its container (flex-1 in the side
- * column, h-full in the grid so a row's cards share a height).
- */
+/** Outline-only headline card, large radius, no fill and no shadow. */
 function HeadlineCard({
   item,
   delay = 0,
@@ -83,26 +123,26 @@ function HeadlineCard({
         href={item.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="liquid-glass card-glow group flex h-full flex-col justify-between rounded-3xl p-6 hover:bg-white/[0.12]"
+        className="group flex h-full flex-col justify-between rounded-[28px] border border-white/12 p-6 transition-colors duration-300 hover:border-white/30"
       >
         <div>
           <ArticleImage
             src={item.imageUrl}
-            className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"
+            className="mb-5 aspect-[16/9] w-full rounded-2xl object-cover"
           />
           <div className="flex items-center justify-between gap-3">
             <SourceTag source={item.source} />
-            <IconExternalLink className="h-3.5 w-3.5 text-white/40 transition-colors duration-500 group-hover:text-white" />
+            <IconExternalLink className="h-3.5 w-3.5 text-white/30 transition-colors duration-300 group-hover:text-white" />
           </div>
-          <h3 className="mt-3 text-base font-semibold leading-snug tracking-tight text-white">
+          <h3 className="mt-4 text-base font-semibold leading-snug tracking-tight text-[rgb(var(--azee-chalk))]">
             {item.title}
           </h3>
         </div>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-5 flex items-center justify-between">
           <ArticleDate item={item} />
           <span
             aria-hidden="true"
-            className="text-white/60 transition-all duration-500 group-hover:translate-x-1 group-hover:text-white"
+            className="text-white/40 transition-all duration-300 group-hover:translate-x-1 group-hover:text-white"
           >
             →
           </span>
@@ -114,10 +154,7 @@ function HeadlineCard({
 
 /**
  * Beside the lead card sit exactly this many headlines, kept at 2 so
- * the 1/3-width side column stays close in height to the lead card
- * (the prior height-balance fix — see lg:items-start below). Everything
- * past the lead + side pair flows into the full-width grid underneath,
- * which is free to be as tall as it likes without affecting the lead.
+ * the 1/3-width side column stays close in height to the lead card.
  */
 const SIDE_HEADLINES = 2;
 
@@ -125,17 +162,15 @@ const SIDE_HEADLINES = 2;
  * How many grid cards show before "See more" — one full desktop row
  * (the grid is 3 columns at lg). With the lead + 2 side cards that's
  * 6 stories visible by default; the rest of whatever the feed returned
- * (typically ~14 items) are one click away, no extra request.
+ * are one click away, no extra request.
  */
 const GRID_HEADLINES_DEFAULT = 3;
 
-export function Research() {
+/** The live news channel: the real feed, in its established layout. */
+function NewsChannel() {
   const { data: news } = useLatestNews();
   const [expanded, setExpanded] = useState(false);
   const items = news?.items ?? [];
-  // Newest item gets the large card — structural emphasis only, not
-  // editorial curation. The next two fill the side list; the remainder
-  // form the grid below.
   const [lead, ...rest] = items;
   const sideHeadlines = rest.slice(0, SIDE_HEADLINES);
   const gridHeadlines = rest.slice(SIDE_HEADLINES);
@@ -144,108 +179,176 @@ export function Research() {
     : gridHeadlines.slice(0, GRID_HEADLINES_DEFAULT);
   const hiddenCount = gridHeadlines.length - GRID_HEADLINES_DEFAULT;
 
+  if (items.length === 0) return null;
+
   return (
-    <section id="research" className="relative overflow-hidden py-24 lg:py-32">
-      {/* Faint terminal grid behind the section */}
-      <div aria-hidden="true" className="bg-grid absolute inset-0" />
+    <>
+      <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
+        {lead && (
+          <Reveal className="lg:col-span-2">
+            <a
+              href={lead.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex h-full flex-col justify-between rounded-[28px] border border-white/12 p-8 transition-colors duration-300 hover:border-white/30 sm:p-10"
+            >
+              <div>
+                <ArticleImage
+                  src={lead.imageUrl}
+                  className="mb-7 aspect-[16/9] w-full rounded-2xl object-cover"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <SourceTag source={lead.source} />
+                  <IconExternalLink className="h-4 w-4 text-white/40 transition-colors duration-300 group-hover:text-white" />
+                </div>
+                <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-3xl">
+                  {lead.title}
+                </h3>
+                {lead.summary && (
+                  <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/50 sm:text-base">
+                    {lead.summary}
+                  </p>
+                )}
+              </div>
+              <div className="mt-8 flex items-center justify-between">
+                <ArticleDate item={lead} />
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/70 transition-all duration-300 group-hover:gap-3 group-hover:text-white">
+                  Read at {lead.source} <span aria-hidden="true">→</span>
+                </span>
+              </div>
+            </a>
+          </Reveal>
+        )}
+
+        <div className="flex flex-col gap-5">
+          {sideHeadlines.map((item, i) => (
+            <HeadlineCard
+              key={item.title}
+              item={item}
+              delay={i * 100}
+              wrapperClassName="flex-1"
+            />
+          ))}
+        </div>
+      </div>
+
+      {visibleGrid.length > 0 && (
+        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleGrid.map((item, i) => (
+            <HeadlineCard
+              key={item.title}
+              item={item}
+              delay={(i % 3) * 100}
+              wrapperClassName="h-full"
+            />
+          ))}
+        </div>
+      )}
+
+      {hiddenCount > 0 && (
+        <div className="mt-12 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="rounded-full border border-white/20 px-7 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:border-white/45"
+          >
+            {expanded ? "Show fewer" : `See more headlines (${hiddenCount})`}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Honest empty state for a channel that has no content yet. */
+function PendingChannel({ channel }: { channel: Channel }) {
+  return (
+    <div className="mt-14 rounded-[28px] border border-white/12 px-8 py-20 text-center sm:px-12">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
+        Not yet published
+      </p>
+      <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-white/55">
+        {channel.pendingNote}
+      </p>
+    </div>
+  );
+}
+
+export function Research() {
+  const [activeId, setActiveId] = useState(CHANNELS[0].id);
+  const active = CHANNELS.find((c) => c.id === activeId) ?? CHANNELS[0];
+
+  return (
+    <section
+      id="research"
+      className="relative bg-[rgb(var(--azee-ink))] py-28 lg:py-40"
+    >
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
+        className="absolute inset-x-0 top-0 h-px bg-white/10"
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
-        <SectionHeading
-          eyebrow="Latest Market News"
-          title="Headlines moving Pakistan's markets."
-          description="Live coverage from Business Recorder — the PSX, SECP, the State Bank, and the wider economy. Headlines link out to the publisher; AZEE does not author this news."
-        />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
+        <div className="mx-auto max-w-3xl text-center">
+          <Reveal>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/40">
+              News &amp; Insights
+            </p>
+          </Reveal>
+          <Reveal delay={100}>
+            <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-chalk))] sm:text-6xl lg:text-7xl">
+              Headlines moving
+              <br />
+              Pakistan&apos;s markets.
+            </h2>
+          </Reveal>
 
-        {items.length > 0 && (
-          <>
-            {/* Featured row: large lead + a short side list. lg:items-start
-                keeps the lead card sized by its own content instead of
-                stretching to the side column's height. */}
-            <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
-              {lead && (
-                <Reveal className="lg:col-span-2">
-                  <a
-                    href={lead.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="liquid-glass-strong glass-sheen card-glow group flex h-full flex-col justify-between rounded-3xl p-8 sm:p-10"
+          {/* Channel switcher — pill tabs, the section's only control. */}
+          <Reveal delay={200}>
+            <div
+              role="tablist"
+              aria-label="News and insights channels"
+              className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/12 p-1.5"
+            >
+              {CHANNELS.map((channel) => {
+                const selected = channel.id === active.id;
+                return (
+                  <button
+                    key={channel.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveId(channel.id)}
+                    className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors duration-300 ${
+                      selected
+                        ? "bg-[rgb(var(--azee-chalk))] text-[rgb(var(--azee-ink))]"
+                        : "text-white/55 hover:text-white"
+                    }`}
                   >
-                    <div>
-                      <ArticleImage
-                        src={lead.imageUrl}
-                        className="mb-6 aspect-[16/9] w-full rounded-2xl object-cover"
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <SourceTag source={lead.source} />
-                        <IconExternalLink className="h-4 w-4 text-white/50 transition-colors duration-500 group-hover:text-white" />
-                      </div>
-                      <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-white sm:text-3xl">
-                        {lead.title}
-                      </h3>
-                      {lead.summary && (
-                        <p className="mt-4 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">
-                          {lead.summary}
-                        </p>
-                      )}
-                    </div>
-                    <div className="mt-8 flex items-center justify-between">
-                      <ArticleDate item={lead} />
-                      <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 transition-all duration-500 group-hover:gap-3 group-hover:text-white">
-                        Read at {lead.source} <span aria-hidden="true">→</span>
+                    {channel.label}
+                    {channel.status === "pending" && (
+                      <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
+                        Soon
                       </span>
-                    </div>
-                  </a>
-                </Reveal>
-              )}
-
-              {/* Side list */}
-              <div className="flex flex-col gap-5">
-                {sideHeadlines.map((item, i) => (
-                  <HeadlineCard
-                    key={item.title}
-                    item={item}
-                    delay={i * 100}
-                    wrapperClassName="flex-1"
-                  />
-                ))}
-              </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+          </Reveal>
 
-            {/* Full-width grid of further headlines — a plain uniform grid,
-                so each row's cards share a height and no single column can
-                run away with the layout. */}
-            {visibleGrid.length > 0 && (
-              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleGrid.map((item, i) => (
-                  <HeadlineCard
-                    key={item.title}
-                    item={item}
-                    delay={(i % 3) * 100}
-                    wrapperClassName="h-full"
-                  />
-                ))}
-              </div>
-            )}
+          <Reveal delay={250}>
+            <p className="mx-auto mt-8 max-w-xl text-sm leading-relaxed text-white/50">
+              {active.blurb}
+            </p>
+          </Reveal>
+        </div>
 
-            {hiddenCount > 0 && (
-              <div className="mt-10 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setExpanded((v) => !v)}
-                  aria-expanded={expanded}
-                  className="liquid-glass rounded-full px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-white/15"
-                >
-                  {expanded
-                    ? "Show fewer"
-                    : `See more headlines (${hiddenCount})`}
-                </button>
-              </div>
-            )}
-          </>
+        {active.status === "live" && active.id === "news" ? (
+          <NewsChannel />
+        ) : (
+          <PendingChannel channel={active} />
         )}
       </div>
     </section>
