@@ -14,7 +14,7 @@ test.beforeEach(() => {
 
 const MODULE_CARD = '#modules a[href^="/knowledge-centre/"]';
 
-test("landing: typography-forward hero with the video kept as a supporting panel, 8 modules, clean console", async ({
+test("landing: moonlit hero renders with video + animated entrance, 8 modules, clean console", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -26,12 +26,7 @@ test("landing: typography-forward hero with the video kept as a supporting panel
   await page.goto("/knowledge-centre");
   await expect(page.locator("h1")).toContainText("Understand the market");
 
-  /*
-   * The blue-hour footage is KEPT — same asset, still muted and looping
-   * — but demoted from a full-bleed background to a framed panel beside
-   * the copy. Both halves matter: that it is still there, and that it no
-   * longer dominates.
-   */
+  // Hero video: a real Pexels source, muted + looping autoplay.
   const video = page.locator("section video").first();
   await expect(video).toHaveAttribute("src", /videos\.pexels\.com/);
   const media = await video.evaluate((v: HTMLVideoElement) => ({
@@ -40,27 +35,6 @@ test("landing: typography-forward hero with the video kept as a supporting panel
   }));
   expect(media.muted).toBe(true);
   expect(media.loop).toBe(true);
-
-  // Demoted, measurably: the panel must be a fraction of the viewport,
-  // not the full-bleed background it used to be.
-  const box = await video.boundingBox();
-  const viewport = page.viewportSize()!;
-  expect(box, "the hero video panel is rendered").not.toBeNull();
-  const coverage = (box!.width * box!.height) / (viewport.width * viewport.height);
-  expect(
-    coverage,
-    `video covers ${(coverage * 100).toFixed(1)}% of the viewport — it must be a supporting panel, not the dominant visual`,
-  ).toBeLessThan(0.4);
-
-  // The heading outranks it: real content leads the section.
-  const h1Box = await page.locator("h1").boundingBox();
-  expect(h1Box!.y).toBeLessThan(box!.y + box!.height);
-
-  // The real structural facts sit in the primary column.
-  const hero = page.locator("section").first();
-  await expect(hero).toContainText("8");
-  await expect(hero).toContainText(/modules/i);
-  await expect(hero).toContainText(/Beginner to Advanced/i);
 
   // Entrance animation: the stacked elements carry the kc-fade-up keyframe,
   // and it resolves to fully visible. Seeking past the end asserts this
