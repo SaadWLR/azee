@@ -51,7 +51,7 @@ const CREDENTIALS: Credential[] = [
     label: "PSX TREC Holder",
     issuer: "Pakistan Stock Exchange",
     note: "Licensed trading rights — ready, futures and odd-lot markets.",
-    fan: "z-40 lg:left-[2%] lg:top-0 lg:-rotate-[6deg]",
+    fan: "z-40 lg:left-[3%] lg:top-0 lg:-rotate-[5deg]",
     cascade: "z-40 -rotate-[2.5deg]",
   },
   {
@@ -59,7 +59,7 @@ const CREDENTIALS: Credential[] = [
     label: "SECP Registration",
     issuer: "Securities & Exchange Commission",
     note: "Registered under the Commission's conduct and capital rules.",
-    fan: "z-30 lg:left-[16%] lg:top-[23%] lg:rotate-[4deg]",
+    fan: "z-30 lg:left-[15%] lg:top-[25%] lg:rotate-[3.5deg]",
     cascade: "z-30 rotate-[2deg]",
   },
   {
@@ -67,7 +67,7 @@ const CREDENTIALS: Credential[] = [
     label: "CDC Participant",
     issuer: "Central Depository Company",
     note: "Client securities held in sub-accounts, separate from house assets.",
-    fan: "z-20 lg:left-[1%] lg:top-[46%] lg:-rotate-[3.5deg]",
+    fan: "z-20 lg:left-[2%] lg:top-[50%] lg:-rotate-[3deg]",
     cascade: "z-20 -rotate-[1.5deg]",
   },
   {
@@ -75,7 +75,7 @@ const CREDENTIALS: Credential[] = [
     label: "NCCPL Participant",
     issuer: "National Clearing Company",
     note: "Direct membership of the company that settles every PSX trade.",
-    fan: "z-10 lg:left-[14%] lg:top-[68%] lg:rotate-[2.5deg]",
+    fan: "z-10 lg:left-[13%] lg:top-[75%] lg:rotate-[2.5deg]",
     cascade: "z-10 rotate-[1deg]",
   },
 ];
@@ -158,7 +158,7 @@ export function WhyAzee() {
              * pulls up under the one before it — a different
              * arrangement, not the fan shrunk.
              */}
-            <div className="relative mx-auto w-full max-w-sm lg:h-[30rem] lg:max-w-none">
+            <div className="relative mx-auto w-full max-w-sm lg:h-[40rem] lg:max-w-none">
               {CREDENTIALS.map((item, i) => (
                 <div
                   key={item.label}
