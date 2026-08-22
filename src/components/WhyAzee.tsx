@@ -1,146 +1,177 @@
 import { Reveal } from "./Reveal";
 
 /**
- * #about — the credential wall.
+ * #about — the credential seal stack.
  *
- * ONE FOCAL POINT: the firm's real, verifiable licences, set as
- * typography. Nothing here is decorative. Every figure on screen is
- * either a registration number AZEE actually holds or a span of years
- * computed from the real founding year.
+ * ONE FOCAL POINT: AZEE's four real registrations as a physical object.
+ * Each licence sits on its own card, rotated and depth-shadowed, fanned
+ * into a stack — the way the paper certificates themselves would sit on
+ * a desk. It replaced a 2×4 grid inside one large empty bordered box,
+ * which was a container, not a composition.
  *
- * WHY NOT THE REGULATORS' LOGOS: the brief offered official PSX / SECP /
- * CDC / NCCPL marks as an option, on the condition that the real current
- * logos be used rather than approximations. Those assets are not in this
- * repo and I will not redraw or approximate a regulator's mark — a
- * wrong-looking official logo on a licensed broker's site is worse than
- * no logo. The brief's stated alternative is taken instead: the
- * registration numbers themselves, plus a dynamically computed years
- * figure, as the typographic anchor. Dropping in the real marks later is
- * a contained change to CREDENTIALS below.
+ * Everything on the cards is real and independently checkable: PSX TREC
+ * 108, SECP 0041920, CDC 04184, NCCPL C0418401. The years figure is
+ * COMPUTED from the 2003 founding year, never typed.
  *
- * WHAT REPLACED THE OLD TREATMENT: six filled glass cards each with a
- * rounded icon tile — a generic icon-and-card grid, which the spec
- * forbids. The icons carried no information the heading did not already
- * carry, so they are gone rather than restyled.
+ * DIMENSIONALITY IS REAL, NOT IMPLIED. Each card carries its own
+ * rotation and its own long shadow, and they overlap — so the depth
+ * comes from the arrangement itself rather than from a border pretending
+ * to be an edge.
+ *
+ * MOBILE IS A DIFFERENT COMPOSITION, not this one scaled. A four-card
+ * fan needs horizontal room it does not have on a phone; shrunk down it
+ * becomes an unreadable overlap. Below `sm` the cards straighten out
+ * into an offset cascade — still layered and still overlapping top to
+ * bottom, but each one legible on its own line.
  */
 
-/** The year AZEE Securities was incorporated. The single source for the
- *  years figure below — never hardcode the span itself. */
+/** The year AZEE Securities was incorporated — the single source for
+ *  the years figure below. Never hardcode the span itself. */
 const FOUNDED = 2003;
 
 interface Credential {
-  /** The identifier itself — the visual anchor of each entry. */
   value: string;
-  /** What the identifier IS. */
   label: string;
-  /** What it means for a client, in plain terms. */
+  issuer: string;
   note: string;
+  /** Desktop fan geometry: rotation, offsets and stacking order. */
+  fan: string;
+  /** Mobile cascade geometry — a gentler, vertical arrangement. */
+  cascade: string;
 }
 
 /*
- * Real registrations, matching src/data/company.ts and the Footer. The
- * numbers are the visual: each is independently checkable against the
- * issuing body's own register.
+ * Real registrations, matching src/data/company.ts and the Footer.
+ * Ordered front-to-back: the exchange licence reads first because it is
+ * the one that lets AZEE trade at all.
  */
 const CREDENTIALS: Credential[] = [
   {
-    value: "108",
+    value: "No. 108",
     label: "PSX TREC Holder",
-    note: "Licensed trading rights on the Pakistan Stock Exchange — ready, futures and odd-lot markets.",
+    issuer: "Pakistan Stock Exchange",
+    note: "Licensed trading rights — ready, futures and odd-lot markets.",
+    fan: "z-40 lg:left-[2%] lg:top-0 lg:-rotate-[6deg]",
+    cascade: "z-40 -rotate-[2.5deg]",
   },
   {
     value: "0041920",
     label: "SECP Registration",
-    note: "Registered with the Securities & Exchange Commission of Pakistan, under its conduct and capital rules.",
+    issuer: "Securities & Exchange Commission",
+    note: "Registered under the Commission's conduct and capital rules.",
+    fan: "z-30 lg:left-[16%] lg:top-[23%] lg:rotate-[4deg]",
+    cascade: "z-30 rotate-[2deg]",
   },
   {
     value: "04184",
     label: "CDC Participant",
-    note: "Client securities sit in sub-accounts at the Central Depository Company, separate from house assets.",
+    issuer: "Central Depository Company",
+    note: "Client securities held in sub-accounts, separate from house assets.",
+    fan: "z-20 lg:left-[1%] lg:top-[46%] lg:-rotate-[3.5deg]",
+    cascade: "z-20 -rotate-[1.5deg]",
   },
   {
     value: "C0418401",
     label: "NCCPL Participant",
-    note: "Direct membership of the National Clearing Company, which settles every PSX trade.",
+    issuer: "National Clearing Company",
+    note: "Direct membership of the company that settles every PSX trade.",
+    fan: "z-10 lg:left-[14%] lg:top-[68%] lg:rotate-[2.5deg]",
+    cascade: "z-10 rotate-[1deg]",
   },
 ];
 
+function SealCard({ item }: { item: Credential }) {
+  return (
+    <div className="rounded-[22px] border border-white/12 bg-[rgb(20_19_16)] px-7 py-6 shadow-[0_28px_60px_-12px_rgba(0,0,0,0.85)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[rgb(var(--azee-orange))]">
+        {item.label}
+      </p>
+      {/* Level 4 — the datum. Serif, because this is the object's face. */}
+      <p className="font-display mt-3 text-[1.75rem] leading-none text-[rgb(var(--azee-chalk))]">
+        {item.value}
+      </p>
+      {/* Level 5 — metadata. */}
+      <p className="mt-2.5 text-xs text-white/45">{item.issuer}</p>
+      <p className="mt-4 max-w-[17rem] text-xs leading-relaxed text-white/35">
+        {item.note}
+      </p>
+    </div>
+  );
+}
+
 export function WhyAzee() {
-  // Computed, never written down: the figure is correct next year too.
   const years = new Date().getFullYear() - FOUNDED;
 
   return (
     <section
       id="about"
-      className="relative bg-[rgb(var(--azee-ink))] py-28 lg:py-40"
+      className="relative bg-[rgb(var(--azee-ink))] py-32 lg:py-48"
     >
-      {/* A single hairline, the section's only ornament. */}
       <div
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-px bg-white/10"
       />
 
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-12">
-        {/* Centred, single column — no split layout. */}
-        <div className="mx-auto max-w-3xl text-center">
-          <Reveal>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/40">
-              Why AZEE Securities
-            </p>
-          </Reveal>
-
-          <Reveal delay={100}>
-            {/*
-             * The one display-serif moment in this section. Colour is
-             * --azee-chalk, a desaturated off-white — not pure white.
-             */}
-            <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-chalk))] sm:text-6xl lg:text-7xl">
-              {years} years,
-              <br />
-              fully accountable.
-            </h2>
-          </Reveal>
-
-          <Reveal delay={200}>
-            <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-white/55">
-              Every year since {FOUNDED}, under the same four regulators. These
-              are the registrations that make that verifiable — each one
-              checkable against the issuing body&apos;s own register.
-            </p>
-          </Reveal>
-        </div>
-
-        {/*
-         * The credential wall. Outline-only on dark, large radius, no
-         * fill and no shadow — the spec's alternative to the "filled
-         * card pretending to be elevated" pattern this replaced.
-         */}
-        <div className="mt-20 grid grid-cols-1 gap-px overflow-hidden rounded-[28px] border border-white/12 sm:grid-cols-2">
-          {CREDENTIALS.map((item, i) => (
-            <Reveal key={item.label} delay={(i % 2) * 100}>
-              <div className="h-full bg-[rgb(var(--azee-ink))] p-8 sm:p-10">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
-                  {item.label}
-                </p>
-                {/* The number is the visual. */}
-                <p className="mt-4 text-4xl font-semibold tabular-nums tracking-tight text-[rgb(var(--azee-chalk))] sm:text-5xl">
-                  {item.value}
-                </p>
-                <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/50">
-                  {item.note}
-                </p>
-              </div>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
+        <div className="grid items-center gap-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16">
+          {/* ── Copy ──────────────────────────────────────────────── */}
+          <div>
+            {/* Level 5 — metadata */}
+            <Reveal>
+              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-[rgb(var(--azee-orange))]">
+                Why AZEE Securities
+              </p>
             </Reveal>
-          ))}
-        </div>
 
-        <Reveal delay={200}>
-          <p className="mt-10 text-center text-xs leading-relaxed text-white/35">
-            AZEE Securities (Pvt.) Ltd. — incorporated {FOUNDED}, Registration
-            No. K-8159 (2000-1), Securities Broker Licence No.
-            108/Securities&nbsp;Broker/2019.
-          </p>
-        </Reveal>
+            {/* Level 1 — the hero statement */}
+            <Reveal delay={100}>
+              <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem] lg:text-[4.5rem]">
+                {years} years.
+                <br />
+                Fully accountable.
+              </h2>
+            </Reveal>
+
+            {/* Level 3 — the supporting line */}
+            <Reveal delay={200}>
+              <p className="mt-10 max-w-md text-[15px] leading-[1.75] text-white/50">
+                Every year since {FOUNDED}, under the same four regulators —
+                each registration independently checkable against its issuing
+                register.
+              </p>
+            </Reveal>
+
+            <Reveal delay={280}>
+              <p className="mt-12 max-w-md text-xs leading-relaxed text-white/30">
+                AZEE Securities (Pvt.) Ltd. — incorporated {FOUNDED},
+                Registration No. K-8159 (2000-1), Securities Broker Licence
+                No. 108/Securities&nbsp;Broker/2019.
+              </p>
+            </Reveal>
+          </div>
+
+          {/* ── The seal stack ────────────────────────────────────── */}
+          <Reveal delay={150}>
+            {/*
+             * Desktop: absolutely-positioned fan inside a fixed-height
+             * stage. Mobile: a relative offset cascade, where each card
+             * pulls up under the one before it — a different
+             * arrangement, not the fan shrunk.
+             */}
+            <div className="relative mx-auto w-full max-w-sm lg:h-[30rem] lg:max-w-none">
+              {CREDENTIALS.map((item, i) => (
+                <div
+                  key={item.label}
+                  className={`${item.cascade} ${item.fan} relative w-full lg:absolute lg:w-[21rem] ${
+                    i > 0 ? "-mt-6 lg:mt-0" : ""
+                  }`}
+                >
+                  <SealCard item={item} />
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </div>
       </div>
     </section>
   );
