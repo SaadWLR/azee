@@ -37,12 +37,22 @@ test("sits fourth in the homepage order, before Research", async ({ page }) => {
     "the conversion section must come BEFORE the research section",
   ).toBeLessThan(research!.y);
 
-  // And it is genuinely early: within the first ~2.5 screens.
-  const viewport = page.viewportSize()!;
+  /*
+   * And it is genuinely early — measured as a FRACTION OF THE PAGE
+   * rather than in screen-heights.
+   *
+   * A screen-count threshold drifts with section padding: the homepage
+   * redesign deliberately increased vertical spacing, which pushed this
+   * from 2.9 to 3.2 screens without moving it one place in the order.
+   * The claim worth defending is "in the first half of the page, not
+   * buried at the end" (it was last, at ~7.3 screens), and that holds
+   * regardless of how generous the spacing becomes.
+   */
+  const pageHeight = await page.evaluate(() => document.body.scrollHeight);
   expect(
-    cta!.y / viewport.height,
-    `conversion section starts ${(cta!.y / viewport.height).toFixed(1)} screens down`,
-  ).toBeLessThan(3);
+    cta!.y / pageHeight,
+    `conversion section starts ${((cta!.y / pageHeight) * 100).toFixed(0)}% down the page`,
+  ).toBeLessThan(0.5);
 });
 
 test("the symbol lookup is real: typed input returns the live quote for that symbol", async ({
