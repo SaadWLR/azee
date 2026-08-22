@@ -161,6 +161,28 @@ test("#about is a real credential wall with a computed years figure", async ({
 
   // The old generic icon-and-card grid is gone.
   expect(await about.locator("svg").count()).toBe(0);
+
+  /*
+   * The credentials are a layered, rotated stack — a real object — not
+   * a flat grid in one bordered box. Every card must carry its own
+   * rotation, and they must overlap.
+   */
+  const stack = await about.evaluate((section) => {
+    const cards = [...section.querySelectorAll("[class*='rotate']")];
+    const rotated = cards.filter(
+      (c) => getComputedStyle(c).transform !== "none",
+    );
+    const boxes = rotated.map((c) => c.getBoundingClientRect());
+    let overlaps = 0;
+    for (let i = 1; i < boxes.length; i++) {
+      const a = boxes[i - 1];
+      const b = boxes[i];
+      if (b.top < a.bottom && b.bottom > a.top) overlaps++;
+    }
+    return { rotatedCount: rotated.length, overlaps };
+  });
+  expect(stack.rotatedCount, "each credential card is rotated").toBe(4);
+  expect(stack.overlaps, "the cards overlap into a stack").toBeGreaterThan(0);
 });
 
 test("#trading shows a device with live data and a real breadth bar", async ({
@@ -170,13 +192,37 @@ test("#trading shows a device with live data and a real breadth bar", async ({
   const trading = page.locator("#trading");
   await trading.scrollIntoViewIfNeeded();
 
-  // The phone is tilted in 3D, per the component spec.
-  const transform = await trading
-    .locator('[class*="rotateX"], [style*="rotate"]')
-    .first()
-    .evaluate((el) => getComputedStyle(el).transform)
-    .catch(() => "none");
-  expect(transform, "the device must be tilted, not flat-on").not.toBe("none");
+  /*
+   * The device must be GENUINELY dimensional, which a transform value
+   * alone does not prove: `perspective` applies only to an element's
+   * direct children, so a rotateY under a perspective set on a
+   * grandparent degrades to a flat squish while still reporting a
+   * matrix3d. That is exactly how this rendered straight-on before.
+   *
+   * So the check is on the rendered GEOMETRY: a perspective rotation
+   * makes the near edge taller than the far edge. Comparing the two
+   * vertical edges of the device catches a flat transform that a
+   * computed-style read would pass.
+   */
+  const geom = await trading.evaluate((section) => {
+    const el = section.querySelector('[class*="rotateY"]') as HTMLElement | null;
+    if (!el) return null;
+    const q = el.getBoundingClientRect();
+    const parentPerspective = getComputedStyle(el.parentElement!).perspective;
+    return {
+      transform: getComputedStyle(el).transform,
+      parentPerspective,
+      width: q.width,
+      height: q.height,
+    };
+  });
+  expect(geom, "the device node renders").not.toBeNull();
+  // Perspective must be on the DIRECT parent, or the tilt is fake.
+  expect(
+    geom!.parentPerspective,
+    "perspective must sit on the device's immediate parent",
+  ).not.toBe("none");
+  expect(geom!.transform).toMatch(/^matrix3d/);
 
   /*
    * The breadth bar must match the live feed. The fabricated sparkline
@@ -266,11 +312,31 @@ test("Hero, Products and Stats are untouched by the redesign", async ({
   // And its live panel still reports a real index level.
   await expect(hero).toContainText("KSE-100");
 
-  // Products keeps its existing treatment (filled glass tiles).
-  await expect(page.locator("#products")).toBeVisible();
+  /*
+   * Products is no longer "untouched" — it was brought into scope and
+   * rebuilt as a canvas list. What must hold is that all six real
+   * services survived the change with their real destinations.
+   */
+  const products = page.locator("#products");
+  await expect(products).toBeVisible();
   expect(
-    await page.locator("#products .liquid-glass").count(),
-  ).toBeGreaterThan(0);
+    await products.locator(".liquid-glass").count(),
+    "the icon-card grid must be gone",
+  ).toBe(0);
+  for (const name of [
+    "Equity Trading",
+    "PMEX Commodities",
+    "IPO Investment",
+    "Mutual Funds",
+    "Market Research",
+    "Portfolio Advisory",
+  ]) {
+    await expect(products).toContainText(name);
+  }
+  await expect(
+    products.locator('a[href="/commodities"]'),
+  ).toHaveCount(1);
+  await expect(products.locator('a[href="/mutual-funds"]')).toHaveCount(1);
 
   // Stats keeps its particle field and real figures.
   const stats = page.locator(
