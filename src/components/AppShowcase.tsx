@@ -255,8 +255,16 @@ export function AppShowcase() {
            * the thing being depicted, so the device frame and the tilt
            * are dropped entirely for a different composition (below).
            */}
-          <div className="mt-24 flex justify-center lg:[perspective:1500px]">
-            <div className="relative w-full max-w-[18rem]">
+          <div className="mt-24 flex justify-center">
+            {/*
+             * Perspective sits HERE, on the device's immediate parent —
+             * not on the flex wrapper above. That distinction is the
+             * whole bug: with perspective one level too high, rotateY
+             * collapses to a flat affine skew that still reports a
+             * matrix3d and can even look tilted in a screenshot because
+             * of the rotateZ, while having no real depth at all.
+             */}
+            <div className="relative w-full max-w-[18rem] lg:[perspective:1500px]">
               {/* Cast shadow, outside the transformed node so it stays
                   on the ground rather than tilting with the device. */}
               <div

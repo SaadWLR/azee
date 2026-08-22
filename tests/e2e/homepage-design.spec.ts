@@ -169,9 +169,15 @@ test("#about is a real credential wall with a computed years figure", async ({
    */
   const stack = await about.evaluate((section) => {
     const cards = [...section.querySelectorAll("[class*='rotate']")];
-    const rotated = cards.filter(
-      (c) => getComputedStyle(c).transform !== "none",
-    );
+    /*
+     * Tailwind v4 emits rotate-* as the standalone CSS `rotate`
+     * property, NOT as a `transform`. Checking only `transform` reports
+     * "none" on a card that is visibly rotated — so both are accepted.
+     */
+    const rotated = cards.filter((c) => {
+      const cs = getComputedStyle(c);
+      return cs.transform !== "none" || (cs.rotate && cs.rotate !== "none");
+    });
     const boxes = rotated.map((c) => c.getBoundingClientRect());
     let overlaps = 0;
     for (let i = 1; i < boxes.length; i++) {

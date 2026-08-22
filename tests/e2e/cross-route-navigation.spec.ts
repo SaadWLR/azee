@@ -98,9 +98,22 @@ test("Products section survives losing its nav link", async ({ page }) => {
   // ...but the section itself still renders, in full.
   const products = page.locator("#products");
   await expect(products).toBeAttached();
-  await expect(products).toContainText("Every market, one relationship.");
-  // All six product tiles, each with its heading and body copy.
-  await expect(products.locator("a")).toHaveCount(6);
+  await expect(products).toContainText("Every market,");
+  await expect(products).toContainText("one relationship.");
+  /*
+   * The section is now a canvas list rather than a six-tile grid, so
+   * the anchor count changed and that is deliberate: the old grid gave
+   * all six an <a>, four of them dead href="#" placeholders. Only the
+   * two services with a real page are links now; the rest are inert
+   * rather than pretending. What must hold is that all six services
+   * are still present with their real copy.
+   */
+  await expect(products.locator('a[href="/commodities"]')).toHaveCount(1);
+  await expect(products.locator('a[href="/mutual-funds"]')).toHaveCount(1);
+  await expect(
+    products.locator('a[href="#"]'),
+    "no dead placeholder anchors remain",
+  ).toHaveCount(0);
   for (const title of [
     "Equity Trading",
     "PMEX Commodities",
