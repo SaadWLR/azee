@@ -159,13 +159,21 @@ function PhoneScreen({
         })}
       </div>
 
-      <div className="mt-auto flex gap-3 pt-4">
-        <span className="flex-1 rounded-full bg-white py-2.5 text-center text-xs font-bold text-black">
-          Buy
-        </span>
-        <span className="flex-1 rounded-full border border-white/25 py-2.5 text-center text-xs font-bold text-white">
-          Sell
-        </span>
+      {/*
+       * NO BUY/SELL CONTROLS. The screen previously ended with Buy and
+       * Sell buttons. AZEE has no live trading platform yet — Client
+       * Login routes to an honest coming-soon page — so depicting order
+       * controls would imply a product that does not exist. Live market
+       * data on the screen is real and stays; simulated order or
+       * portfolio functionality does not belong here at all.
+       *
+       * What closes the screen instead is the one honest thing to say
+       * about it: where these numbers come from.
+       */}
+      <div className="mt-auto border-t border-white/10 pt-4">
+        <p className="text-center text-[10px] leading-relaxed text-gray-500">
+          Live PSX ready-board data
+        </p>
       </div>
     </div>
   );
@@ -207,24 +215,24 @@ export function AppShowcase() {
   return (
     <section
       id="trading"
-      className="relative overflow-hidden bg-[rgb(var(--azee-bone))] py-28 lg:py-40"
+      className="relative overflow-hidden bg-[rgb(var(--azee-bone))] py-32 lg:py-48"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-black/45">
+            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-[rgb(var(--azee-orange))]">
               AZEE Stockify
             </p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="font-display mt-8 text-[2.75rem] text-[#141210] sm:text-6xl">
+            <h2 className="font-display mt-10 text-[3rem] text-[#141210] sm:text-[4rem] lg:text-[4.5rem]">
               The exchange,
               <br />
               in one hand.
             </h2>
           </Reveal>
           <Reveal delay={200}>
-            <p className="mx-auto mt-8 max-w-lg text-base leading-relaxed text-black/55">
+            <p className="mx-auto mt-10 max-w-lg text-[15px] leading-[1.75] text-black/55">
               Trade, monitor and manage your PSX portfolio from anywhere — the
               same real-time data and order routing as the desktop terminal.
               The screen below is showing the live market right now.
@@ -234,17 +242,38 @@ export function AppShowcase() {
 
         {/* The device: tilted in 3D, with a real cast shadow. */}
         <Reveal delay={250}>
-          <div className="mt-20 flex justify-center [perspective:1600px]">
-            <div className="relative w-64 sm:w-72">
-              {/* Contact shadow on the light ground. */}
+          {/*
+           * THE STAGE. `perspective` applies only to an element's DIRECT
+           * children — this is the bug that made the previous tilt read
+           * as flat: perspective sat on a grandparent, so rotateY
+           * degraded to a plain orthographic squish and the phone
+           * rendered straight-on in a screenshot even though the
+           * computed transform really was a matrix3d. The transformed
+           * device below is now an immediate child of this element.
+           *
+           * Applied only from `lg`. On a phone you are already holding
+           * the thing being depicted, so the device frame and the tilt
+           * are dropped entirely for a different composition (below).
+           */}
+          <div className="mt-24 flex justify-center lg:[perspective:1500px]">
+            <div className="relative w-full max-w-[18rem]">
+              {/* Cast shadow, outside the transformed node so it stays
+                  on the ground rather than tilting with the device. */}
               <div
                 aria-hidden="true"
-                className="absolute -bottom-8 left-1/2 h-10 w-3/4 -translate-x-1/2 rounded-[50%] bg-black/25 blur-2xl"
+                className="absolute -bottom-10 left-1/2 hidden h-12 w-4/5 -translate-x-1/2 rounded-[50%] bg-black/30 blur-2xl lg:block"
               />
+              {/*
+               * MOBILE: a flat, bezel-less panel — the live screen
+               * itself, presented directly.
+               * DESKTOP: a real device at a dramatic angle
+               * (rotateY -18deg / rotateX 6deg / rotateZ -2deg), which
+               * is the reference's floor, not its ceiling.
+               */}
               <div
-                className="relative rounded-[3rem] bg-[#141210] p-3 shadow-[0_50px_90px_-20px_rgba(0,0,0,0.45)] [transform:rotateX(6deg)_rotateY(-14deg)_rotate(1deg)]"
+                className="relative overflow-hidden rounded-[2rem] bg-[#141210] shadow-[0_24px_60px_-24px_rgba(0,0,0,0.5)] lg:rounded-[3rem] lg:p-3 lg:shadow-[50px_70px_110px_-30px_rgba(0,0,0,0.5)] lg:[transform:rotateY(-18deg)_rotateX(6deg)_rotateZ(-2deg)]"
               >
-                <div className="h-[540px] overflow-hidden rounded-[2.4rem] border border-white/10">
+                <div className="h-[520px] overflow-hidden rounded-[2rem] border border-white/10 lg:h-[540px] lg:rounded-[2.4rem]">
                   {snapshot && quotes && (
                     <PhoneScreen
                       index={snapshot.index}
@@ -253,9 +282,10 @@ export function AppShowcase() {
                     />
                   )}
                 </div>
+                {/* Speaker notch — part of the device, so desktop only. */}
                 <div
                   aria-hidden="true"
-                  className="absolute left-1/2 top-6 h-1.5 w-16 -translate-x-1/2 rounded-full bg-black/70"
+                  className="absolute left-1/2 top-6 hidden h-1.5 w-16 -translate-x-1/2 rounded-full bg-black/70 lg:block"
                 />
               </div>
             </div>
@@ -264,7 +294,7 @@ export function AppShowcase() {
 
         {/* Capabilities, as a restrained centred list — no icon tiles. */}
         <Reveal delay={150}>
-          <ul className="mx-auto mt-24 grid max-w-3xl grid-cols-1 gap-x-12 gap-y-4 sm:grid-cols-2">
+          <ul className="mx-auto mt-28 grid max-w-3xl grid-cols-1 gap-x-12 gap-y-4 sm:grid-cols-2">
             {FEATURES.map((feature) => (
               <li
                 key={feature}
