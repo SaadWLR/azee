@@ -292,7 +292,25 @@ export function ClosingCTA() {
             </div>
           )}
 
-          <div className="mt-6">
+          {/*
+           * DIMENSIONAL RESULT CARD.
+           *
+           * `perspective` lives here, on the IMMEDIATE parent of the
+           * transformed node — applying it to a grandparent silently
+           * degrades rotateY to a flat orthographic squish, which is
+           * exactly how the #trading device ended up looking straight-on
+           * despite reporting a matrix3d transform.
+           *
+           * Desktop only. The tilt is applied to the DISPLAY card, never
+           * to the input or the chips above it — controls you type into
+           * and click stay flat and square to the reader. On mobile the
+           * card is flat too: a 16-degree rotation on a 375px-wide
+           * screen costs legibility of live prices and buys nothing.
+           *
+           * None of this touches the lookup itself.
+           */}
+          <div className="mt-7 lg:[perspective:1400px]">
+            <div className="transition-transform duration-500 lg:[transform:rotateY(-16deg)_rotateX(6deg)_rotateZ(1.5deg)] lg:hover:[transform:rotateY(-9deg)_rotateX(4deg)_rotateZ(1deg)] lg:[box-shadow:45px_55px_90px_-30px_rgba(0,0,0,0.75)]">
             {error && !quotes ? (
               // Honest failure — never a placeholder quote.
               <div className="rounded-[28px] border border-white/15 px-6 py-14 text-center text-sm text-white/50">
@@ -310,6 +328,7 @@ export function ClosingCTA() {
                 No PSX symbol matches “{query.trim()}”.
               </div>
             )}
+            </div>
           </div>
 
           <p className="mt-5 text-xs leading-relaxed text-white/35">
