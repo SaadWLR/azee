@@ -209,26 +209,36 @@ body {
  * behind its items, in every browser. The blur is left in as a
  * harmless progressive nicety for engines that honour it.
  */
+/*
+ * The persistent nav.
+ *
+ * Re-tokened from the pre-redesign navy/blue to ink + orange. The old
+ * treatment was a solid navy gradient with a blue border and blue glow;
+ * against the redesigned ink and bone sections it read as a leftover
+ * from a different palette — most obviously floating over the bone
+ * #trading section, where a navy slab with a blue halo has nothing to
+ * do with anything around it.
+ *
+ * Now: a translucent INK surface (so the section behind it shows
+ * through rather than being covered by an unrelated colour), with the
+ * border and glow carrying the site's actual accent at low alpha.
+ */
 .nav-glass {
-  background: linear-gradient(
-    180deg,
-    rgb(10 14 26),
-    rgb(var(--azee-navy))
-  );
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid rgb(var(--azee-blue) / 0.2);
+  background: rgb(var(--azee-ink) / 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgb(var(--azee-orange) / 0.16);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 6px 28px rgb(var(--azee-blue) / 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 6px 28px rgb(var(--azee-orange) / 0.06);
   transition: box-shadow 0.5s ease;
 }
 
 .nav-glass-scrolled {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 12px 40px rgba(0, 0, 0, 0.5),
-    0 6px 28px rgb(var(--azee-blue) / 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 6px 28px rgb(var(--azee-orange) / 0.1);
 }
 
 /* Deep navy glass for secondary actions. */
