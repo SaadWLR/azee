@@ -53,7 +53,8 @@ test("no redesigned section uses a gradient or radial colour wash", async ({
           // Hairline rules are a 1px linear-gradient and are allowed;
           // anything with real height is a wash.
           const r = (el as Element).getBoundingClientRect();
-          if (r.height > 3) found.push(`${(el as Element).tagName}: ${bg.slice(0, 70)}`);
+          if (r.height > 3)
+            found.push(`${(el as Element).tagName}: ${bg.slice(0, 70)}`);
         }
       }
       return found;
@@ -221,7 +222,9 @@ test("#trading shows a device with live data and a real breadth bar", async ({
    * computed-style read would pass.
    */
   const geom = await trading.evaluate((section) => {
-    const el = section.querySelector('[class*="rotateY"]') as HTMLElement | null;
+    const el = section.querySelector(
+      '[class*="rotateY"]',
+    ) as HTMLElement | null;
     if (!el) return null;
     const q = el.getBoundingClientRect();
     const parentPerspective = getComputedStyle(el.parentElement!).perspective;
@@ -349,9 +352,7 @@ test("Hero, Products and Stats are untouched by the redesign", async ({
   ]) {
     await expect(products).toContainText(name);
   }
-  await expect(
-    products.locator('a[href="/commodities"]'),
-  ).toHaveCount(1);
+  await expect(products.locator('a[href="/commodities"]')).toHaveCount(1);
   await expect(products.locator('a[href="/mutual-funds"]')).toHaveCount(1);
 
   // Stats keeps its particle field and real figures.
@@ -444,7 +445,21 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
    * colour transition is 0.45s and the page scrolls smoothly, so a
    * single read lands on a genuine in-between frame. Both are polled.
    */
-  const expectTheme = async (theme: string, surface: string) => {
+  const expectTheme = async (theme: string, surface: string, id?: string) => {
+    if (id) {
+      /*
+       * Scrolled by an explicit offset INTO the section rather than
+       * with scrollIntoViewIfNeeded: these sections are taller than
+       * the viewport, so "if needed" settles for bringing the top edge
+       * into view — which on a tall viewport can leave the bar still
+       * sitting over the section above. The test would then be reading
+       * the previous section's theme and calling it a failure.
+       */
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel) as HTMLElement;
+        window.scrollTo(0, el.offsetTop + 240);
+      }, id);
+    }
     await expect(nav).toHaveAttribute("data-nav-theme", theme, {
       timeout: 10_000,
     });
@@ -461,10 +476,202 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
   await expectTheme("hero", "rgb(12, 24, 66)");
 
   // Over #about: the ink default.
-  await page.locator("#about").scrollIntoViewIfNeeded();
-  await expectTheme("dark", INK);
+  await expectTheme("dark", INK, "#about");
 
   // Over the bone #trading block: the light theme still wins.
-  await page.locator("#trading").scrollIntoViewIfNeeded();
-  await expectTheme("light", BONE);
+  await expectTheme("light", BONE, "#trading");
+});
+
+/*
+ * ── #products is a chain, not a motif ──────────────────────────────
+ *
+ * The section's claim is "Every market, one relationship", and the
+ * chain is how it is made visible: six services threaded onto one
+ * chain, each on its own link.
+ *
+ * The assertions are the properties that make it a chain rather than a
+ * column of ovals, because those are exactly the ones that decay
+ * silently — a geometry constant nudged, a row height changed, and it
+ * degrades into decoration without anything failing.
+ */
+test("#products threads its services onto one real chain", async ({ page }) => {
+  await page.goto("/");
+  const products = page.locator("#products");
+  const rows = products.locator("[data-product-row]");
+  const chain = products.locator("svg.chain:visible");
+
+  /*
+   * Run at BOTH breakpoints. The section renders two chains and shows
+   * one, and they are not the same drawing scaled — each carries its
+   * own pitch, link width and wire, paired with its own row height. A
+   * desktop-only check would leave every one of those numbers on the
+   * phone unguarded, which is where they are tightest.
+   */
+  const assertChain = async (label: string) => {
+    await products.scrollIntoViewIfNeeded();
+
+    await expect(rows, label).toHaveCount(6);
+
+    // Only one of the two breakpoint chains is rendered at a time.
+    await expect(chain, label).toHaveCount(1);
+
+    const geometry = await chain.evaluate((svg) => {
+      const rects = [...svg.querySelectorAll("g > rect")];
+      const num = (el: Element, a: string) => Number(el.getAttribute(a));
+      return {
+        // 6 links + a clipped second copy of each turned link that has a
+        // face-on link below it.
+        shapes: rects.length,
+        widths: rects.map((r) => num(r, "width")),
+        tops: rects.slice(0, 6).map((r) => num(r, "y")),
+        heights: rects.slice(0, 6).map((r) => num(r, "height")),
+        radii: rects.slice(0, 6).map((r) => num(r, "rx")),
+        // The rect is the stroke's CENTRELINE, so the link's real outer
+        // extent is half a wire beyond it at each end.
+        wire: num(rects[0], "stroke-width"),
+        clipped: svg.querySelectorAll("g[clip-path]").length,
+      };
+    });
+
+    // ALTERNATION. Consecutive links are turned 90° to each other, so
+    // their apparent widths must alternate wide/narrow. A chain drawn
+    // without this is a stack of identical ovals.
+    const [wide, narrow] = [geometry.widths[0], geometry.widths[1]];
+    expect(
+      narrow,
+      `${label}: turned links read narrower than face-on ones`,
+    ).toBeLessThan(wide / 2);
+    for (let i = 0; i < 6; i++) {
+      expect(geometry.widths[i], `${label}: link ${i} alternates`).toBe(
+        i % 2 === 0 ? wide : narrow,
+      );
+    }
+
+    // STADIUM ENDS. A link's end is a semicircle of its own half-width —
+    // that is what gives it a hole to thread through.
+    geometry.radii.forEach((r, i) => {
+      expect(r, `${label}: link ${i} ends in a true semicircle`).toBeCloseTo(
+        geometry.widths[i] / 2,
+        1,
+      );
+    });
+
+    // OVERLAP. Consecutive links must overlap by half a link-width, the
+    // resting geometry of a hanging chain. Touching end-to-end is a
+    // string of beads; not touching is not a chain at all.
+    const pitch = geometry.tops[1] - geometry.tops[0];
+    const overlap = geometry.heights[0] + geometry.wire - pitch;
+    expect(overlap, `${label}: links overlap`).toBeGreaterThan(0);
+    expect(overlap, `${label}: by about half a link-width`).toBeCloseTo(
+      wide / 2,
+      0,
+    );
+
+    // INTERLOCK. Seen head-on a turned link is the nearer body at both
+    // its joints, which document order cannot express on its own; the
+    // inverted joints are corrected with a clipped redraw. Two of the
+    // five joints qualify for a six-link chain.
+    expect(
+      geometry.clipped,
+      `${label}: the inverted joints are corrected`,
+    ).toBe(2);
+    expect(geometry.shapes).toBe(6 + geometry.clipped);
+
+    /*
+     * PITCH EQUALS ROW HEIGHT. This is the coupling that puts each link
+     * beside its OWN service rather than near it, and it is held by two
+     * numbers in different places — a geometry constant and a Tailwind
+     * row-height class. Asserted directly rather than by comment.
+     */
+    const rowHeights = await rows.evaluateAll((els) =>
+      els.map((el) => el.getBoundingClientRect().height),
+    );
+    expect(
+      new Set(rowHeights).size,
+      `${label}: every row is the same height`,
+    ).toBe(1);
+    expect(
+      rowHeights[0],
+      `${label}: the chain's pitch is the row height`,
+    ).toBeCloseTo(pitch, 0);
+
+    // And each link ends up centred on its own row, to the pixel.
+    const offsets = await page.evaluate(() => {
+      const svg = [...document.querySelectorAll("#products svg.chain")].find(
+        (s) => s.getBoundingClientRect().width > 0,
+      )!;
+      const box = svg.getBoundingClientRect();
+      const scale = box.height / svg.viewBox.baseVal.height;
+      const links = [...svg.querySelectorAll("g > rect")].slice(0, 6);
+      return [...document.querySelectorAll("[data-product-row]")].map(
+        (row, i) => {
+          const r = row.getBoundingClientRect();
+          const y = Number(links[i].getAttribute("y"));
+          const h = Number(links[i].getAttribute("height"));
+          return box.top + (y + h / 2) * scale - (r.top + r.height / 2);
+        },
+      );
+    });
+    offsets.forEach((d, i) => {
+      expect(
+        Math.abs(d),
+        `${label}: link ${i} is centred on its own row`,
+      ).toBeLessThan(1.5);
+    });
+
+    /*
+     * The mapping is mechanical: hovering a service lights that link and
+     * no other. Without this the chain is an illustration placed beside
+     * a list rather than the list's own structure.
+     */
+    const litIds = async () =>
+      chain.evaluate((svg) =>
+        [...svg.querySelectorAll("g > rect")]
+          .slice(0, 6)
+          .map((r) => /lit/.test(r.getAttribute("stroke") ?? "")),
+      );
+    expect(await litIds(), `${label}: nothing is lit at rest`).toEqual(
+      Array(6).fill(false),
+    );
+    await rows.nth(2).hover();
+    await expect
+      .poll(litIds, { timeout: 3_000 })
+      .toEqual([false, false, true, false, false, false]);
+    // Leave nothing lit for the next pass.
+    await page.mouse.move(0, 0);
+  };
+
+  await assertChain("desktop chain");
+
+  const original = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertChain("mobile chain");
+  await page.setViewportSize(original);
+});
+
+/*
+ * The four services with no page behind them must not wear an arrow.
+ * An arrow on a row that goes nowhere is a promise the section cannot
+ * keep — the same convention the Footer's live-route list follows.
+ */
+test("#products only signals a destination where one exists", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const products = page.locator("#products");
+  await products.scrollIntoViewIfNeeded();
+
+  const arrows = await products.evaluate((section) =>
+    [...section.querySelectorAll("[data-product-row]")].map((row) => ({
+      linked: row.querySelector("a[href]") !== null,
+      arrow: (row.textContent ?? "").includes("→"),
+    })),
+  );
+  expect(arrows.filter((r) => r.linked).length).toBe(2);
+  for (const row of arrows) {
+    expect(row.arrow, "an arrow appears only on a row that links").toBe(
+      row.linked,
+    );
+  }
+  await expect(products.locator('a[href="#"]')).toHaveCount(0);
 });

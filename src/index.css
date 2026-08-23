@@ -796,3 +796,19 @@ body {
     transform: none;
   }
 }
+
+/*
+ * ── #products chain ───────────────────────────────────────────────
+ * The chain's assembly and its rows' entrance are driven by inline
+ * styles (the stagger is per-index), so the reduced-motion opt-out has
+ * to override them. It resolves to the finished state — assembled
+ * chain, rows in place — rather than to no chain at all.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .chain g,
+  [data-product-row] {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
