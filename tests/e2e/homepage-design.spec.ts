@@ -675,3 +675,96 @@ test("#products only signals a destination where one exists", async ({
   }
   await expect(products.locator('a[href="#"]')).toHaveCount(0);
 });
+
+/*
+ * ── The brand mark follows its surface ─────────────────────────────
+ *
+ * The nav carries both lettering variants of the AZEE mark and shows
+ * whichever the current ground was drawn for: the white-lettering
+ * artwork on the hero's navy and on ink, the dark-lettering artwork on
+ * the bone #trading block.
+ *
+ * This replaced an ink chip — a dark pill drawn behind the logo so a
+ * mark made for dark surfaces would still read on a light one. The
+ * chip's absence is asserted as directly as the swap, because
+ * reintroducing it is the obvious "fix" if either asset ever goes
+ * missing, and it would look deliberate rather than broken.
+ */
+test("the nav brand swaps lettering with its surface, and wears no chip", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const nav = page.locator("nav.nav-glass");
+
+  const brandAt = async (theme: string, scrollTo: string | null) => {
+    if (scrollTo) {
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel) as HTMLElement;
+        window.scrollTo(0, el.offsetTop + 240);
+      }, scrollTo);
+    } else {
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
+    await expect(nav).toHaveAttribute("data-nav-theme", theme, {
+      timeout: 10_000,
+    });
+    // The marks cross-fade over 0.45s; poll past it rather than
+    // reading a genuine in-between frame.
+    return await expect
+      .poll(
+        async () =>
+          nav.evaluate((el) => {
+            const brand = el.querySelector(".nav-brand")!;
+            const cs = getComputedStyle(brand);
+            const opacity = (sel: string) =>
+              Number(
+                getComputedStyle(brand.querySelector(sel)!).opacity,
+              ).toFixed(2);
+            return [
+              opacity(".nav-mark-on-dark"),
+              opacity(".nav-mark-on-light"),
+              cs.backgroundColor,
+              cs.borderTopLeftRadius,
+              cs.paddingTop,
+            ].join("|");
+          }),
+        { timeout: 5_000 },
+      )
+      .toBe(
+        theme === "light"
+          ? // On bone: dark lettering, and no chip behind it.
+            "0.00|1.00|rgba(0, 0, 0, 0)|0px|0px"
+          : // On navy and ink: the original white lettering, untouched.
+            "1.00|0.00|rgba(0, 0, 0, 0)|0px|0px",
+      );
+  };
+
+  await brandAt("hero", null);
+  await brandAt("dark", "#about");
+  await brandAt("light", "#trading");
+
+  /*
+   * Both files must actually decode. An <img> whose src 404s still
+   * reports its computed opacity perfectly happily, so the checks
+   * above would pass over a missing asset.
+   */
+  const loaded = await nav.evaluate((el) =>
+    [...el.querySelectorAll(".nav-mark")].map((img) => ({
+      file: (img as HTMLImageElement).currentSrc.split("/").pop() ?? "",
+      decoded:
+        (img as HTMLImageElement).complete &&
+        (img as HTMLImageElement).naturalWidth > 0,
+    })),
+  );
+  expect(loaded).toHaveLength(2);
+  for (const mark of loaded) {
+    expect(mark.decoded, `${mark.file} must decode`).toBe(true);
+  }
+  expect(loaded.some((m) => /azee-logo-dark/.test(m.file))).toBe(true);
+
+  // One accessible name, not the company announced twice.
+  const alts = await nav.evaluate((el) =>
+    [...el.querySelectorAll(".nav-mark")].map((i) => i.getAttribute("alt")),
+  );
+  expect(alts.filter((a) => a && a.length > 0)).toHaveLength(1);
+});

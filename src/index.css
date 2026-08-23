@@ -279,17 +279,55 @@ body {
 }
 
 /*
- * The brand mark is a WHITE-text, dark-background PNG. On the bone
- * surface its "Securities Private Limited" line all but disappears, so
- * the light theme gives it back the dark ground it was drawn for — a
- * small ink chip behind the logo. Recolouring the asset itself is not
- * possible (the orange mark would invert with it), and shipping a
- * second logo file for one nav state is not worth the divergence.
+ * ── The brand mark's two lettering variants ──────────────────────────
+ *
+ * This replaced an ink chip. The nav used to carry only the
+ * white-lettering mark, whose "Securities" line all but vanished on
+ * the bone surface, so the light theme drew a dark pill behind the
+ * logo to give it back the ground it was drawn for. That was a
+ * workaround for having one asset, not a design: it put a black
+ * capsule in the middle of a light bar and made the mark look like a
+ * badge pasted on rather than part of the nav.
+ *
+ * With the dark-lettering variant on hand, each surface gets the
+ * artwork actually drawn for it and the chip is gone.
+ *
+ * The two marks are stacked and cross-faded rather than swapped by
+ * `src`. The bar transitions its whole palette over 0.45s; a src swap
+ * lands in one frame and would leave the logo visibly out of step with
+ * the surface changing around it. Same duration and easing here, so
+ * the mark turns over with the bar.
+ *
+ * The white mark stays in flow and defines the box; the dark one is
+ * absolutely positioned over it at the same height with width:auto,
+ * so its own aspect is preserved instead of being stretched to the
+ * other's. Both are tightly cropped artwork, so they land at the same
+ * optical size.
  */
-.nav-glass[data-nav-theme="light"] .nav-brand {
-  background: rgb(var(--azee-ink));
-  border-radius: 9999px;
-  padding: 0.3rem 0.75rem;
+.nav-brand {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-mark {
+  transition: opacity 0.45s ease;
+}
+
+.nav-mark-on-light {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: auto;
+  opacity: 0;
+}
+
+.nav-glass[data-nav-theme="light"] .nav-mark-on-dark {
+  opacity: 0;
+}
+
+.nav-glass[data-nav-theme="light"] .nav-mark-on-light {
+  opacity: 1;
 }
 
 /*

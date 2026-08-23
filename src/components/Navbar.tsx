@@ -2,26 +2,55 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FadeIn } from "./FadeIn";
 import azeeLogo from "../assets/azee-logo.png";
+import azeeLogoDark from "../assets/azee-logo-dark.png";
 
-/*
- * The real AZEE Securities mark (dark-background variant, transparent
- * PNG). Rendered at h-9 (36px) — proportional to the nav rhythm the
- * former two-line text lockup set, and crisp: the 316×123 source has
- * enough pixels for a 36px render even at 3× DPR (needs 108px tall).
- * w-auto keeps its 2.57:1 aspect; intrinsic width/height attrs reserve
- * space to avoid layout shift. Per the brand decision the logo stands
- * alone — the "PSX Trading & Research" tagline is dropped since the
- * mark already names the company.
+/**
+ * The real AZEE Securities mark, in both of its lettering variants.
+ *
+ * The bar sits over three different grounds, and one mark cannot serve
+ * them all: the supplied artwork is white-lettering on transparent, so
+ * on the bone #trading surface its "Securities" line all but
+ * disappeared. That used to be papered over with an ink chip behind
+ * the logo — a dark ground carried along so a mark drawn for dark
+ * would still read. With the dark-lettering variant on hand the chip
+ * is gone and each surface simply gets the artwork drawn for it.
+ *
+ * BOTH ARE RENDERED, and CSS decides which is visible — rather than
+ * swapping `src` off React state. The nav already crossfades its whole
+ * palette over 0.45s; a src swap would pop the logo mid-fade, half a
+ * second out of step with the bar around it. Stacked and cross-faded,
+ * the mark changes with everything else. See .nav-mark in index.css.
+ *
+ * Rendered at h-9 (36px) — the rhythm the former two-line text lockup
+ * set — and crisp at 3× DPR from both sources (needs 108px tall; they
+ * are 123px and 240px). w-auto keeps each one's own aspect: 2.57:1 for
+ * the white mark, 2.38:1 for the dark one, both tightly cropped, so
+ * they read at the same optical size. Intrinsic width/height reserve
+ * space to avoid layout shift.
+ *
+ * Only the in-flow mark carries the alt text; the overlay is the same
+ * company name a second time, so it is hidden from assistive tech
+ * rather than announced twice.
  */
 function BrandMark() {
   return (
-    <img
-      src={azeeLogo}
-      alt="AZEE Securities"
-      width={316}
-      height={123}
-      className="h-9 w-auto"
-    />
+    <>
+      <img
+        src={azeeLogo}
+        alt="AZEE Securities"
+        width={316}
+        height={123}
+        className="nav-mark nav-mark-on-dark h-9 w-auto"
+      />
+      <img
+        src={azeeLogoDark}
+        alt=""
+        aria-hidden="true"
+        width={571}
+        height={240}
+        className="nav-mark nav-mark-on-light h-9 w-auto"
+      />
+    </>
   );
 }
 
