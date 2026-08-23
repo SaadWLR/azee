@@ -18,9 +18,12 @@ import type { StockQuote } from "../types";
  *    forbids outright. The section is now flat ink with one solid
  *    second tone behind the lookup panel — a simple two-tone block, no
  *    gradient anywhere in the section.
- *  · The result card was a filled dark panel on a muted background —
- *    the "generic dashboard widget" pattern. It is now outline-only at
- *    a large radius, with the price itself carrying the weight.
+ *  · The result card carries a real surface at a large radius, tilted
+ *    in perspective with a long directional shadow. It was outline-only
+ *    for one pass; with no fill there was no silhouette for the
+ *    rotation to read against, so it computed correctly and looked
+ *    flat. It is a solid slab again — but a floating, tilted one, not
+ *    the muted dashboard widget it started as.
  *  · Every control is a true capsule (rounded-full): both CTAs, the
  *    chips, and the lookup input, which was previously a rounded
  *    rectangle.
@@ -56,7 +59,19 @@ function fmtVolume(value: number | undefined): string {
 function QuoteCard({ quote }: { quote: StockQuote }) {
   const up = quote.changePercent >= 0;
   return (
-    <div className="rounded-[28px] border border-white/15 p-6">
+    /*
+     * A SOLID surface, not an outline.
+     *
+     * This card used to be `border` with no background, sitting on the
+     * panel behind it. A perspective rotation needs a silhouette to
+     * read against — with nothing but a hairline outline on near-black
+     * there was no shape for the trapezoid to show in, so the tilt
+     * computed correctly and looked flat. Filling it a few steps
+     * lighter than both the ink ground and the panel gives it an edge
+     * that catches the rotation, and the long directional shadow lifts
+     * the near corner off the panel.
+     */
+    <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] p-6 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-wide text-[rgb(var(--azee-chalk))]">
@@ -310,21 +325,34 @@ export function ClosingCTA() {
            * None of this touches the lookup itself.
            */}
           <div className="mt-7 lg:[perspective:1400px]">
-            <div className="transition-transform duration-500 lg:[transform:rotateY(-16deg)_rotateX(6deg)_rotateZ(1.5deg)] lg:hover:[transform:rotateY(-9deg)_rotateX(4deg)_rotateZ(1deg)] lg:[box-shadow:45px_55px_90px_-30px_rgba(0,0,0,0.75)]">
+            {/*
+             * Angles raised to the reference floor. -16deg was
+             * geometrically real but imperceptible on THIS object: the
+             * card is wide and short (423x296) where the #trading device
+             * is narrow and tall (288x540), and a rotateY reads as a
+             * difference in left-vs-right edge height — a short element
+             * gives that difference almost no edge to show along. More
+             * rotation, plus the solid fill on the card itself, is what
+             * makes the depth visible rather than merely present.
+             *
+             * Hover still eases it toward upright so the live numbers
+             * are easy to read when someone actually looks at them.
+             */}
+            <div className="transition-transform duration-500 lg:[transform:rotateY(-24deg)_rotateX(8deg)_rotateZ(2deg)] lg:hover:[transform:rotateY(-8deg)_rotateX(3deg)_rotateZ(0.5deg)]">
             {error && !quotes ? (
               // Honest failure — never a placeholder quote.
-              <div className="rounded-[28px] border border-white/15 px-6 py-14 text-center text-sm text-white/50">
+              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
                 Live prices are temporarily unavailable. Please try again
                 shortly.
               </div>
             ) : loading && !quotes ? (
-              <div className="rounded-[28px] border border-white/15 px-6 py-14 text-center text-sm text-white/50">
+              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
                 Loading live PSX prices…
               </div>
             ) : active ? (
               <QuoteCard quote={active} />
             ) : (
-              <div className="rounded-[28px] border border-white/15 px-6 py-14 text-center text-sm text-white/50">
+              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
                 No PSX symbol matches “{query.trim()}”.
               </div>
             )}
