@@ -531,7 +531,7 @@ export function IndicesPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300/90">
             {TAB_EYEBROW[tab]}
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="font-display mt-3 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
             Indices
           </h1>
           {/* Brand-signature stripe — same motif as the other page

@@ -98,7 +98,7 @@ export function Hero() {
               lines={["Market intelligence.", "Real-time execution."]}
               baseDelay={300}
               charStagger={30}
-              className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl"
+              className="font-display text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem] lg:text-[4.5rem]"
             />
 
             {/* Brand signature: a single short orange stripe echoing the
