@@ -32,12 +32,22 @@ test("no redesigned section uses a gradient or radial colour wash", async ({
    * The forbidden pattern: abstract gradient blobs / ambient corner
    * glows. Checked on the section AND every one of its decorative
    * children, since that is where such a wash would live.
+   *
+   * ONE sanctioned exception, marked in the markup with
+   * data-hero-blend: the band that carries the hero's navy down into
+   * #about's ink. That gradient is structural — it bridges two real
+   * sections that genuinely differ in colour so the boundary reads as
+   * one descent rather than a cut — rather than decorative. It is
+   * excluded by that attribute alone, so any OTHER gradient appearing
+   * in these sections still fails, and a second one cannot be
+   * smuggled in without adding the marker deliberately.
    */
   for (const id of REDESIGNED) {
     const gradients = await page.locator(id).evaluate((section) => {
       const found: string[] = [];
       const all = [section, ...Array.from(section.querySelectorAll("*"))];
       for (const el of all) {
+        if ((el as Element).hasAttribute("data-hero-blend")) continue;
         const bg = getComputedStyle(el as Element).backgroundImage;
         if (bg && bg !== "none" && /gradient/i.test(bg)) {
           // Hairline rules are a 1px linear-gradient and are allowed;
@@ -359,4 +369,102 @@ test("Hero, Products and Stats are untouched by the redesign", async ({
       { timeout: 15_000 },
     )
     .toEqual(["20+", "10,000+", "450+", "2"]);
+});
+
+/*
+ * ── Hero → About continuity ────────────────────────────────────────
+ *
+ * The boundary between the hero and #about used to be a cut: black
+ * footage above, ink below, a hairline between them. It is now a blend
+ * carried by BOTH sides — the hero's own bottom scrim settles into
+ * --azee-navy, and #about's band picks that navy up and eases it into
+ * ink.
+ *
+ * Both halves are asserted, because the whole point is that they meet.
+ * A blend applied to only one side is exactly the "two unrelated
+ * sections stacked" problem it was meant to fix, and it would still
+ * look plausible in isolation.
+ */
+test("the hero and #about meet through one continuous blend", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // Exactly one sanctioned blend on the page — the marker is not a
+  // general licence to add gradients.
+  await expect(page.locator("[data-hero-blend]")).toHaveCount(1);
+
+  const navy = "12, 24, 66";
+
+  // #about's half: navy at the top edge, easing to nothing.
+  const band = page.locator("#about [data-hero-blend]");
+  const bandBg = await band.evaluate(
+    (el) => getComputedStyle(el).backgroundImage,
+  );
+  expect(bandBg, "the band must be a top-down linear gradient").toContain(
+    "linear-gradient",
+  );
+  expect(bandBg, "the band must start in the brand navy").toContain(navy);
+  expect(
+    await band.evaluate((el) => el.getBoundingClientRect().height),
+    "a blend needs real distance to read as a blend, not a seam",
+  ).toBeGreaterThan(200);
+
+  // The hero's half: its bottom scrim must land on the same navy, or
+  // the two sides meet at different colours and the seam returns.
+  const heroScrim = page.locator("#markets > div[aria-hidden='true']").first();
+  const heroBg = await heroScrim.evaluate(
+    (el) => getComputedStyle(el).backgroundImage,
+  );
+  expect(
+    heroBg,
+    "the hero's floor must carry the same navy the band starts from",
+  ).toContain(navy);
+
+  // The band sits behind the content, not over it.
+  await expect(band).toHaveCSS("pointer-events", "none");
+});
+
+/*
+ * ── The nav's third theme ──────────────────────────────────────────
+ *
+ * The bar is opaque, so it must match whichever of the page's three
+ * grounds it is over: the blue-lit hero, the ink sections, the bone
+ * #trading block. Asserted by scrolling to each and reading the
+ * resolved attribute plus the surface it produces.
+ */
+test("the nav carries a distinct theme over hero, ink and bone", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const nav = page.locator("nav.nav-glass");
+
+  /*
+   * The attribute settles first, then the surface catches up: the
+   * colour transition is 0.45s and the page scrolls smoothly, so a
+   * single read lands on a genuine in-between frame. Both are polled.
+   */
+  const expectTheme = async (theme: string, surface: string) => {
+    await expect(nav).toHaveAttribute("data-nav-theme", theme, {
+      timeout: 10_000,
+    });
+    await expect
+      .poll(
+        async () => nav.evaluate((el) => getComputedStyle(el).backgroundColor),
+        { timeout: 5_000 },
+      )
+      .toBe(surface);
+  };
+
+  // Top of the page: over the hero, wearing the brand navy.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expectTheme("hero", "rgb(12, 24, 66)");
+
+  // Over #about: the ink default.
+  await page.locator("#about").scrollIntoViewIfNeeded();
+  await expectTheme("dark", INK);
+
+  // Over the bone #trading block: the light theme still wins.
+  await page.locator("#trading").scrollIntoViewIfNeeded();
+  await expectTheme("light", BONE);
 });

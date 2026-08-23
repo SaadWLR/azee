@@ -215,10 +215,13 @@ body {
  * ink/bone pair, and orange survives in the nav only where it already
  * meant something specific — the active-link underline.
  *
- * SECTION-AWARE. The homepage alternates dark ink sections with one
- * light bone section (#trading). A single fixed treatment cannot read
- * cleanly over both, so the nav flips its whole palette when it is over
- * a section that opts in via data-nav-theme-section="light".
+ * SECTION-AWARE. The homepage runs three different grounds under this
+ * bar: the blue-lit hero, the ink sections, and one light bone section
+ * (#trading). A single fixed treatment cannot read cleanly over all
+ * three, so the nav flips its whole palette to match whichever section
+ * it is currently over, named by that section in
+ * data-nav-theme-section. Sections without the attribute get the ink
+ * default below.
  */
 .nav-glass {
   background: rgb(var(--azee-ink));
@@ -311,6 +314,60 @@ body {
 
 .nav-glass[data-nav-theme="light"] .nav-toggle span {
   background: rgb(13 12 10);
+}
+
+/*
+ * ── Hero treatment ───────────────────────────────────────────────────
+ *
+ * The third surface. Over the homepage hero the bar is not sitting on
+ * ink — it is sitting on footage of a globe rim-lit in --azee-blue over
+ * a floor that now settles into --azee-navy. A flat black capsule there
+ * reads as a foreign object dropped onto the picture.
+ *
+ * So it takes the brand navy itself: --azee-navy verbatim, not a
+ * hand-tuned near-black. That token is already dark (12 24 66 — a
+ * luminance under 4%), so the bar stays firmly opaque and every label
+ * on it keeps its contrast; it simply belongs to the same picture.
+ *
+ * Blue here is the site's REAL identity, not a decoration: the same
+ * --azee-blue that lights the globe, the snapshot's backlight and the
+ * hero's glass panels. The rim and glow below echo that light rather
+ * than inventing a new colour.
+ *
+ * It transitions to and from the ink default through the shared
+ * .nav-glass transition, so scrolling out of the hero is a fade
+ * between two dark surfaces, not a swap.
+ */
+.nav-glass[data-nav-theme="hero"] {
+  background: rgb(var(--azee-navy));
+  border-color: rgb(var(--azee-blue) / 0.3);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--azee-blue) / 0.18),
+    0 6px 28px rgba(0, 0, 0, 0.45);
+}
+
+.nav-glass[data-nav-theme="hero"].nav-glass-scrolled {
+  box-shadow:
+    inset 0 1px 0 rgb(var(--azee-blue) / 0.18),
+    0 14px 44px rgba(0, 0, 0, 0.55);
+}
+
+/*
+ * Client Login's resting .glass-navy is a translucent navy gradient —
+ * on a navy bar it has nothing to stand against and dissolves. On this
+ * theme it lifts to a brighter blue so it stays the one raised object
+ * in the bar, which is the job it does on every other surface.
+ */
+.nav-glass[data-nav-theme="hero"] .nav-cta {
+  background: rgb(var(--azee-blue) / 0.24);
+  border-color: rgb(var(--azee-blue) / 0.5);
+  box-shadow: none;
+}
+
+/* Same reason: the toggle's white-on-white outline needs the blue. */
+.nav-glass[data-nav-theme="hero"] .nav-toggle {
+  border-color: rgb(var(--azee-blue) / 0.35);
+  background: rgb(var(--azee-blue) / 0.12);
 }
 
 /* Deep navy glass for secondary actions. */

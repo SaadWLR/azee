@@ -211,6 +211,25 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
   );
 }
 
+/**
+ * The surfaces the nav knows how to sit over.
+ *
+ * "dark"  — the ink ground almost every section uses (the default).
+ * "light" — an opted-in bone section (#trading).
+ * "hero"  — the homepage hero. Its own theme rather than the shared
+ *           dark one because the hero is not ink: it is footage rim-lit
+ *           in --azee-blue over a navy floor, and a flat black bar
+ *           floating on it reads as a foreign object rather than part
+ *           of the same picture.
+ *
+ * Ordered by precedence — if the bar overlaps more than one opted-in
+ * section at once, the earlier entry wins. Light outranks hero because
+ * a light surface is the one case where the wrong choice costs
+ * legibility rather than just cohesion.
+ */
+const THEME_PRECEDENCE = ["light", "hero"] as const;
+type NavTheme = "dark" | (typeof THEME_PRECEDENCE)[number];
+
 /** Shared row treatment for every tappable line in the mobile menu. */
 const MOBILE_ROW =
   "block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
@@ -398,7 +417,7 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   /** Which surface the nav is currently sitting over. */
-  const [navTheme, setNavTheme] = useState<"dark" | "light">("dark");
+  const [navTheme, setNavTheme] = useState<NavTheme>("dark");
   const [active, setActive] = useState("");
   const headerRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -446,10 +465,11 @@ export function Navbar() {
    * SECTION-AWARE THEME.
    *
    * The nav is opaque and fixed, so whatever section it happens to be
-   * covering decides how it should look. A section opts into the light
-   * treatment with data-nav-theme-section="light" — today only the bone
-   * #trading block does, but any future light section gets it by adding
-   * that attribute, with no change here.
+   * covering decides how it should look. A section opts in by naming a
+   * theme in data-nav-theme-section — "light" for the bone #trading
+   * block, "hero" for the homepage hero. Any future section gets a
+   * treatment by adding that attribute plus a CSS block for its value;
+   * this effect only needs the new value added to THEME_PRECEDENCE.
    *
    * Measured against the nav's own band (its real top and bottom edges)
    * rather than a fixed scroll offset, so it stays correct as the bar's
@@ -469,20 +489,30 @@ export function Navbar() {
       const nav = navRef.current;
       if (!nav) return;
       const bar = nav.getBoundingClientRect();
-      const lightSections = document.querySelectorAll(
-        '[data-nav-theme-section="light"]',
-      );
-      let overLight = false;
-      for (const section of lightSections) {
-        const rect = section.getBoundingClientRect();
-        // Overlap test against the bar's band, not just its midpoint —
-        // a partial overlap should already flip it.
-        if (rect.top < bar.bottom && rect.bottom > bar.top) {
-          overLight = true;
+
+      // Highest-precedence theme whose section the bar currently
+      // overlaps, falling back to the ink default.
+      let next: NavTheme = "dark";
+      for (const theme of THEME_PRECEDENCE) {
+        const sections = document.querySelectorAll(
+          `[data-nav-theme-section="${theme}"]`,
+        );
+        let found = false;
+        for (const section of sections) {
+          const rect = section.getBoundingClientRect();
+          // Overlap test against the bar's band, not just its midpoint —
+          // a partial overlap should already flip it.
+          if (rect.top < bar.bottom && rect.bottom > bar.top) {
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          next = theme;
           break;
         }
       }
-      setNavTheme(overLight ? "light" : "dark");
+      setNavTheme(next);
     };
 
     const schedule = () => {

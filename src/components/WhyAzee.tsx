@@ -107,12 +107,32 @@ export function WhyAzee() {
       id="about"
       className="relative bg-[rgb(var(--azee-ink))] py-32 lg:py-48"
     >
+      {/*
+       * HERO → ABOUT BLEND.
+       *
+       * The second half of the boundary. The Hero's floor now settles
+       * into --azee-navy; this band picks that navy up at full strength
+       * at the very top edge, carries a lift of --azee-blue through the
+       * upper third (the same blue the globe footage is rim-lit in),
+       * and eases to nothing against the ink ground below.
+       *
+       * The two halves meet at the same colour, so the sections read as
+       * one continuous descent into darkness rather than a cut between
+       * a blue section and a black one.
+       *
+       * This is a gradient with meaning — it bridges two real sections
+       * that genuinely differ in colour — not an ambient wash sitting
+       * behind content. data-hero-blend marks it as the one sanctioned
+       * gradient in a redesigned section; the design spec asserts every
+       * OTHER gradient in these sections is still forbidden.
+       */}
       <div
+        data-hero-blend="true"
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-white/10"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[26rem] bg-[linear-gradient(to_bottom,rgb(var(--azee-navy)/0.95),rgb(var(--azee-blue)/0.16)_26%,rgb(var(--azee-navy)/0.28)_52%,transparent_100%)]"
       />
 
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
         <div className="grid items-center gap-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16">
           {/* ── Copy ──────────────────────────────────────────────── */}
           <div>

@@ -43,6 +43,13 @@ export function Hero() {
   return (
     <section
       id="markets"
+      /*
+       * The nav gets its own treatment over this section — blended
+       * toward the Hero's blues rather than the flat ink the other dark
+       * sections use. Same opt-in mechanism as the bone section's
+       * light theme.
+       */
+      data-nav-theme-section="hero"
       className="relative flex min-h-screen w-full flex-col overflow-hidden bg-black"
       onMouseMove={handleMouseMove}
     >
@@ -64,7 +71,16 @@ export function Hero() {
       {/* Soft dark gradient for text contrast over the footage */}
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/60 via-black/25 to-transparent"
+        /*
+         * The Hero's lower scrim now settles into NAVY rather than flat
+         * black. It is the first half of the blend into #about: the
+         * globe footage is rim-lit in --azee-blue, so letting the
+         * section's own floor carry that blue down means the boundary
+         * below continues a colour that is already here instead of
+         * introducing one. The video itself is untouched — this is the
+         * overlay that has always sat above it.
+         */
+        className="absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgb(var(--azee-navy)/0.92),rgb(var(--azee-navy)/0.4)_28%,rgb(0_0_0/0.2)_55%,transparent_100%)]"
       />
 
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
