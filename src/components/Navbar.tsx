@@ -137,7 +137,7 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
   }, [pathname]);
 
   const underline =
-    "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500";
+    "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_10px_rgb(var(--azee-orange)/0.55)] after:transition-all after:duration-500";
   const triggerState = active
     ? "text-white after:w-6"
     : open
@@ -584,7 +584,7 @@ export function Navbar() {
               const isActive = link.to
                 ? pathname === link.to
                 : active === link.hash;
-              const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
+              const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_10px_rgb(var(--azee-orange)/0.55)] after:transition-all after:duration-500 hover:text-white ${
                 isActive ? "is-active text-white after:w-6" : "text-gray-300 after:w-0"
               }`;
               return (
