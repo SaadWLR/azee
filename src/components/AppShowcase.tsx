@@ -215,6 +215,13 @@ export function AppShowcase() {
   return (
     <section
       id="trading"
+      /*
+       * Opts this section into the nav's light treatment. The nav is
+       * opaque and fixed, so it needs to know when it is over a bone
+       * block; any future light section gets the same behaviour just by
+       * carrying this attribute.
+       */
+      data-nav-theme-section="light"
       className="relative overflow-hidden bg-[rgb(var(--azee-bone))] py-32 lg:py-48"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">

@@ -397,6 +397,8 @@ function MobileMenu({
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  /** Which surface the nav is currently sitting over. */
+  const [navTheme, setNavTheme] = useState<"dark" | "light">("dark");
   const [active, setActive] = useState("");
   const headerRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -439,6 +441,66 @@ export function Navbar() {
       window.removeEventListener("resize", update);
     };
   }, []);
+
+  /*
+   * SECTION-AWARE THEME.
+   *
+   * The nav is opaque and fixed, so whatever section it happens to be
+   * covering decides how it should look. A section opts into the light
+   * treatment with data-nav-theme-section="light" — today only the bone
+   * #trading block does, but any future light section gets it by adding
+   * that attribute, with no change here.
+   *
+   * Measured against the nav's own band (its real top and bottom edges)
+   * rather than a fixed scroll offset, so it stays correct as the bar's
+   * height changes across breakpoints and when the mobile menu opens.
+   *
+   * A plain rAF-throttled scroll listener rather than an
+   * IntersectionObserver: what matters is whether a band overlaps the
+   * nav right now, which is a direct rect comparison — an observer
+   * would need a rootMargin recalculated from the nav's live height to
+   * express the same thing.
+   */
+  useEffect(() => {
+    let frame = 0;
+
+    const evaluate = () => {
+      frame = 0;
+      const nav = navRef.current;
+      if (!nav) return;
+      const bar = nav.getBoundingClientRect();
+      const lightSections = document.querySelectorAll(
+        '[data-nav-theme-section="light"]',
+      );
+      let overLight = false;
+      for (const section of lightSections) {
+        const rect = section.getBoundingClientRect();
+        // Overlap test against the bar's band, not just its midpoint —
+        // a partial overlap should already flip it.
+        if (rect.top < bar.bottom && rect.bottom > bar.top) {
+          overLight = true;
+          break;
+        }
+      }
+      setNavTheme(overLight ? "light" : "dark");
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(evaluate);
+    };
+
+    evaluate();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+    // Re-evaluated on route change: a different page has different
+    // sections, and the old page's rects are gone.
+  }, [pathname]);
 
   /* Soft drop shadow once the page is scrolled. */
   useEffect(() => {
@@ -486,6 +548,7 @@ export function Navbar() {
       <FadeIn delay={100}>
         <nav
           ref={navRef}
+          data-nav-theme={navTheme}
           className={`nav-glass pointer-events-auto mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full px-5 py-2.5 sm:px-7 ${
             scrolled ? "nav-glass-scrolled" : ""
           }`}
@@ -514,7 +577,7 @@ export function Navbar() {
             </Link>
           )}
 
-          <ul className="hidden items-center gap-7 lg:flex">
+          <ul className="nav-themed hidden items-center gap-7 lg:flex">
             {NAV_LINKS.map((link) => {
               // A route entry is "active" on its own route; a hash
               // entry is active when scroll-spy has it in view.
@@ -522,7 +585,7 @@ export function Navbar() {
                 ? pathname === link.to
                 : active === link.hash;
               const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-gradient-to-r after:from-blue-400/0 after:via-blue-400/90 after:to-blue-400/0 after:shadow-[0_0_8px_rgb(var(--azee-blue)/0.6)] after:transition-all after:duration-500 hover:text-white ${
-                isActive ? "text-white after:w-6" : "text-gray-300 after:w-0"
+                isActive ? "is-active text-white after:w-6" : "text-gray-300 after:w-0"
               }`;
               return (
                 <li key={link.label} className="flex items-center">
@@ -567,7 +630,7 @@ export function Navbar() {
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full border border-white/10 bg-white/[0.05] transition-all duration-500 hover:bg-white/10 active:scale-[0.95] lg:hidden"
+            className="nav-toggle flex h-8 w-8 shrink-0 flex-col items-center justify-center gap-[5px] rounded-full border border-white/10 bg-white/[0.05] transition-all duration-500 hover:bg-white/10 active:scale-[0.95] lg:hidden"
           >
             <span
               className={`h-px w-4 bg-white transition-transform duration-500 ${
