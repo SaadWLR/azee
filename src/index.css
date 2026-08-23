@@ -275,6 +275,34 @@ body {
   color: rgb(13 12 10);
 }
 
+/*
+ * The brand mark is a WHITE-text, dark-background PNG. On the bone
+ * surface its "Securities Private Limited" line all but disappears, so
+ * the light theme gives it back the dark ground it was drawn for — a
+ * small ink chip behind the logo. Recolouring the asset itself is not
+ * possible (the orange mark would invert with it), and shipping a
+ * second logo file for one nav state is not worth the divergence.
+ */
+.nav-glass[data-nav-theme="light"] .nav-brand {
+  background: rgb(var(--azee-ink));
+  border-radius: 9999px;
+  padding: 0.3rem 0.75rem;
+}
+
+/*
+ * Client Login keeps its glass-navy treatment on dark, but on bone a
+ * navy-blue pill is the one saturated object in an otherwise neutral
+ * bar — and navy is the palette this redesign moved away from. On light
+ * it becomes a solid ink capsule: the same shape, inverted to match the
+ * surface.
+ */
+.nav-glass[data-nav-theme="light"] .nav-cta {
+  background: rgb(var(--azee-ink));
+  border-color: rgb(13 12 10 / 0.2);
+  color: rgb(var(--azee-bone));
+  box-shadow: none;
+}
+
 /* The hamburger's bars and its outline. */
 .nav-glass[data-nav-theme="light"] .nav-toggle {
   border-color: rgb(13 12 10 / 0.15);

@@ -566,13 +566,13 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="shrink-0"
+              className="nav-brand shrink-0"
               aria-label="AZEE Securities — back to top"
             >
               <BrandMark />
             </button>
           ) : (
-            <Link to="/" className="shrink-0" aria-label="AZEE Securities — home">
+            <Link to="/" className="nav-brand shrink-0" aria-label="AZEE Securities — home">
               <BrandMark />
             </Link>
           )}
@@ -618,7 +618,7 @@ export function Navbar() {
           {/* See the mobile counterpart: /get-started, not a dead "#". */}
           <Link
             to="/get-started"
-            className="glass-navy hidden whitespace-nowrap rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98] lg:block"
+            className="nav-cta glass-navy hidden whitespace-nowrap rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98] lg:block"
           >
             Client Login
           </Link>
