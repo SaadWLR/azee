@@ -123,7 +123,22 @@ function useInViewCount(target: number, duration = 1800) {
         setValue(0);
         const start = performance.now();
         const tick = (now: number) => {
-          const t = Math.min((now - start) / duration, 1);
+          /*
+           * Clamped at BOTH ends, and the lower clamp is the load-bearing
+           * one. `start` is read here, inside the task that schedules the
+           * frame; `now` is the time the browser says that FRAME BEGAN —
+           * which can precede it, because the frame is already underway
+           * when this task runs. An unclamped t then goes negative, and
+           * since eased = 1 - (1 - t)³ that lands BELOW zero, rendering
+           * figures like "-612+ Investors Served" in the firm's own trust
+           * section. Same class of falsehood as the "0+" this hook was
+           * written to prevent, just harder to catch: it lasts a frame or
+           * two and only when the timestamps land that way.
+           *
+           * This matches useCountUp in MarketSnapshot.tsx, which runs the
+           * identical easing and has always clamped both ends.
+           */
+          const t = Math.min(Math.max((now - start) / duration, 0), 1);
           const eased = 1 - Math.pow(1 - t, 3);
           setValue(Math.round(target * eased));
           if (t < 1) {
