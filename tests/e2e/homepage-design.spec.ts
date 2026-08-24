@@ -23,6 +23,39 @@ const REDESIGNED = ["#about", "#trading", "#research", "#start-investing"];
 const INK = "rgb(13, 12, 10)";
 const BONE = "rgb(237, 233, 226)";
 
+/**
+ * Park the fixed navbar `into` pixels inside a section, and land there
+ * before returning.
+ *
+ * Two traps, both of which produced real flakes in this file:
+ *
+ * `offsetTop` is measured from the nearest POSITIONED ancestor, not
+ * the document, so any `position: relative` wrapper anywhere up the
+ * tree silently shifts it — and the scroll then lands in a different
+ * section than the test believes.
+ *
+ * And the page sets `scroll-behavior: smooth` globally, so a plain
+ * scrollTo starts an animation that outlives the call. Assertions then
+ * race it: the nav is still crossing the section above when its theme
+ * is read. `behavior: "instant"` opts this one scroll out without
+ * touching how the site behaves for anyone else.
+ */
+async function parkNavIn(
+  page: import("@playwright/test").Page,
+  selector: string,
+  into = 240,
+) {
+  await page.evaluate(
+    ({ sel, offset }) => {
+      const el = document.querySelector(sel);
+      if (!el) throw new Error(`no element for ${sel}`);
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: top + offset, behavior: "instant" });
+    },
+    { sel: selector, offset: into },
+  );
+}
+
 test("no redesigned section uses a gradient or radial colour wash", async ({
   page,
 }) => {
@@ -448,17 +481,14 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
   const expectTheme = async (theme: string, surface: string, id?: string) => {
     if (id) {
       /*
-       * Scrolled by an explicit offset INTO the section rather than
-       * with scrollIntoViewIfNeeded: these sections are taller than
-       * the viewport, so "if needed" settles for bringing the top edge
+       * Parked an explicit distance INTO the section rather than using
+       * scrollIntoViewIfNeeded: these sections are taller than the
+       * viewport, so "if needed" settles for bringing the top edge
        * into view — which on a tall viewport can leave the bar still
-       * sitting over the section above. The test would then be reading
-       * the previous section's theme and calling it a failure.
+       * sitting over the section above. The test would then read the
+       * previous section's theme and call it a failure.
        */
-      await page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement;
-        window.scrollTo(0, el.offsetTop + 240);
-      }, id);
+      await parkNavIn(page, id);
     }
     await expect(nav).toHaveAttribute("data-nav-theme", theme, {
       timeout: 10_000,
@@ -472,7 +502,7 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
   };
 
   // Top of the page: over the hero, wearing the brand navy.
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await expectTheme("hero", "rgb(12, 24, 66)");
 
   // Over #about: the ink default.
@@ -496,6 +526,16 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
  */
 test("#products threads its services onto one real chain", async ({ page }) => {
   await page.goto("/");
+  /*
+   * Every scroll in this test is a means of getting somewhere, never
+   * the thing under test — and the page's global `scroll-behavior:
+   * smooth` turns each one into an animation that outlives the command
+   * that started it. Forced instant so positions are settled by the
+   * time anything is measured or pointed at.
+   */
+  await page.addStyleTag({
+    content: "html { scroll-behavior: auto !important; }",
+  });
   const products = page.locator("#products");
   const rows = products.locator("[data-product-row]");
   const chain = products.locator("svg.chain:visible");
@@ -633,6 +673,30 @@ test("#products threads its services onto one real chain", async ({ page }) => {
     expect(await litIds(), `${label}: nothing is lit at rest`).toEqual(
       Array(6).fill(false),
     );
+
+    /*
+     * Hovering a row is not as simple as .hover(), and getting it wrong
+     * made this test fail two ways at once — the wrong link lit, or
+     * none at all.
+     *
+     * The page sets `scroll-behavior: smooth` globally. Playwright
+     * scrolls the target into view, measures it, then moves the mouse —
+     * but the smooth scroll is still travelling, so the content keeps
+     * sliding under a cursor that has already stopped, and a different
+     * row ends up beneath it. Measured after a viewport change: row 2
+     * came to rest at y=0 while the cursor sat at y≈448, which is row
+     * 5 — and row 5 lit. The rows are a uniform 120/128px pitch, so a
+     * scroll still in flight lands cleanly on a neighbour rather than
+     * missing everything, which is what made it look like an off-by-one.
+     *
+     * Scrolling is therefore forced instant for this test, and the row
+     * is centred rather than merely made visible — centring also keeps
+     * it out from under the fixed navbar, which is what produced the
+     * "nothing lit" variant.
+     */
+    await rows.nth(2).evaluate((el) =>
+      el.scrollIntoView({ block: "center", behavior: "instant" }),
+    );
     await rows.nth(2).hover();
     await expect
       .poll(litIds, { timeout: 3_000 })
@@ -698,12 +762,11 @@ test("the nav brand swaps lettering with its surface, and wears no chip", async 
 
   const brandAt = async (theme: string, scrollTo: string | null) => {
     if (scrollTo) {
-      await page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement;
-        window.scrollTo(0, el.offsetTop + 240);
-      }, scrollTo);
+      await parkNavIn(page, scrollTo);
     } else {
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.evaluate(() =>
+        window.scrollTo({ top: 0, behavior: "instant" }),
+      );
     }
     await expect(nav).toHaveAttribute("data-nav-theme", theme, {
       timeout: 10_000,
