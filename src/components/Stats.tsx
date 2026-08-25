@@ -218,7 +218,19 @@ const PARTICLES = [
 
 export function Stats() {
   return (
-    <section className="section-tint-a relative overflow-hidden py-24 lg:py-32">
+    <section
+      /*
+       * Navy, not the site-wide near-black body ground.
+       *
+       * This section is not one of the five the palette pass
+       * enumerated, but it is directly below them, and leaving it on
+       * #05070d put a hard cut from the white #trading block straight
+       * back into the old near-black — the exact system this pass
+       * moved the page off. Ending on the brand navy keeps the
+       * alternation intact all the way down.
+       */
+      className="relative overflow-hidden bg-[rgb(var(--azee-navy))] py-24 lg:py-32"
+    >
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {PARTICLES.map((p, i) => (
           <span

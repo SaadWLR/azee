@@ -166,9 +166,9 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
   }, [pathname]);
 
   const underline =
-    "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_10px_rgb(var(--azee-orange)/0.55)] after:transition-all after:duration-500";
+    "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500";
   const triggerState = active
-    ? "text-white after:w-6"
+    ? "text-white after:w-7"
     : open
       ? "text-white after:w-0"
       : "text-gray-300 after:w-0";
@@ -643,8 +643,8 @@ export function Navbar() {
               const isActive = link.to
                 ? pathname === link.to
                 : active === link.hash;
-              const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[2px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_10px_rgb(var(--azee-orange)/0.55)] after:transition-all after:duration-500 hover:text-white ${
-                isActive ? "is-active text-white after:w-6" : "text-gray-300 after:w-0"
+              const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500 hover:text-white ${
+                isActive ? "is-active text-white after:w-7" : "text-gray-300 after:w-0"
               }`;
               return (
                 <li key={link.label} className="flex items-center">

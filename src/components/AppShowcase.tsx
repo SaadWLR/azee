@@ -102,7 +102,7 @@ function PhoneScreen({
   stats: MarketStat[] | null | undefined;
 }) {
   return (
-    <div className="flex h-full flex-col bg-[rgb(var(--azee-ink))] px-5 pb-6 pt-4">
+    <div className="flex h-full flex-col bg-[rgb(var(--azee-navy))] px-5 pb-6 pt-4">
       <div className="flex items-center justify-between text-[10px] text-gray-400">
         <span className="tabular-nums">9:41</span>
         <span className="tracking-[0.2em]">AZEE STOCKIFY</span>
@@ -192,14 +192,14 @@ function StoreBadge({
   return (
     <a
       href="#"
-      className="inline-flex items-center gap-3 rounded-full border border-black/20 px-6 py-3 transition-colors duration-300 hover:border-black/45"
+      className="inline-flex items-center gap-3 rounded-full border border-[rgb(var(--azee-navy)/0.22)] px-6 py-3 transition-colors duration-300 hover:border-[rgb(var(--azee-navy)/0.62)]"
     >
-      <Icon className="h-6 w-6 text-black" />
+      <Icon className="h-6 w-6 text-[rgb(var(--azee-navy))]" />
       <span>
-        <span className="block text-[10px] leading-tight text-black/50">
+        <span className="block text-[10px] leading-tight text-[rgb(var(--azee-navy)/0.68)]">
           {small}
         </span>
-        <span className="block text-sm font-semibold leading-tight text-black">
+        <span className="block text-sm font-semibold leading-tight text-[rgb(var(--azee-navy))]">
           {big}
         </span>
       </span>
@@ -222,24 +222,22 @@ export function AppShowcase() {
        * carrying this attribute.
        */
       data-nav-theme-section="light"
-      className="relative overflow-hidden bg-[rgb(var(--azee-bone))] py-32 lg:py-48"
+      className="relative overflow-hidden bg-[rgb(var(--azee-paper))] py-32 lg:py-48"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-[rgb(var(--azee-orange))]">
-              AZEE Stockify
-            </p>
+            <p className="eyebrow">AZEE Stockify</p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="font-display mt-10 text-[3rem] text-[#141210] sm:text-[4rem] lg:text-[4.5rem]">
+            <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-navy))] sm:text-[4rem] lg:text-[4.5rem]">
               The exchange,
               <br />
               in one hand.
             </h2>
           </Reveal>
           <Reveal delay={200}>
-            <p className="mx-auto mt-10 max-w-lg text-[15px] leading-[1.75] text-black/55">
+            <p className="mx-auto mt-10 max-w-lg text-[15px] leading-[1.75] text-[rgb(var(--azee-navy)/0.62)]">
               Trade, monitor and manage your PSX portfolio from anywhere — the
               same real-time data and order routing as the desktop terminal.
               The screen below is showing the live market right now.
@@ -276,7 +274,7 @@ export function AppShowcase() {
                   on the ground rather than tilting with the device. */}
               <div
                 aria-hidden="true"
-                className="absolute -bottom-10 left-1/2 hidden h-12 w-4/5 -translate-x-1/2 rounded-[50%] bg-black/30 blur-2xl lg:block"
+                className="absolute -bottom-10 left-1/2 hidden h-12 w-4/5 -translate-x-1/2 rounded-[50%] bg-[rgb(var(--azee-navy)/0.28)] blur-2xl lg:block"
               />
               {/*
                * MOBILE: a flat, bezel-less panel — the live screen
@@ -286,7 +284,7 @@ export function AppShowcase() {
                * is the reference's floor, not its ceiling.
                */}
               <div
-                className="relative overflow-hidden rounded-[2rem] bg-[#141210] shadow-[0_24px_60px_-24px_rgba(0,0,0,0.5)] lg:rounded-[3rem] lg:p-3 lg:shadow-[50px_70px_110px_-30px_rgba(0,0,0,0.5)] lg:[transform:rotateY(-18deg)_rotateX(6deg)_rotateZ(-2deg)]"
+                className="relative overflow-hidden rounded-[2rem] bg-[rgb(6_11_30)] shadow-[0_24px_60px_-24px_rgba(0,0,0,0.5)] lg:rounded-[3rem] lg:p-3 lg:shadow-[50px_70px_110px_-30px_rgba(0,0,0,0.5)] lg:[transform:rotateY(-18deg)_rotateX(6deg)_rotateZ(-2deg)]"
               >
                 <div className="h-[520px] overflow-hidden rounded-[2rem] border border-white/10 lg:h-[540px] lg:rounded-[2.4rem]">
                   {snapshot && quotes && (
@@ -313,7 +311,7 @@ export function AppShowcase() {
             {FEATURES.map((feature) => (
               <li
                 key={feature}
-                className="flex items-start gap-3 border-t border-black/10 pt-4 text-sm leading-relaxed text-black/65"
+                className="flex items-start gap-3 border-t border-[rgb(var(--azee-navy)/0.12)] pt-4 text-sm leading-relaxed text-[rgb(var(--azee-navy)/0.7)]"
               >
                 {feature}
               </li>

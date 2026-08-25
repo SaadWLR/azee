@@ -82,8 +82,8 @@ const CREDENTIALS: Credential[] = [
 
 function SealCard({ item }: { item: Credential }) {
   return (
-    <div className="rounded-[22px] border border-white/12 bg-[rgb(20_19_16)] px-7 py-6 shadow-[0_28px_60px_-12px_rgba(0,0,0,0.85)]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[rgb(var(--azee-orange))]">
+    <div className="rounded-[22px] border border-[rgb(var(--azee-blue)/0.22)] bg-[rgb(var(--azee-panel))] px-7 py-6 shadow-[0_28px_60px_-12px_rgba(3,6,20,0.9)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgb(var(--azee-orange))]">
         {item.label}
       </p>
       {/* Level 4 — the datum. Serif, because this is the object's face. */}
@@ -91,8 +91,8 @@ function SealCard({ item }: { item: Credential }) {
         {item.value}
       </p>
       {/* Level 5 — metadata. */}
-      <p className="mt-2.5 text-xs text-white/45">{item.issuer}</p>
-      <p className="mt-4 max-w-[17rem] text-xs leading-relaxed text-white/35">
+      <p className="mt-2.5 text-xs text-white/65">{item.issuer}</p>
+      <p className="mt-4 max-w-[17rem] text-xs leading-relaxed text-white/60">
         {item.note}
       </p>
     </div>
@@ -105,31 +105,32 @@ export function WhyAzee() {
   return (
     <section
       id="about"
-      className="relative bg-[rgb(var(--azee-ink))] py-32 lg:py-48"
+      className="relative bg-[rgb(var(--azee-navy))] py-32 lg:py-48"
     >
       {/*
        * HERO → ABOUT BLEND.
        *
-       * The second half of the boundary. The Hero's floor now settles
-       * into --azee-navy; this band picks that navy up at full strength
-       * at the very top edge, carries a lift of --azee-blue through the
-       * upper third (the same blue the globe footage is rim-lit in),
-       * and eases to nothing against the ink ground below.
+       * Its job changed when this section became navy. The two grounds
+       * now MATCH — the hero's floor settles into --azee-navy and this
+       * section is that navy — so the colour seam the band was built to
+       * hide no longer exists.
        *
-       * The two halves meet at the same colour, so the sections read as
-       * one continuous descent into darkness rather than a cut between
-       * a blue section and a black one.
+       * What is still there is a TEXTURE seam: above the line is video,
+       * grained and moving, and below it is flat colour. The band now
+       * covers that instead, carrying the same --azee-blue lift the
+       * globe is rim-lit in down over the join and easing it out into
+       * the flat ground. Same purpose as before — the two sections read
+       * as one descent — against the difference that actually remains.
        *
-       * This is a gradient with meaning — it bridges two real sections
-       * that genuinely differ in colour — not an ambient wash sitting
-       * behind content. data-hero-blend marks it as the one sanctioned
-       * gradient in a redesigned section; the design spec asserts every
-       * OTHER gradient in these sections is still forbidden.
+       * A gradient with meaning rather than an ambient wash, and
+       * data-hero-blend still marks it as the one sanctioned gradient
+       * here; the design spec asserts every OTHER gradient in these
+       * sections is forbidden.
        */}
       <div
         data-hero-blend="true"
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[26rem] bg-[linear-gradient(to_bottom,rgb(var(--azee-navy)/0.95),rgb(var(--azee-blue)/0.16)_26%,rgb(var(--azee-navy)/0.28)_52%,transparent_100%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[26rem] bg-[linear-gradient(to_bottom,rgb(var(--azee-navy))_0%,rgb(var(--azee-blue)/0.18)_22%,rgb(var(--azee-blue)/0.07)_52%,transparent_100%)]"
       />
 
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-12">
@@ -138,9 +139,7 @@ export function WhyAzee() {
           <div>
             {/* Level 5 — metadata */}
             <Reveal>
-              <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-[rgb(var(--azee-orange))]">
-                Why AZEE Securities
-              </p>
+              <p className="eyebrow">Why AZEE Securities</p>
             </Reveal>
 
             {/* Level 1 — the hero statement */}
@@ -162,7 +161,7 @@ export function WhyAzee() {
             </Reveal>
 
             <Reveal delay={280}>
-              <p className="mt-12 max-w-md text-xs leading-relaxed text-white/30">
+              <p className="mt-12 max-w-md text-xs leading-relaxed text-white/55">
                 AZEE Securities (Pvt.) Ltd. — incorporated {FOUNDED},
                 Registration No. K-8159 (2000-1), Securities Broker Licence
                 No. 108/Securities&nbsp;Broker/2019.

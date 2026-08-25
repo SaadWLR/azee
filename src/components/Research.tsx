@@ -85,7 +85,7 @@ function ArticleImage({ src, className }: { src?: string; className: string }) {
 
 function SourceTag({ source }: { source: string }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+    <span className="inline-flex items-center rounded-full border border-[rgb(var(--azee-navy)/0.16)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[rgb(var(--azee-navy)/0.65)]">
       {source}
     </span>
   );
@@ -101,7 +101,7 @@ function formatDate(iso: string): string {
 
 function ArticleDate({ item }: { item: NewsFeedItem }) {
   return (
-    <p className="text-xs tabular-nums text-white/40">
+    <p className="text-xs tabular-nums text-[rgb(var(--azee-navy)/0.62)]">
       {formatDate(item.publishedAt)}
     </p>
   );
@@ -123,7 +123,7 @@ function HeadlineCard({
         href={item.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="group flex h-full flex-col justify-between rounded-[28px] border border-white/12 p-6 transition-colors duration-300 hover:border-white/30"
+        className="group flex h-full flex-col justify-between rounded-[28px] border border-[rgb(var(--azee-navy)/0.14)] p-6 transition-colors duration-300 hover:border-[rgb(var(--azee-navy)/0.6)]"
       >
         <div>
           <ArticleImage
@@ -132,9 +132,9 @@ function HeadlineCard({
           />
           <div className="flex items-center justify-between gap-3">
             <SourceTag source={item.source} />
-            <IconExternalLink className="h-3.5 w-3.5 text-white/30 transition-colors duration-300 group-hover:text-white" />
+            <IconExternalLink className="h-3.5 w-3.5 text-[rgb(var(--azee-navy)/0.62)] transition-colors duration-300 group-hover:text-[rgb(var(--azee-navy))]" />
           </div>
-          <h3 className="mt-4 text-base font-semibold leading-snug tracking-tight text-[rgb(var(--azee-chalk))]">
+          <h3 className="mt-4 text-base font-semibold leading-snug tracking-tight text-[rgb(var(--azee-navy))]">
             {item.title}
           </h3>
         </div>
@@ -142,7 +142,7 @@ function HeadlineCard({
           <ArticleDate item={item} />
           <span
             aria-hidden="true"
-            className="text-white/40 transition-all duration-300 group-hover:translate-x-1 group-hover:text-white"
+            className="text-[rgb(var(--azee-navy)/0.62)] transition-all duration-300 group-hover:translate-x-1 group-hover:text-[rgb(var(--azee-navy))]"
           >
             →
           </span>
@@ -190,7 +190,7 @@ function NewsChannel() {
               href={lead.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex h-full flex-col justify-between rounded-[28px] border border-white/12 p-8 transition-colors duration-300 hover:border-white/30 sm:p-10"
+              className="group flex h-full flex-col justify-between rounded-[28px] border border-[rgb(var(--azee-navy)/0.14)] p-8 transition-colors duration-300 hover:border-[rgb(var(--azee-navy)/0.6)] sm:p-10"
             >
               <div>
                 <ArticleImage
@@ -199,20 +199,20 @@ function NewsChannel() {
                 />
                 <div className="flex items-center justify-between gap-3">
                   <SourceTag source={lead.source} />
-                  <IconExternalLink className="h-4 w-4 text-white/40 transition-colors duration-300 group-hover:text-white" />
+                  <IconExternalLink className="h-4 w-4 text-[rgb(var(--azee-navy)/0.62)] transition-colors duration-300 group-hover:text-[rgb(var(--azee-navy))]" />
                 </div>
-                <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-3xl">
+                <h3 className="mt-5 max-w-xl text-2xl font-bold leading-[1.15] tracking-tight text-[rgb(var(--azee-navy))] sm:text-3xl">
                   {lead.title}
                 </h3>
                 {lead.summary && (
-                  <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/50 sm:text-base">
+                  <p className="mt-4 max-w-xl text-sm leading-relaxed text-[rgb(var(--azee-navy)/0.68)] sm:text-base">
                     {lead.summary}
                   </p>
                 )}
               </div>
               <div className="mt-8 flex items-center justify-between">
                 <ArticleDate item={lead} />
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/70 transition-all duration-300 group-hover:gap-3 group-hover:text-white">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[rgb(var(--azee-navy)/0.75)] transition-all duration-300 group-hover:gap-3 group-hover:text-[rgb(var(--azee-navy))]">
                   Read at {lead.source} <span aria-hidden="true">→</span>
                 </span>
               </div>
@@ -251,7 +251,7 @@ function NewsChannel() {
             type="button"
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
-            className="rounded-full border border-white/20 px-7 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:border-white/45"
+            className="rounded-full border border-[rgb(var(--azee-navy)/0.22)] px-7 py-3 text-sm font-semibold text-[rgb(var(--azee-navy))] transition-colors duration-300 hover:border-[rgb(var(--azee-navy)/0.62)]"
           >
             {expanded ? "Show fewer" : `See more headlines (${hiddenCount})`}
           </button>
@@ -264,11 +264,11 @@ function NewsChannel() {
 /** Honest empty state for a channel that has no content yet. */
 function PendingChannel({ channel }: { channel: Channel }) {
   return (
-    <div className="mt-14 rounded-[28px] border border-white/12 px-8 py-20 text-center sm:px-12">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
+    <div className="mt-14 rounded-[28px] border border-[rgb(var(--azee-navy)/0.14)] px-8 py-20 text-center sm:px-12">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[rgb(var(--azee-navy)/0.62)]">
         Not yet published
       </p>
-      <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-white/55">
+      <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-[rgb(var(--azee-navy)/0.6)]">
         {channel.pendingNote}
       </p>
     </div>
@@ -282,22 +282,22 @@ export function Research() {
   return (
     <section
       id="research"
-      className="relative bg-[rgb(var(--azee-ink))] py-28 lg:py-40"
+      /* White ground — the opaque nav needs its light treatment here. */
+      data-nav-theme-section="light"
+      className="relative bg-[rgb(var(--azee-paper))] py-28 lg:py-40"
     >
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-white/10"
+        className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-navy)/0.12)]"
       />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/40">
-              News &amp; Insights
-            </p>
+            <p className="eyebrow">News &amp; Insights</p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-chalk))] sm:text-6xl lg:text-7xl">
+            <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-navy))] sm:text-6xl lg:text-7xl">
               Headlines moving
               <br />
               Pakistan&apos;s markets.
@@ -309,7 +309,7 @@ export function Research() {
             <div
               role="tablist"
               aria-label="News and insights channels"
-              className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/12 p-1.5"
+              className="mt-10 inline-flex items-center gap-2 rounded-full border border-[rgb(var(--azee-navy)/0.14)] p-1.5"
             >
               {CHANNELS.map((channel) => {
                 const selected = channel.id === active.id;
@@ -322,13 +322,13 @@ export function Research() {
                     onClick={() => setActiveId(channel.id)}
                     className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors duration-300 ${
                       selected
-                        ? "bg-[rgb(var(--azee-chalk))] text-[rgb(var(--azee-ink))]"
-                        : "text-white/55 hover:text-white"
+                        ? "bg-[rgb(var(--azee-navy))] text-[rgb(var(--azee-paper))]"
+                        : "text-[rgb(var(--azee-navy)/0.6)] hover:text-[rgb(var(--azee-navy))]"
                     }`}
                   >
                     {channel.label}
                     {channel.status === "pending" && (
-                      <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
+                      <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[rgb(var(--azee-navy)/0.62)]">
                         Soon
                       </span>
                     )}
@@ -339,7 +339,7 @@ export function Research() {
           </Reveal>
 
           <Reveal delay={250}>
-            <p className="mx-auto mt-8 max-w-xl text-sm leading-relaxed text-white/50">
+            <p className="mx-auto mt-8 max-w-xl text-sm leading-relaxed text-[rgb(var(--azee-navy)/0.68)]">
               {active.blurb}
             </p>
           </Reveal>

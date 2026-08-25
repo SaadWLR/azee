@@ -44,10 +44,10 @@ export function Hero() {
     <section
       id="markets"
       /*
-       * The nav gets its own treatment over this section — blended
-       * toward the Hero's blues rather than the flat ink the other dark
-       * sections use. Same opt-in mechanism as the bone section's
-       * light theme.
+       * The nav gets its own treatment over this section — a blue-black
+       * darker than the navy the sections below use, because the hero
+       * is black footage rather than a section colour. Same opt-in
+       * mechanism the white sections use for their light theme.
        */
       data-nav-theme-section="hero"
       className="relative flex min-h-screen w-full flex-col overflow-hidden bg-black"
@@ -72,15 +72,26 @@ export function Hero() {
       <div
         aria-hidden="true"
         /*
-         * The Hero's lower scrim now settles into NAVY rather than flat
-         * black. It is the first half of the blend into #about: the
-         * globe footage is rim-lit in --azee-blue, so letting the
-         * section's own floor carry that blue down means the boundary
-         * below continues a colour that is already here instead of
-         * introducing one. The video itself is untouched — this is the
-         * overlay that has always sat above it.
+         * BLACK-DOMINANT, WITH THE BLUE COMPRESSED INTO THE HANDOFF.
+         *
+         * This scrim used to hold --azee-navy at 0.92 all the way up
+         * through 28% of the hero's height, which put saturated blue
+         * across the whole lower third — the hero read as a blue
+         * section rather than a black one with blue light in it.
+         *
+         * The navy now lives only in the bottom eighth, where it still
+         * has a job to do: #about's ground is that same navy, and the
+         * blend band there starts from it, so the two sections must
+         * meet on the same colour or the seam comes back. Above that
+         * handoff the scrim is plain black, so the blue in the hero
+         * comes from the globe's rim light and the snapshot's backlight
+         * — actual light in the scene — rather than from a wash laid
+         * over the footage.
+         *
+         * The video itself is untouched; this is the overlay that has
+         * always sat above it.
          */
-        className="absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgb(var(--azee-navy)/0.92),rgb(var(--azee-navy)/0.4)_28%,rgb(0_0_0/0.2)_55%,transparent_100%)]"
+        className="absolute inset-x-0 bottom-0 h-2/3 bg-[linear-gradient(to_top,rgb(var(--azee-navy)/0.95),rgb(var(--azee-navy)/0.42)_12%,rgb(0_0_0/0.58)_30%,rgb(0_0_0/0.18)_62%,transparent_100%)]"
       />
 
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -117,11 +128,16 @@ export function Hero() {
               className="font-display text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem] lg:text-[4.5rem]"
             />
 
-            {/* Brand signature: a single short orange stripe echoing the
-                logo mark's own orange slash — the one deliberately warm
-                note at the top of the page. */}
+            {/* Brand signature: a single orange stripe echoing the logo
+                mark's own orange slash — the one warm note on the first
+                screen, and now the same solid bar the section eyebrows
+                below use. It used to fade out to transparent across its
+                own 64px, which left perhaps 30px of actual colour on a
+                black field; a mark that thin is a texture, not an
+                accent. Solid and wider, it reads as the deliberate
+                brand note it was always meant to be. */}
             <FadeIn delay={900}>
-              <div className="mt-6 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />
+              <div className="mt-6 h-1 w-24 rounded-full bg-[rgb(var(--azee-orange))]" />
             </FadeIn>
 
             <FadeIn delay={1000}>

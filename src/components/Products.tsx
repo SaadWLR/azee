@@ -261,10 +261,19 @@ function Chain({
               x2={cx + w / 2}
               y2={0}
             >
-              <stop offset="0%" stopColor="rgb(var(--azee-chalk))" stopOpacity="0.9" />
-              <stop offset="34%" stopColor="rgb(var(--azee-chalk))" stopOpacity="0.4" />
-              <stop offset="68%" stopColor="rgb(var(--azee-chalk))" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="rgb(var(--azee-chalk))" stopOpacity="0.38" />
+              {/*
+               * INVERTED FOR A LIGHT GROUND. On ink the wire was chalk
+               * and the lit edge was the most OPAQUE — brightness was
+               * how light read. On white the wire is navy and light
+               * reads as the absence of ink, so the ramp turns over:
+               * the lit left run is the thinnest density, the shadow
+               * side the densest, and the far edge lifts again for the
+               * rim. Same bar, same lamp, opposite arithmetic.
+               */}
+              <stop offset="0%" stopColor="rgb(var(--azee-navy))" stopOpacity="0.32" />
+              <stop offset="34%" stopColor="rgb(var(--azee-navy))" stopOpacity="0.58" />
+              <stop offset="68%" stopColor="rgb(var(--azee-navy))" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="rgb(var(--azee-navy))" stopOpacity="0.7" />
             </linearGradient>
             <linearGradient
               id={`${uid}-lit-${key}`}
@@ -375,24 +384,28 @@ export function Products() {
   return (
     <section
       id="products"
-      className="relative bg-[rgb(var(--azee-ink))] py-32 lg:py-48"
+      /*
+       * White ground, so the nav needs its light treatment here the
+       * same way #trading does — the bar is opaque and would otherwise
+       * sit navy-on-white.
+       */
+      data-nav-theme-section="light"
+      className="relative bg-[rgb(var(--azee-paper))] py-32 lg:py-48"
     >
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-white/10"
+        className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-navy)/0.12)]"
       />
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-12">
         <div className="max-w-2xl">
           {/* Level 5 — metadata */}
           <Reveal>
-            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-[rgb(var(--azee-orange))]">
-              Products &amp; Services
-            </p>
+            <p className="eyebrow">Products &amp; Services</p>
           </Reveal>
           {/* Level 1 — hero statement */}
           <Reveal delay={100}>
-            <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem]">
+            <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-navy))] sm:text-[4rem]">
               Every market,
               <br />
               one relationship.
@@ -400,7 +413,7 @@ export function Products() {
           </Reveal>
           {/* Level 3 — supporting line */}
           <Reveal delay={200}>
-            <p className="mt-10 max-w-md text-[15px] leading-[1.75] text-white/50">
+            <p className="mt-10 max-w-md text-[15px] leading-[1.75] text-[rgb(var(--azee-navy)/0.62)]">
               Equities, commodities, primary-market offerings and managed
               products — executed and researched under one regulated roof.
             </p>
@@ -436,10 +449,10 @@ export function Products() {
             {PRODUCTS.map((product, i) => {
               const body = (
                 <>
-                  <span className="font-display text-[1.6rem] text-[rgb(var(--azee-chalk))] transition-colors duration-300 group-hover:text-[rgb(var(--azee-orange))] sm:text-[1.9rem]">
+                  <span className="font-display text-[1.6rem] text-[rgb(var(--azee-navy))] transition-colors duration-300 group-hover:text-[rgb(var(--azee-orange))] sm:text-[1.9rem]">
                     {product.title}
                   </span>
-                  <span className="mt-2 max-w-md text-sm leading-relaxed text-white/40 lg:mt-0 lg:max-w-[19rem] lg:shrink-0 lg:text-right">
+                  <span className="mt-2 max-w-md text-sm leading-relaxed text-[rgb(var(--azee-navy)/0.68)] lg:mt-0 lg:max-w-[19rem] lg:shrink-0 lg:text-right">
                     {product.text}
                   </span>
                   {/* Only the services with a page behind them get an
@@ -447,7 +460,7 @@ export function Products() {
                   {product.to ? (
                     <span
                       aria-hidden="true"
-                      className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 transition-all duration-300 group-hover:translate-x-1 group-hover:text-[rgb(var(--azee-orange))] lg:static lg:translate-y-0 lg:shrink-0"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-[rgb(var(--azee-navy)/0.6)] transition-all duration-300 group-hover:translate-x-1 group-hover:text-[rgb(var(--azee-orange))] lg:static lg:translate-y-0 lg:shrink-0"
                     >
                       →
                     </span>

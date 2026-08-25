@@ -71,7 +71,7 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
      * that catches the rotation, and the long directional shadow lifts
      * the near corner off the panel.
      */
-    <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] p-6 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
+    <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] p-6 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-wide text-[rgb(var(--azee-chalk))]">
@@ -184,18 +184,18 @@ export function ClosingCTA() {
   return (
     <section
       id="start-investing"
-      className="relative w-full bg-[rgb(var(--azee-ink))] py-28 lg:py-40"
+      className="relative w-full bg-[rgb(var(--azee-navy))] py-28 lg:py-40"
     >
       <div
         aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-white/10"
+        className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-blue)/0.25)]"
       />
 
       <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-12">
         {/* ── Copy + CTA ─────────────────────────────────────────── */}
         <div>
           <p
-            className="closing-fade-up text-[11px] font-semibold uppercase tracking-[0.28em] text-white/40"
+            className="closing-fade-up eyebrow"
             style={{ animationDelay: "0.1s" }}
           >
             Start investing
@@ -246,7 +246,7 @@ export function ClosingCTA() {
           style={{ animationDelay: "0.45s" }}
         >
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[rgb(var(--azee-orange))]">
+            <span className="eyebrow">
               Live PSX lookup
             </span>
             <input
@@ -278,7 +278,7 @@ export function ClosingCTA() {
                   }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors duration-300 ${
                     picked === q.symbol
-                      ? "bg-[rgb(var(--azee-chalk))] text-[rgb(var(--azee-ink))]"
+                      ? "bg-[rgb(var(--azee-chalk))] text-[rgb(var(--azee-navy))]"
                       : "border border-white/15 text-white/65 hover:border-white/40 hover:text-white"
                   }`}
                 >
@@ -341,18 +341,18 @@ export function ClosingCTA() {
             <div className="transition-transform duration-500 lg:[transform:rotateY(-24deg)_rotateX(8deg)_rotateZ(2deg)] lg:hover:[transform:rotateY(-8deg)_rotateX(3deg)_rotateZ(0.5deg)]">
             {error && !quotes ? (
               // Honest failure — never a placeholder quote.
-              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 Live prices are temporarily unavailable. Please try again
                 shortly.
               </div>
             ) : loading && !quotes ? (
-              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 Loading live PSX prices…
               </div>
             ) : active ? (
               <QuoteCard quote={active} />
             ) : (
-              <div className="rounded-[28px] border border-white/12 bg-[rgb(33_30_26)] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.9)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 No PSX symbol matches “{query.trim()}”.
               </div>
             )}
