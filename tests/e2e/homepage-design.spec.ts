@@ -19,9 +19,17 @@ test.beforeEach(() => {
 
 const REDESIGNED = ["#about", "#trading", "#research", "#start-investing"];
 
-/** Warm near-black ink and its light counter-tone. */
-const INK = "rgb(13, 12, 10)";
-const BONE = "rgb(237, 233, 226)";
+/*
+ * The two section grounds. The page alternates the brand navy with
+ * white — AZEE's own colours — where it used to alternate a warm ink
+ * with a cream bone. --azee-ink and --azee-bone no longer exist.
+ */
+const NAVY = "rgb(12, 24, 66)";
+const PAPER = "rgb(255, 255, 255)";
+/** The hero's bar is darker than the navy sections: black with a blue cast. */
+const HERO_BAR = "rgb(7, 10, 22)";
+/** Display type on the dark ground — off-white, never pure #fff. */
+const CHALK = "rgb(232, 230, 225)";
 
 /**
  * Park the fixed navbar `into` pixels inside a section, and land there
@@ -67,10 +75,11 @@ test("no redesigned section uses a gradient or radial colour wash", async ({
    * children, since that is where such a wash would live.
    *
    * ONE sanctioned exception, marked in the markup with
-   * data-hero-blend: the band that carries the hero's navy down into
-   * #about's ink. That gradient is structural — it bridges two real
-   * sections that genuinely differ in colour so the boundary reads as
-   * one descent rather than a cut — rather than decorative. It is
+   * data-hero-blend: the band across the top of #about. Both sides of
+   * that boundary are now the same navy, so what it covers is the
+   * TEXTURE change from moving video to flat colour rather than a
+   * colour change. Structural either way — it joins two real sections
+   * — rather than decorative. It is
    * excluded by that attribute alone, so any OTHER gradient appearing
    * in these sections still fails, and a second one cannot be
    * smuggled in without adding the marker deliberately.
@@ -96,23 +105,65 @@ test("no redesigned section uses a gradient or radial colour wash", async ({
   }
 });
 
-test("sections commit to one flat colour, alternating ink and bone", async ({
+test("sections commit to one flat colour, alternating navy and white", async ({
   page,
 }) => {
   await page.goto("/");
 
+  /*
+   * The rhythm, not just the values. It used to be four dark sections
+   * and a single light one at the bottom, which is a page with one
+   * exception rather than an alternation. #products and #research are
+   * white now, so the scroll actually alternates.
+   *
+   * #products is included here even though it is not in REDESIGNED —
+   * it carries a ground in this system and would otherwise be the one
+   * section free to drift.
+   */
   const colours: Record<string, string> = {};
-  for (const id of REDESIGNED) {
+  for (const id of [...REDESIGNED, "#products"]) {
     colours[id] = await page
       .locator(id)
       .evaluate((el) => getComputedStyle(el).backgroundColor);
   }
 
-  expect(colours["#about"]).toBe(INK);
-  expect(colours["#research"]).toBe(INK);
-  expect(colours["#start-investing"]).toBe(INK);
-  // The one light section — the page's colour rhythm comes from this.
-  expect(colours["#trading"]).toBe(BONE);
+  expect(colours["#about"], "#about is the brand navy").toBe(NAVY);
+  expect(colours["#start-investing"], "the conversion block is navy").toBe(NAVY);
+  expect(colours["#products"], "#products is white").toBe(PAPER);
+  expect(colours["#research"], "#research is white").toBe(PAPER);
+  expect(colours["#trading"], "#trading is white").toBe(PAPER);
+
+  // Flat colour, still: every one of them commits to a single value
+  // rather than reaching for a wash. (The gradient test above covers
+  // the decorative case; this covers the ground itself.)
+  for (const [id, value] of Object.entries(colours)) {
+    expect([NAVY, PAPER], `${id} must be one of the two grounds`).toContain(
+      value,
+    );
+  }
+});
+
+test("every white section tells the nav it is light", async ({ page }) => {
+  await page.goto("/");
+  /*
+   * The bar is opaque. A white section that does not carry this
+   * attribute gets the navy bar sitting on it — which is exactly the
+   * regression the ink chip was invented to paper over. Asserted from
+   * the ground colour outwards, so adding a white section without the
+   * attribute fails here rather than in a screenshot.
+   */
+  const mismatches = await page.evaluate(() => {
+    const bad: string[] = [];
+    for (const el of document.querySelectorAll("section[id]")) {
+      const bg = getComputedStyle(el).backgroundColor;
+      if (bg !== "rgb(255, 255, 255)") continue;
+      if (el.getAttribute("data-nav-theme-section") !== "light") {
+        bad.push(el.id);
+      }
+    }
+    return bad;
+  });
+  expect(mismatches, "white sections must opt into the light nav").toEqual([]);
 });
 
 test("each redesigned section leads with the serif display face", async ({
@@ -138,18 +189,32 @@ test("each redesigned section leads with the serif display face", async ({
   expect(bodyFamily).toMatch(/Inter/i);
 });
 
-test("headline colour is a desaturated off-white, never pure white", async ({
+test("headlines take the colour their own ground calls for", async ({
   page,
 }) => {
   await page.goto("/");
-  for (const id of ["#about", "#research", "#start-investing"]) {
+  /*
+   * Was "never pure white", which only ever had teeth on a dark
+   * ground. Now that half these sections are white, the rule that
+   * matters is that each headline is the counter-tone of its OWN
+   * ground: chalk on navy (off-white, so oversized display type does
+   * not glare) and the brand navy on white. Pure #fff on a white
+   * section would be invisible, and the old assertion would have
+   * passed it.
+   */
+  for (const id of ["#about", "#start-investing"]) {
     const colour = await page
       .locator(`${id} h2`)
       .first()
       .evaluate((el) => getComputedStyle(el).color);
-    expect(colour, `${id} headline must not be pure white`).not.toBe(
-      "rgb(255, 255, 255)",
-    );
+    expect(colour, `${id} headline is chalk on navy`).toBe(CHALK);
+  }
+  for (const id of ["#products", "#research", "#trading"]) {
+    const colour = await page
+      .locator(`${id} h2`)
+      .first()
+      .evaluate((el) => getComputedStyle(el).color);
+    expect(colour, `${id} headline is navy on white`).toBe(NAVY);
   }
 });
 
@@ -467,7 +532,7 @@ test("the hero and #about meet through one continuous blend", async ({
  * #trading block. Asserted by scrolling to each and reading the
  * resolved attribute plus the surface it produces.
  */
-test("the nav carries a distinct theme over hero, ink and bone", async ({
+test("the nav carries a distinct theme over hero, navy and white", async ({
   page,
 }) => {
   await page.goto("/");
@@ -503,13 +568,13 @@ test("the nav carries a distinct theme over hero, ink and bone", async ({
 
   // Top of the page: over the hero, wearing the brand navy.
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await expectTheme("hero", "rgb(12, 24, 66)");
+  await expectTheme("hero", HERO_BAR);
 
   // Over #about: the ink default.
-  await expectTheme("dark", INK, "#about");
+  await expectTheme("dark", NAVY, "#about");
 
   // Over the bone #trading block: the light theme still wins.
-  await expectTheme("light", BONE, "#trading");
+  await expectTheme("light", PAPER, "#trading");
 });
 
 /*
