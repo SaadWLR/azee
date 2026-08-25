@@ -37,23 +37,59 @@
    */
   --azee-orange: 233 81 38;
   /*
-   * Homepage redesign tokens.
+   * The same accent, deepened for LIGHT grounds.
    *
-   * --azee-ink is the base for the redesigned sections: a very dark
-   * WARM black rather than pure #000, so the page reads as a considered
-   * surface instead of an absence of colour. Pure black is kept for the
-   * Hero, which is video-backed and untouched.
+   * Brand orange is a mid-tone: brilliant on navy (4.63:1 at 12px) and
+   * only 3.7:1 on white, which is under AA for anything but large
+   * text. Now that three sections are white, orange needed a value
+   * that carries the same accent at the same size without failing —
+   * this one measures about 5:1 on paper.
    *
-   * --azee-bone is the light counter-tone. Sections alternate dark ink
-   * and light bone so the scroll has rhythm from flat colour alone —
-   * no gradient washes anywhere.
+   * It is the same hue walked down in value, not a different colour:
+   * on white a deeper orange actually reads with MORE presence than
+   * the brighter one, because the contrast is doing the work the
+   * saturation cannot.
+   */
+  --azee-orange-deep: 196 61 24;
+  /*
+   * ── Homepage section palette: classic blue and white ───────────────
+   *
+   * This replaced a warm ink/bone pair. That pair was a deliberate
+   * treatment for a handful of sections, but it read as the site's
+   * identity, and AZEE's identity is blue and orange — the navy above
+   * is the real thing, already lighting the hero's globe and its glass
+   * panels. The page now alternates the brand navy with white, which
+   * is what a brokerage's own colours actually are, and orange is the
+   * one warm mark against them.
+   *
+   * --azee-navy (above) is the DARK SECTION GROUND, used verbatim
+   * rather than as a new near-black. That is the point: at #0C1842 it
+   * is dark enough to carry chalk display type at 4.5rem and still
+   * unmistakably blue, which a blue-black of the ink family never was.
+   *
+   * --azee-panel is the card surface ON that ground, and it sits
+   * DARKER than the section rather than lighter. That inverts the
+   * relationship the old cards had with ink, and it was a contrast
+   * decision rather than a taste one: these cards carry small orange
+   * labels, and brand orange on a navy LIGHTER than the ground measured
+   * 3.98:1 — under AA for 11px text. Against this deeper plate the same
+   * label measures about 5:1. The cards still read as objects because
+   * depth here comes from the border catching light along the top edge
+   * and from a long shadow, which is how a plate set INTO a surface
+   * actually reads.
+   *
+   * --azee-paper is the white ground. True white, not a cream: the
+   * whole reason the bone sections needed apologising for is that an
+   * off-white large enough to be a section reads as aged paper, and
+   * "classic blue and white" wants the white to be white.
    *
    * --azee-chalk is the headline colour on dark: a slightly desaturated
    * off-white, never pure #fff, which is what keeps oversized display
-   * type from glaring.
+   * type from glaring. Unchanged — it is the h1 colour on every page in
+   * the site, not just these sections.
    */
-  --azee-ink: 13 12 10;
-  --azee-bone: 237 233 226;
+  --azee-panel: 8 17 48;
+  --azee-paper: 255 255 255;
   --azee-chalk: 232 230 225;
 }
 
@@ -68,6 +104,62 @@
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.06;
+}
+
+/*
+ * ── Section eyebrow ──────────────────────────────────────────────────
+ *
+ * The small uppercase label that opens each homepage section, and the
+ * main place orange earns its keep.
+ *
+ * It used to be 11px at weight 500 tracked out to 0.3em. At that size
+ * every letter is a thin isolated stroke with a lot of air around it,
+ * and orange — a mid-tone, not a bright — simply dissolved: present in
+ * the stylesheet, invisible on the page. The brief for this pass was
+ * that orange should read as an obvious, deliberate accent, and the
+ * honest reading of "barely there" was that it was too small, too
+ * light and too spread out to register as a colour at all.
+ *
+ * So: a size up, weight up to bold, and tracking pulled in, which
+ * gives the letters enough mass to carry a hue. Then the rule — a
+ * short solid orange bar set before the label. That is the part that
+ * actually makes it obvious: a bar is a SHAPE, and a solid 28×3px of
+ * saturated orange reads as a colour decision from across the room in
+ * a way that letterforms at any weight do not.
+ *
+ * It is a class rather than repeated utilities so every section opens
+ * on exactly the same mark, and so the amount of orange on the page is
+ * one number in one place if it ever needs pulling back.
+ */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(var(--azee-orange));
+}
+
+/*
+ * The bar takes currentColor so it can never drift out of step with
+ * the label beside it, and light sections deepen both together. Those
+ * sections are already marked for the nav's benefit, so the ground is
+ * named once and read here rather than tracked twice.
+ */
+.eyebrow::before {
+  content: "";
+  width: 1.75rem;
+  height: 3px;
+  flex: none;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+[data-nav-theme-section="light"] .eyebrow {
+  color: rgb(var(--azee-orange-deep));
 }
 
 html {
@@ -216,16 +308,15 @@ body {
  * meant something specific — the active-link underline.
  *
  * SECTION-AWARE. The homepage runs three different grounds under this
- * bar: the blue-lit hero, the ink sections, and one light bone section
- * (#trading). A single fixed treatment cannot read cleanly over all
- * three, so the nav flips its whole palette to match whichever section
- * it is currently over, named by that section in
- * data-nav-theme-section. Sections without the attribute get the ink
- * default below.
+ * bar: the near-black hero, the navy sections, and the white ones. A
+ * single fixed treatment cannot read cleanly over all three, so the nav
+ * flips its whole palette to match whichever section it is currently
+ * over, named by that section in data-nav-theme-section. Sections
+ * without the attribute get the navy default below.
  */
 .nav-glass {
-  background: rgb(var(--azee-ink));
-  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(var(--azee-navy));
+  border: 1px solid rgb(255 255 255 / 0.12);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 6px 28px rgba(0, 0, 0, 0.35);
@@ -243,17 +334,17 @@ body {
 
 /* ── Light treatment, used while the nav sits over a bone section ── */
 .nav-glass[data-nav-theme="light"] {
-  background: rgb(var(--azee-bone));
-  border-color: rgb(13 12 10 / 0.12);
+  background: rgb(var(--azee-paper));
+  border-color: rgb(var(--azee-navy) / 0.14);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 8px 30px rgba(13, 12, 10, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 8px 30px rgb(var(--azee-navy) / 0.16);
 }
 
 .nav-glass[data-nav-theme="light"].nav-glass-scrolled {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 14px 44px rgba(13, 12, 10, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 14px 44px rgb(var(--azee-navy) / 0.22);
 }
 
 /*
@@ -268,14 +359,14 @@ body {
  */
 .nav-glass[data-nav-theme="light"] .nav-themed > li > a,
 .nav-glass[data-nav-theme="light"] .nav-themed > li > button {
-  color: rgb(13 12 10 / 0.7);
+  color: rgb(var(--azee-navy) / 0.72);
 }
 
 .nav-glass[data-nav-theme="light"] .nav-themed > li > a:hover,
 .nav-glass[data-nav-theme="light"] .nav-themed > li > button:hover,
 .nav-glass[data-nav-theme="light"] .nav-themed > li > a.is-active,
 .nav-glass[data-nav-theme="light"] .nav-themed > li > button.is-active {
-  color: rgb(13 12 10);
+  color: rgb(var(--azee-navy));
 }
 
 /*
@@ -338,50 +429,49 @@ body {
  * surface.
  */
 .nav-glass[data-nav-theme="light"] .nav-cta {
-  background: rgb(var(--azee-ink));
-  border-color: rgb(13 12 10 / 0.2);
-  color: rgb(var(--azee-bone));
+  background: rgb(var(--azee-navy));
+  border-color: rgb(var(--azee-navy) / 0.25);
+  color: rgb(var(--azee-paper));
   box-shadow: none;
 }
 
 /* The hamburger's bars and its outline. */
 .nav-glass[data-nav-theme="light"] .nav-toggle {
-  border-color: rgb(13 12 10 / 0.15);
-  background: rgb(13 12 10 / 0.04);
+  border-color: rgb(var(--azee-navy) / 0.18);
+  background: rgb(var(--azee-navy) / 0.05);
 }
 
 .nav-glass[data-nav-theme="light"] .nav-toggle span {
-  background: rgb(13 12 10);
+  background: rgb(var(--azee-navy));
 }
 
 /*
  * ── Hero treatment ───────────────────────────────────────────────────
  *
- * The third surface. Over the homepage hero the bar is not sitting on
- * ink — it is sitting on footage of a globe rim-lit in --azee-blue over
- * a floor that now settles into --azee-navy. A flat black capsule there
- * reads as a foreign object dropped onto the picture.
+ * The third surface, and the darkest of the three. The bar over the
+ * hero sits on black footage, not on a section colour, and the hero is
+ * meant to read BLACK with blue as a hint rather than as a coequal
+ * tone.
  *
- * So it takes the brand navy itself: --azee-navy verbatim, not a
- * hand-tuned near-black. That token is already dark (12 24 66 — a
- * luminance under 4%), so the bar stays firmly opaque and every label
- * on it keeps its contrast; it simply belongs to the same picture.
+ * It used to take --azee-navy verbatim, which made the bar the single
+ * most saturated blue object on the first screen — the blue announced
+ * itself before the footage did. It is now a blue-black: the navy's
+ * own hue pulled almost all the way down to black, so the bar reads as
+ * part of the dark rather than as a navy capsule laid over it.
  *
- * Blue here is the site's REAL identity, not a decoration: the same
- * --azee-blue that lights the globe, the snapshot's backlight and the
- * hero's glass panels. The rim and glow below echo that light rather
- * than inventing a new colour.
- *
- * It transitions to and from the ink default through the shared
- * .nav-glass transition, so scrolling out of the hero is a fade
- * between two dark surfaces, not a swap.
+ * The blue survives where blue belongs — in the LIGHT. The rim and the
+ * inset highlight carry --azee-blue, the same blue rim-lighting the
+ * globe behind it, so the hint comes from the way the bar catches the
+ * scene's light rather than from the colour of its body. That is also
+ * what keeps it distinct from the navy sections below, which use the
+ * full token as their ground.
  */
 .nav-glass[data-nav-theme="hero"] {
-  background: rgb(var(--azee-navy));
-  border-color: rgb(var(--azee-blue) / 0.3);
+  background: rgb(7 10 22);
+  border-color: rgb(var(--azee-blue) / 0.32);
   box-shadow:
-    inset 0 1px 0 rgb(var(--azee-blue) / 0.18),
-    0 6px 28px rgba(0, 0, 0, 0.45);
+    inset 0 1px 0 rgb(var(--azee-blue) / 0.2),
+    0 6px 28px rgba(0, 0, 0, 0.55);
 }
 
 .nav-glass[data-nav-theme="hero"].nav-glass-scrolled {
