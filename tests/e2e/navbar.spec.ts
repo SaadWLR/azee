@@ -23,7 +23,7 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
   // On /market-watch the trigger wears the active underline.
-  await expect(trigger).toHaveClass(/after:w-6/);
+  await expect(trigger).toHaveClass(/is-active/);
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
@@ -88,7 +88,7 @@ test("dropdown link navigates, closes the menu, and highlights Tools on the new 
   await page.getByRole("menuitem", { name: "Economic Dashboard" }).click();
 
   await expect(page).toHaveURL(/\/economic-dashboard$/);
-  await expect(trigger).toHaveClass(/after:w-6/); // Tools active on that route
+  await expect(trigger).toHaveClass(/is-active/); // Tools active on that route
   await expect(trigger).toHaveAttribute("aria-expanded", "false"); // closed after nav
 });
 
@@ -103,7 +103,7 @@ test("scroll-spy still activates section anchors on the homepage (unaffected by 
   );
   // The Research top-level anchor should light up (its underline grows).
   await expect(page.locator('header nav a[href="#research"]')).toHaveClass(
-    /after:w-6/,
+    /is-active/,
     { timeout: 10_000 },
   );
 });

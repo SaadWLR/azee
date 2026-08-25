@@ -168,7 +168,11 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
   const underline =
     "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500";
   const triggerState = active
-    ? "text-white after:w-7"
+    ? // `is-active` is the semantic marker the link treatment already
+      // uses, and index.css styles it for BUTTONS too — the trigger
+      // simply never set it, so on the light theme an active Tools
+      // trigger missed the full-contrast colour its own rule defines.
+      "is-active text-white after:w-7"
     : open
       ? "text-white after:w-0"
       : "text-gray-300 after:w-0";
