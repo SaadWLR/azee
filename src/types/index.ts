@@ -4,6 +4,7 @@ export type {
   MarketIndexQuote,
   MarketIndicesResponse,
   MarketSnapshot,
+  MarketBreadth,
   MarketStat,
   MarketStatus,
   MarketWatchResponse,
@@ -27,3 +28,8 @@ export type {
 export type { CompanyInfo, RegulatoryInfo } from "./company";
 export type { NewsFeedItem, NewsFeedResponse } from "./news";
 export type { CorporateMeeting, MeetingCalendarResponse } from "./calendar";
+export type {
+  MarketPulseResponse,
+  SentimentSignal,
+  SentimentZone,
+} from "./sentiment";

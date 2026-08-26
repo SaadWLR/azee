@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   MarketStat,
+  MarketBreadth,
   MarketWatchResponse,
   StockQuote,
 } from "../../src/types";
@@ -307,9 +308,45 @@ async function fetchMarketWatch(): Promise<MarketWatchResponse> {
     { label: "Symbols Traded", value: String(quotes.length) },
   ];
 
+  /*
+   * The same breadth, as NUMBERS.
+   *
+   * Additive on purpose: `stats` above is unchanged, down to the
+   * counts, because several consumers render those strings verbatim.
+   * This block re-exposes the identical advancer/decliner figures in a
+   * form that can be computed with, so the sentiment layer never has
+   * to parse "291" back out of our own display copy.
+   *
+   * `unchanged` is derived by subtraction rather than filtered
+   * separately, so the three counts are guaranteed to sum to the
+   * symbols-traded figure the stats array already publishes — they can
+   * never disagree with each other.
+   *
+   * THE VOLUME SUMS APPLY A LIQUIDITY FILTER; the counts do not. PSX's
+   * table carries a price change for symbols that did not actually
+   * trade (the change is read against LDCP), so a zero-volume symbol
+   * is a real directional data point but carries no conviction. It
+   * counts as an advancer or decliner and contributes nothing to the
+   * volume weighting. Everything here is summed from the parsed rows —
+   * no second fetch, no new upstream.
+   */
+  const traded = quotes.filter((q) => (q.volume ?? 0) > 0);
+  const breadth: MarketBreadth = {
+    advancers,
+    decliners,
+    unchanged: quotes.length - advancers - decliners,
+    advancingVolume: traded
+      .filter((q) => q.changePercent > 0)
+      .reduce((sum, q) => sum + (q.volume ?? 0), 0),
+    decliningVolume: traded
+      .filter((q) => q.changePercent < 0)
+      .reduce((sum, q) => sum + (q.volume ?? 0), 0),
+  };
+
   return {
     quotes,
     stats,
+    breadth,
     asOf: new Date().toISOString(),
     source: "psx",
   };

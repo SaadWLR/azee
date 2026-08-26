@@ -53,9 +53,43 @@ export interface MarketStat {
 }
 
 /** Full market-watch payload: per-symbol quotes plus session stats. */
+/**
+ * Raw session breadth, in NUMBERS rather than the display strings the
+ * `stats` array carries.
+ *
+ * `stats` exists to be printed; this exists to be computed with. They
+ * are deliberately separate: the stats entries are pre-formatted
+ * ("948.7M shares", "291") and several consumers render them verbatim,
+ * so deriving arithmetic from them would mean parsing our own display
+ * layer back into numbers.
+ *
+ * advancers/decliners/unchanged count EVERY quoted symbol. The two
+ * volume sums do not: a symbol showing a price change on zero trades
+ * contributes nothing to a volume-weighted read, so it is excluded
+ * there and counted here. That asymmetry is the point — the counts say
+ * how many moved, the volumes say how much conviction was behind it.
+ */
+export interface MarketBreadth {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  /** Sum of volume across advancing symbols (zero-volume excluded). */
+  advancingVolume: number;
+  /** Sum of volume across declining symbols (zero-volume excluded). */
+  decliningVolume: number;
+}
+
 export interface MarketWatchResponse {
   quotes: StockQuote[];
   stats: MarketStat[];
+  /*
+   * OPTIONAL, and it has to stay optional. The handler keeps a warm
+   * in-memory lastGood payload and the edge cache holds up to 30
+   * minutes outside session hours, so for a while after any deploy
+   * this field genuinely arrives undefined on real requests. Consumers
+   * must treat its absence as "not known yet", never as zero.
+   */
+  breadth?: MarketBreadth;
   /** ISO time of the underlying PSX fetch. */
   asOf: string;
   /** Where the payload came from. */
