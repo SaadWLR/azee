@@ -2,6 +2,7 @@ import { type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { AnimatedHeading } from "./AnimatedHeading";
 import { FadeIn } from "./FadeIn";
+import { MarketPulseGauge } from "./MarketPulseGauge";
 import { MarketSnapshot } from "./MarketSnapshot";
 import { TickerTape } from "./TickerTape";
 import { TrustBadges } from "./TrustBadges";
@@ -36,9 +37,11 @@ export function Hero() {
   /*
    * The hero is a flex column in normal document flow: a spacer the
    * exact height of the fixed navbar, the ticker, then the content
-   * row centered in the remaining space (my-auto). min-h-screen fills
-   * the first viewport but never locks it — taller content simply
-   * extends the page and scrolls.
+   * stack centered in the remaining space. That stack is the
+   * headline/snapshot row followed by the Market Pulse band, centred
+   * together (justify-center on the stack) rather than the row
+   * centring itself. min-h-screen fills the first viewport but never
+   * locks it — taller content simply extends the page and scrolls.
    */
   return (
     <section
@@ -118,8 +121,8 @@ export function Hero() {
         <TickerTape />
       </div>
 
-      <div className="relative z-10 flex w-full flex-1 px-4 py-12 sm:px-6 sm:py-16 lg:px-12 lg:py-20">
-        <div className="mx-auto my-auto flex w-full max-w-7xl flex-col items-start justify-between gap-10 lg:gap-12 xl:flex-row">
+      <div className="relative z-10 flex w-full flex-1 flex-col justify-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:gap-14 lg:px-12 lg:py-20">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-start justify-between gap-10 lg:gap-12 xl:flex-row">
           <div className="w-full max-w-3xl lg:max-w-4xl">
             <AnimatedHeading
               lines={["Market intelligence.", "Real-time execution."]}
@@ -187,6 +190,24 @@ export function Hero() {
               <MarketSnapshot />
             </div>
           </div>
+        </div>
+
+        {/*
+         * Market Pulse closes the hero's live-market zone: same
+         * #markets anchor, same market-watch feed at the same cadence
+         * as the snapshot above it.
+         *
+         * A full-width band rather than a third item in the snapshot's
+         * column. Stacked there it inherited that column's width and
+         * the two panels disagreed badly — 380px of snapshot above
+         * 830px of gauge — while the hero's left half sat empty
+         * beneath the headline. Across the full measure it uses the
+         * room the row leaves behind, and the dial and its eight
+         * signals sit side by side instead of running 600px down the
+         * page.
+         */}
+        <div className="mx-auto w-full max-w-7xl">
+          <MarketPulseGauge />
         </div>
       </div>
     </section>
