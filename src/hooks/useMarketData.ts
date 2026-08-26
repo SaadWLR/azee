@@ -7,9 +7,12 @@ import {
   getGlobalFutures,
   getMarketIndices,
   getMarketSnapshot,
+  getMarketWatch,
   getMarketWatchStats,
   getTickerQuotes,
 } from "../services/marketService";
+import { buildMarketPulse } from "../services/sentimentService";
+import type { MarketPulseResponse } from "../types/sentiment";
 import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
@@ -128,6 +131,29 @@ export function useTickerQuotes() {
    * revalidated edge entry without ever defeating the cache.
    */
   return useAsyncData(getTickerQuotes, { intervalMs: 75_000 });
+}
+
+/*
+ * Market Pulse composes rather than fetches: the fetch is the same
+ * /api/market/watch call the hooks around it already make, and the
+ * scoring is pure logic in sentimentService. Declared at module scope
+ * so its identity is stable — useAsyncData reruns its whole cycle when
+ * the fetcher changes, so an inline arrow here would refetch on every
+ * render.
+ */
+const fetchMarketPulse = async (): Promise<MarketPulseResponse> =>
+  buildMarketPulse(await getMarketWatch());
+
+/**
+ * The homepage sentiment gauge.
+ *
+ * Same 75s cadence and same endpoint as useTickerQuotes and
+ * useAllMarketQuotes — not a new polling pattern and not a new
+ * request: apiGet's dedup window collapses concurrent same-URL GETs,
+ * so this rides the watch feed the hero is already pulling.
+ */
+export function useMarketPulse() {
+  return useAsyncData(fetchMarketPulse, { intervalMs: 75_000 });
 }
 
 export function useAllMarketQuotes() {

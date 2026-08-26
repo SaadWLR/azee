@@ -1,6 +1,7 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type { ForexResponse } from "../types/forex";
 import type {
+  MarketBreadth,
   EtfQuote,
   EtfsResponse,
   FullIndexQuote,
@@ -85,6 +86,28 @@ const WATCH_STATS: MarketStat[] = [
   { label: "Decliners", value: "170", direction: "down" },
   { label: "Symbols Traded", value: "494" },
 ];
+
+/**
+ * Development fixture for the raw breadth numbers.
+ *
+ * The counts are the real Jul 10, 2026 session and agree with
+ * WATCH_STATS above by construction: 291 + 170 + 33 unchanged = the
+ * 494 symbols that array reports.
+ *
+ * The two volume figures are ILLUSTRATIVE. PSX publishes a session
+ * total, not an advancing/declining split, so there is no real number
+ * to copy for those — they are a plausible split under that session's
+ * 948.7M total, chosen so the gauge has something to point at while
+ * developing. Same convention as MARKET_WATCH_FULL below, and it never
+ * ships: production computes both sums from the live quote table.
+ */
+const WATCH_BREADTH: MarketBreadth = {
+  advancers: 291,
+  decliners: 170,
+  unchanged: 33,
+  advancingVolume: 612_400_000,
+  decliningVolume: 284_900_000,
+};
 
 /** Liquid PSX main-board symbols for the ticker tape. */
 const TICKER_QUOTES: StockQuote[] = [
@@ -451,6 +474,32 @@ export async function getMarketWatchStats(): Promise<MarketStat[]> {
  * and stats' requests within a page load and shares the endpoint's
  * edge cache.
  */
+/**
+ * The WHOLE market-watch payload, for consumers that need more than
+ * one of its fields — today the Market Pulse gauge, which reads
+ * `breadth` plus the freshness metadata (`asOf`/`source`/`stale`).
+ *
+ * Not a new fetch cadence and not a new endpoint: the same
+ * /api/market/watch URL the stats, ticker and quotes callers already
+ * use, so apiGet's dedup layer collapses it into their request rather
+ * than adding one.
+ */
+export async function getMarketWatch(): Promise<MarketWatchResponse> {
+  if (import.meta.env.DEV) {
+    // Vercel serverless routes don't run under `vite dev`; the fixture
+    // keeps local development working. Deployed builds always fetch
+    // live market-watch data from the API route.
+    return mockResponse({
+      quotes: MARKET_WATCH_FULL,
+      stats: WATCH_STATS,
+      breadth: WATCH_BREADTH,
+      asOf: new Date().toISOString(),
+      source: "psx" as const,
+    });
+  }
+  return apiGet<MarketWatchResponse>("/api/market/watch");
+}
+
 export async function getAllMarketQuotes(): Promise<StockQuote[]> {
   if (import.meta.env.DEV) {
     // Vercel serverless routes don't run under `vite dev`; the fixture
