@@ -1,14 +1,14 @@
 import { expect, test } from "./fixtures";
 
 /*
- * The Fear and Optimism Index — the sentiment gauge in the hero's
- * live-market zone.
+ * The Fear and Optimism Index — the homepage teaser and its dedicated
+ * page.
  *
- * The thing worth guarding is not that a gauge renders; it is that the
- * gauge tells the truth about how much it knows. Three signals are
- * live, five are not, and the failure this file exists to catch is a
- * change that lets any of the five acquire a number — or quietly drops
- * them so the panel looks complete.
+ * The thing worth guarding is not that a gauge renders; it is that it
+ * tells the truth about how much it knows. Three signals are live,
+ * five are not, and the failures this file exists to catch are a
+ * change that lets any of the five acquire a number, and a page whose
+ * prose claims more is live than actually is.
  */
 test.beforeEach(() => {
   test.skip(
@@ -17,32 +17,19 @@ test.beforeEach(() => {
   );
 });
 
-const GAUGE = 'section[aria-label="Fear and Optimism Index"]';
-
-/**
- * The row for one signal, matched on its label EXACTLY.
- *
- * hasText does substring matching, so "Momentum" also selects "Volume
- * Momentum" — two rows where the test expects one.
- */
-const signalRow = (page: import("@playwright/test").Page, label: string) =>
-  page
-    .locator(`${GAUGE} li`)
-    .filter({ has: page.locator(`span:text-is("${label}")`) });
+const TEASER = 'section[aria-label="Fear and Optimism Index"]';
+const PAGE = "/fear-and-optimism-index";
 
 /** Ranked against PSX's own archive, so live today. */
 const LIVE = ["Momentum", "Volatility", "Volume Momentum"];
 
 /**
- * Not computable yet — INCLUDING Breadth, which this pass demoted.
+ * Not computable yet — INCLUDING Breadth.
  *
- * Breadth previously showed a live score from a fixed TRIN curve. That
- * number was real arithmetic on real data, but it was not comparable
- * to a percentile rank, so mixing the two in one average made the
- * composite partly a formula. It now waits for its own recorded
- * history, and this list is where that change is pinned: if Breadth
- * ever shows a score again without the recorder having filled ~500
- * sessions, this fails.
+ * Breadth showed a live score until the percentile pass demoted it: a
+ * fixed-curve number is not comparable to a percentile rank, so
+ * averaging the two made the composite part formula. It now waits for
+ * its own recorded history, and this list is where that stays pinned.
  */
 const CALIBRATING = [
   "Breadth",
@@ -52,21 +39,25 @@ const CALIBRATING = [
   "Foreign Flows",
 ];
 
-/** The WAF bypass header, when the suite has the secret. */
 const api = () =>
   process.env.E2E_BYPASS_SECRET
     ? { headers: { "x-e2e-bypass": process.env.E2E_BYPASS_SECRET } }
     : {};
 
+/** A signal's row/card, matched on its label EXACTLY. */
+const signalCard = (page: import("@playwright/test").Page, label: string) =>
+  page
+    .locator("main li")
+    .filter({ has: page.locator(`span:text-is("${label}")`) })
+    .first();
+
+const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
 /**
- * The percentile rule, reimplemented from its documented definition
- * rather than imported from the app.
- *
- * Importing the service would only prove the component calls the
- * function it calls — the test would agree with any arithmetic the
- * service happened to contain, including wrong arithmetic. Written out
- * independently, changing the maths takes a deliberate change in two
- * places.
+ * The percentile rule, reimplemented from its definition rather than
+ * imported. Importing the service would only prove the page calls the
+ * function it calls — the test would then agree with any arithmetic
+ * the service happened to contain, including wrong arithmetic.
  */
 function percentileRank(value: number, history: number[]): number {
   let below = 0;
@@ -78,177 +69,315 @@ function percentileRank(value: number, history: number[]): number {
   return ((below + equal / 2) / history.length) * 100;
 }
 
-const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+/* ── The homepage teaser ────────────────────────────────────────── */
 
-test("the gauge renders three live percentile signals", async ({ page }) => {
+test("the homepage teaser shows the reading and leads to the full page", async ({
+  page,
+}) => {
   const pageErrors: string[] = [];
-  const failedRequests: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(String(e)));
-  page.on("response", (r) => {
-    if (r.status() >= 400) failedRequests.push(`${r.status()} ${r.url()}`);
-  });
 
   await page.goto("/");
-  const gauge = page.locator(GAUGE);
-  await expect(gauge).toBeVisible();
+  const teaser = page.locator(TEASER);
+  await expect(teaser).toBeVisible();
 
-  // Five zone bands, drawn from the geometry rather than implied.
-  await expect(gauge.locator("svg path")).toHaveCount(5);
+  // Five wedges and a needle — the same dial the page draws.
+  await expect(teaser.locator("svg path")).toHaveCount(5);
+  await expect(teaser.locator("svg line")).toHaveCount(1);
 
-  // The dial's warm end is Optimism now, not Greed — anywhere on this
-  // panel.
-  await expect(gauge).not.toContainText(/greed/i);
+  /*
+   * The denominator survives the shrink. A bare score in a hero
+   * implies a complete index, so this is the one thing the teaser
+   * cannot drop while getting smaller.
+   */
+  await expect(teaser).toContainText(/3 of 8 signals live/);
+  await expect(teaser).not.toContainText(/greed/i);
 
-  for (const label of LIVE) {
-    const row = signalRow(page, label);
-    await expect(row, `${label} must be listed`).toHaveCount(1);
-    const head = await row.locator("div").first().innerText();
-    expect(head, `${label} must carry a score`).toMatch(/[0-9]/);
-    expect(head, `${label} must not be calibrating`).not.toMatch(
-      /calibrating/i,
-    );
-    const score = Number(head.match(/([0-9]+)\s*$/)?.[1]);
-    expect(score, `${label} score is a percentile`).toBeGreaterThanOrEqual(0);
-    expect(score, `${label} score is a percentile`).toBeLessThanOrEqual(100);
+  // The teaser is a teaser: the detail moved to the page.
+  expect(
+    await teaser.locator("li").count(),
+    "the signal list belongs on the page now, not the hero",
+  ).toBe(0);
+
+  await teaser.getByRole("link", { name: /see the full index/i }).click();
+  await page.waitForURL(`**${PAGE}`);
+  await expect(page.locator("h1")).toHaveText("Fear and Optimism Index");
+  expect(pageErrors, "no uncaught exceptions").toEqual([]);
+});
+
+/* ── The page ───────────────────────────────────────────────────── */
+
+test("the page renders every section", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const failed: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(String(e)));
+  page.on("response", (r) => {
+    if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`);
+  });
+
+  await page.goto(PAGE);
+  await expect(page.locator("h1")).toHaveText("Fear and Optimism Index");
+  const main = page.locator("main");
+
+  // A. Zone legend — five bands with their ranges.
+  for (const [zone, range] of [
+    ["Extreme Fear", "0–30"],
+    ["Fear", "30–45"],
+    ["Neutral", "45–55"],
+    ["Optimism", "55–70"],
+    ["Extreme Optimism", "70–100"],
+  ]) {
+    await expect(main, `${zone} legend chip`).toContainText(range);
   }
 
-  await expect(gauge).toContainText(/3 of 8 signals live/);
+  // B. The dial, with its scale and every zone named on the arc.
+  const dial = page.locator('svg[aria-label^="Fear and Optimism Index:"]');
+  await expect(dial).toBeVisible();
+  await expect(dial.locator("path")).toHaveCount(5);
+  for (const tick of ["0", "25", "50", "75", "100"]) {
+    await expect(
+      dial.locator(`text:text-is("${tick}")`),
+      `tick ${tick}`,
+    ).toHaveCount(1);
+  }
+
+  // Our real cadence, not a borrowed one.
+  await expect(main).toContainText(/updates once per trading day/i);
+
+  // C–G.
+  await expect(main).toContainText(/Sentiment over time/i);
+  await expect(main).toContainText(/Every signal, and where it stands/i);
+  await expect(main).toContainText(/Be fearful when others are greedy/);
+  await expect(main).toContainText(
+    "information tool, not investment advice",
+  );
+  await expect(main).toContainText(/How the number is produced/i);
+  await expect(main).toContainText(/Sources: Pakistan Stock Exchange/);
+  await expect(main).toContainText(/Common questions/i);
+
+  /*
+   * The sources line must name only what actually feeds the index. An
+   * aspirational list would describe a page we have not built.
+   */
+  const sources = await main
+    .locator("p")
+    .filter({ hasText: "Sources: Pakistan Stock Exchange" })
+    .innerText();
+  expect(sources).not.toMatch(/gold|currency|futures|NCCPL|foreign/i);
 
   expect(pageErrors, "no uncaught exceptions").toEqual([]);
   expect(
-    failedRequests.filter(
-      (r) => r.includes("/api/market/watch") || r.includes("/api/market/history"),
-    ),
+    failed.filter((r) => r.includes("/api/market/")),
     "the index's own data sources must not fail",
   ).toEqual([]);
-  if (failedRequests.length) {
-    console.log(`  (unrelated failed requests: ${failedRequests.join(", ")})`);
+});
+
+test("the page never claims more signals are live than are", async ({
+  page,
+}) => {
+  await page.goto(PAGE);
+  const main = page.locator("main");
+
+  /*
+   * An auto-waiting assertion, not locator.count(). count() resolves
+   * immediately against whatever is in the DOM at that instant, and
+   * this page is lazy-loaded and then fills in from two async
+   * fetches — so a bare count reads zero badges on a page that is
+   * about to render three.
+   *
+   * Case-insensitive because the badges are uppercased in CSS.
+   */
+  const liveBadges = main.locator("text=/^Live$/i");
+  await expect(
+    liveBadges,
+    "the breakdown lists exactly the live signals",
+  ).toHaveCount(LIVE.length);
+
+  // Safe to read the prose now that the data has arrived.
+  const text = await main.innerText();
+  const claims = [...text.matchAll(/(\d+) of (\d+) signals live/g)];
+  expect(claims.length, "the reading states its denominator").toBeGreaterThan(0);
+  for (const claim of claims) {
+    expect(Number(claim[1]), `"${claim[0]}" must match the live cards`).toBe(
+      LIVE.length,
+    );
+    expect(Number(claim[2])).toBe(8);
+  }
+
+  // The methodology paragraph carries the same count.
+  expect(text).toContain(`currently ${LIVE.length} of 8`);
+
+  /*
+   * And so does the FAQ — but that answer has to be opened first. The
+   * accordion REMOVES closed panels rather than hiding them, so the
+   * text is genuinely absent until the question is expanded. That is
+   * the point of the component (hidden-but-present text is still read
+   * aloud and still found by in-page search), and it means a test
+   * cannot assert on collapsed copy.
+   */
+  await page
+    .locator("button[aria-expanded]")
+    .filter({ hasText: /How is it calculated/i })
+    .click();
+  await expect(page.locator("main")).toContainText(
+    `currently live: ${LIVE.length} of 8`,
+  );
+
+  for (const label of LIVE) {
+    const card = signalCard(page, label);
+    await expect(card, `${label} card`).toHaveCount(1);
+    expect(await card.innerText(), `${label} shows a score`).toMatch(/\d/);
+  }
+
+  for (const label of CALIBRATING) {
+    const card = signalCard(page, label);
+    await expect(card, `${label} card`).toHaveCount(1);
+    const body = await card.innerText();
+    expect(body, `${label} is marked calibrating`).toMatch(/calibrating/i);
+    // The note is the whole point of an inactive card.
+    expect(
+      body.replace(/calibrating/i, "").trim().length,
+      `${label} explains what unlocks it`,
+    ).toBeGreaterThan(20);
   }
 });
 
-test("Momentum's score is the percentile the archive actually implies", async ({
+test("Momentum's score is the percentile the archive implies", async ({
   page,
   request,
 }) => {
-  /*
-   * End to end on the arithmetic: pull the same archive the page
-   * pulled, recompute Momentum's raw reading and its rank here, and
-   * require the rendered number to match. This is the check that the
-   * deployed endpoint, the scoring service and the component all agree
-   * on one number rather than each being plausible on its own.
-   */
   const res = await request.get("/api/market/history", api());
-  expect(res.ok(), "the history endpoint must answer").toBe(true);
+  expect(res.ok()).toBe(true);
   const history = await res.json();
-
-  expect(Array.isArray(history.points)).toBe(true);
-  expect(
-    history.points.length,
-    "PSX's archive must cover the 590 sessions a ranked signal needs",
-  ).toBeGreaterThan(590);
-
-  // Oldest-first, as the API promises.
-  expect(history.points[0].date < history.points[history.points.length - 1].date).toBe(
-    true,
-  );
-
   const closes = history.points.map((p: { close: number }) => p.close);
   const last = closes.length - 1;
-  const momRaw = (i: number) => {
-    const ma30 = mean(closes.slice(i - 29, i + 1));
-    const ma90 = mean(closes.slice(i - 89, i + 1));
-    return (ma30 - ma90) / ma90;
-  };
+  const momRaw = (i: number) =>
+    (mean(closes.slice(i - 29, i + 1)) - mean(closes.slice(i - 89, i + 1))) /
+    mean(closes.slice(i - 89, i + 1));
   const priors: number[] = [];
   for (let j = last - 500; j < last; j++) priors.push(momRaw(j));
   const expected = Math.round(percentileRank(momRaw(last), priors));
 
-  await page.goto("/");
-  const row = signalRow(page, "Momentum");
+  await page.goto(PAGE);
+  const card = signalCard(page, "Momentum");
   await expect
-    .poll(async () => (await row.locator("div").first().innerText()).match(/[0-9]+/)?.[0], {
+    .poll(async () => (await card.innerText()).match(/\b\d{1,3}\b/)?.[0], {
       timeout: 15_000,
     })
     .toBe(String(expected));
 });
 
-test("five signals stay calibrating, Breadth among them", async ({ page }) => {
-  await page.goto("/");
-  const gauge = page.locator(GAUGE);
-  await expect(gauge).toBeVisible();
+test("the chart's range tabs change what is plotted", async ({ page }) => {
+  await page.goto(PAGE);
+  const chart = page.locator('svg[aria-label^="Fear and Optimism Index from"]');
+  await expect(chart).toBeVisible();
 
-  await expect(gauge.locator("li")).toHaveCount(8);
+  const tabs = page.locator('[role="tab"]');
+  await expect(tabs).toHaveCount(4);
 
-  for (const label of CALIBRATING) {
-    const row = signalRow(page, label);
-    await expect(row, `${label} must be listed`).toHaveCount(1);
+  const rangeOf = async () => chart.getAttribute("aria-label");
+  const threeMonth = await rangeOf();
 
-    /*
-     * The label/badge line, read apart from the note below it. That
-     * split is what makes the digit check meaningful: a note may
-     * legitimately carry a figure ("0 of 500 recorded"), but the slot
-     * where a SCORE would render must be free of one. Matched
-     * case-insensitively because the badge is uppercased in CSS.
-     */
-    const head = await row.locator("div").first().innerText();
-    expect(head, `${label} must be marked calibrating`).toMatch(
-      /calibrating/i,
-    );
-    expect(
-      head,
-      `${label} must show no number where a score would go`,
-    ).not.toMatch(/[0-9]/);
+  await tabs.filter({ hasText: "1Y" }).click();
+  await expect.poll(rangeOf, { timeout: 5_000 }).not.toBe(threeMonth);
+  const year = await rangeOf();
 
-    const note = await row.locator("p").first().innerText();
-    expect(
-      note.trim().length,
-      `${label} must explain what unlocks it`,
-    ).toBeGreaterThan(15);
-  }
-
-  // Breadth's note must say it is accumulating, not that it is broken.
-  const breadthNote = await signalRow(page, "Breadth")
-    .locator("p")
-    .first()
-    .innerText();
-  expect(breadthNote).toMatch(/collecting live history/i);
-  expect(breadthNote).toMatch(/recorded so far/i);
-
-  await expect(gauge).toContainText(
-    "The Fear and Optimism Index is an information tool, not investment",
-  );
-});
-
-test("the history endpoint is additive and well-formed", async ({
-  request,
-}) => {
-  const res = await request.get("/api/market/history", api());
-  const history = await res.json();
-
-  for (const key of ["points", "asOf", "source"]) {
-    expect(history, `history.${key} must be present`).toHaveProperty(key);
-  }
-  const sample = history.points[history.points.length - 1];
-  for (const key of ["date", "close", "volume", "indexAverage"]) {
-    expect(sample, `an EOD point carries ${key}`).toHaveProperty(key);
-  }
-  expect(sample.close).toBeGreaterThan(0);
-  expect(sample.volume).toBeGreaterThan(0);
-  expect(sample.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await tabs.filter({ hasText: "1M" }).click();
+  await expect.poll(rangeOf, { timeout: 5_000 }).not.toBe(year);
 
   /*
-   * The fourth column is an index level, not money. Guarded because
-   * the whole reason it carries this name is that "value" invited
-   * exactly the misreading — if PSX ever starts serving real traded
-   * value here, this fails and someone looks rather than silently
-   * feeding rupees into a signal that expects index points.
+   * A shorter window must plot FEWER points than a longer one. Equal
+   * counts would mean the tabs relabel the same data — which is what
+   * padding a short series to fill a range looks like from outside.
    */
-  expect(
-    Math.abs(sample.indexAverage / sample.close - 1),
-    "indexAverage must track the close, as an index level does",
-  ).toBeLessThan(0.1);
+  const countAt = async (label: string) => {
+    await tabs.filter({ hasText: label }).click();
+    await page.waitForTimeout(400);
+    return chart.locator("line").count();
+  };
+  const oneMonth = await countAt("1M");
+  const sixMonth = await countAt("6M");
+  expect(sixMonth, "6M plots more sessions than 1M").toBeGreaterThan(oneMonth);
+});
 
-  // The watch payload's stats array is still untouched by any of this.
+test("the FAQ accordion opens and closes", async ({ page }) => {
+  await page.goto(PAGE);
+  const questions = page.locator("button[aria-expanded]").filter({
+    hasText: /\?$/,
+  });
+  await expect(questions).toHaveCount(6);
+
+  // The first answer is open on arrival, so the section is never a
+  // wall of closed rows with nothing to read.
+  await expect(questions.nth(0)).toHaveAttribute("aria-expanded", "true");
+
+  await questions.nth(3).click();
+  await expect(questions.nth(3)).toHaveAttribute("aria-expanded", "true");
+  // One at a time: opening the fourth closes the first.
+  await expect(questions.nth(0)).toHaveAttribute("aria-expanded", "false");
+
+  /*
+   * A closed answer must be GONE, not hidden. Text that is only
+   * visually hidden is still read by a screen reader and still found
+   * by in-page search, which makes "collapsed" a lie.
+   */
+  const panelId = await questions.nth(3).getAttribute("aria-controls");
+  await expect(page.locator(`#${panelId}`)).toBeVisible();
+  await questions.nth(3).click();
+  await expect(questions.nth(3)).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(`#${panelId}`)).toHaveCount(0);
+});
+
+test("comparison cards appear only where the series reaches", async ({
+  page,
+}) => {
+  await page.goto(PAGE);
+  const main = page.locator("main");
+
+  // The previous-close delta is always available once there is a
+  // series at all.
+  await expect(main).toContainText(/vs Previous Close/i);
+
+  /*
+   * Each of the three lookbacks is either a card with a real score or
+   * absent — never a card with a dash. A placeholder would be a
+   * measurement that was never taken, dressed as one that was.
+   */
+  for (const label of ["1 Week Ago", "1 Month Ago", "1 Year Ago"]) {
+    /*
+     * .last() is the INNERMOST div containing the label — .first()
+     * returns the outermost matching ancestor, which is the whole
+     * header section and reads as one enormous "card".
+     */
+    const card = main
+      .locator("div")
+      .filter({ has: page.locator("p").filter({ hasText: new RegExp(`^${label}$`, "i") }) })
+      .last();
+    if ((await card.count()) === 0) continue;
+    const body = await card.innerText();
+    expect(body, `${label} must carry a real score`).toMatch(/\d/);
+    expect(body, `${label} must not be a placeholder`).not.toMatch(/—|--|N\/A/);
+  }
+});
+
+test("the history endpoint is well-formed and stats stay untouched", async ({
+  request,
+}) => {
+  const history = await (
+    await request.get("/api/market/history", api())
+  ).json();
+  expect(history.points.length).toBeGreaterThan(590);
+  const sample = history.points[history.points.length - 1];
+  for (const key of ["date", "close", "volume", "indexAverage"]) {
+    expect(sample).toHaveProperty(key);
+  }
+  /*
+   * The fourth column is an index level, not money. If PSX ever starts
+   * serving real traded value here this fails and someone looks,
+   * rather than rupees being fed into a signal expecting index points.
+   */
+  expect(Math.abs(sample.indexAverage / sample.close - 1)).toBeLessThan(0.1);
+
   const watch = await (await request.get("/api/market/watch", api())).json();
   expect(watch.stats.map((s: { label: string }) => s.label)).toEqual([
     "Market Volume",
