@@ -163,6 +163,73 @@ test("cards degrade gracefully when publisher images fail to load", async ({
   expect(pageErrors).toEqual([]);
 });
 
+test("a single-story feed fills the row instead of leaving a gap", async ({
+  page,
+}) => {
+  /*
+   * A one-item feed became a REACHABLE state when the endpoint's
+   * combined floor dropped to 1 (api/news/latest.ts MIN_ITEMS): a
+   * single-publisher outage now serves the surviving publisher's
+   * headlines instead of 503ing, and on a thin day that can be one
+   * story. The lead card's span used to be a fixed 2 of 3 columns, so
+   * that state rendered a card with the last third of the row empty —
+   * the same "unfinished layout" reading the outage notice exists to
+   * prevent, arrived at from the other direction.
+   *
+   * Served from a synthetic single-item payload rather than a slice of
+   * the live feed, so the geometry under test is fixed rather than
+   * dependent on what the publishers happen to be running. The item is
+   * marked "(example)" for the same reason the dev fixture in
+   * newsService is: nothing that could be mistaken for real editorial
+   * copy belongs in this repo.
+   */
+  await page.route("**/api/news/latest*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [
+          {
+            title: "PSX benchmark index climbs in morning trade (example)",
+            link: "https://example.invalid/psx-morning",
+            source: "Business Recorder",
+            publishedAt: "2026-08-28T09:00:00.000Z",
+            summary: "Example fixture lede for a single-story feed.",
+          },
+        ],
+        asOf: "2026-08-28T09:05:00.000Z",
+        source: "live",
+      }),
+    }),
+  );
+
+  await page.goto("/");
+  const research = page.locator("#research");
+  await research.scrollIntoViewIfNeeded();
+
+  const cards = research.locator('a[target="_blank"]');
+  await expect.poll(() => cards.count()).toBe(1);
+
+  /*
+   * The lone card reaches the same right edge the grid uses when it is
+   * full — i.e. it spans the whole row rather than stopping two-thirds
+   * across. Compared against the section's own container so this holds
+   * at any viewport width.
+   */
+  const { cardRight, contentRight } = await research.evaluate((section) => {
+    const card = section.querySelector('a[target="_blank"]')!;
+    const container = section.querySelector(".max-w-7xl") as HTMLElement;
+    const style = getComputedStyle(container);
+    return {
+      cardRight: card.getBoundingClientRect().right,
+      contentRight:
+        container.getBoundingClientRect().right -
+        Number.parseFloat(style.paddingRight),
+    };
+  });
+  expect(Math.abs(cardRight - contentRight)).toBeLessThan(2);
+});
+
 test("#research says the feed is down rather than rendering an empty void", async ({
   page,
 }) => {

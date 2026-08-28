@@ -206,7 +206,22 @@ function NewsChannel() {
     <>
       <div className="mt-14 grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
         {lead && (
-          <Reveal className="lg:col-span-2">
+          /*
+           * The lead takes the whole row when nothing sits beside it.
+           * A thin feed is now a REACHABLE state rather than a
+           * theoretical one — the endpoint serves a single-publisher
+           * partial instead of 503ing (see MIN_ITEMS in
+           * api/news/latest.ts) — and at exactly one story the fixed
+           * 2-of-3 span left the last third of the row visibly empty,
+           * reading as a layout that had failed to finish. Both class
+           * strings are written out in full so Tailwind's scanner
+           * emits them.
+           */
+          <Reveal
+            className={
+              sideHeadlines.length > 0 ? "lg:col-span-2" : "lg:col-span-3"
+            }
+          >
             <a
               href={lead.link}
               target="_blank"
@@ -241,16 +256,20 @@ function NewsChannel() {
           </Reveal>
         )}
 
-        <div className="flex flex-col gap-5">
-          {sideHeadlines.map((item, i) => (
-            <HeadlineCard
-              key={item.title}
-              item={item}
-              delay={i * 100}
-              wrapperClassName="flex-1"
-            />
-          ))}
-        </div>
+        {/* Omitted entirely when empty, so it cannot contribute a
+            stray grid column beside a full-width lead. */}
+        {sideHeadlines.length > 0 && (
+          <div className="flex flex-col gap-5">
+            {sideHeadlines.map((item, i) => (
+              <HeadlineCard
+                key={item.title}
+                item={item}
+                delay={i * 100}
+                wrapperClassName="flex-1"
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {visibleGrid.length > 0 && (

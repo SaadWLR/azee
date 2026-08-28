@@ -136,11 +136,35 @@ function isForeignFocused(title: string): boolean {
 }
 
 /**
- * Floor on the COMBINED, deduplicated result. Fewer than this means
- * both feeds are down or broken (mirrors watch.ts's MIN_VALID_ROWS) —
- * fall through to lastGood/503 rather than serve a misleading stub.
+ * Floor on the COMBINED, deduplicated result: at least one real
+ * headline. Zero means every source is down, blocked or broken — fall
+ * through to lastGood/503 rather than serve an empty stub.
+ *
+ * WHY 1 AND NOT 3. A floor of 3 defeated the reason there are two
+ * publishers at all. The relevance filter is a narrow Pakistan-market
+ * gate, so a feed's raw size is not its useful yield: on Aug 28 2026
+ * Business Recorder's 30 items and The Express Tribune's 25 reduced to
+ * 5 and 2. With a floor of 3, Tribune could not clear it alone — so a
+ * Business-Recorder-only outage (the likely shape of the Aug 28 503,
+ * given BR has historically been the Edge-reachable-only source)
+ * returned 503 and blanked the section while Tribune was answering
+ * perfectly. Promise.allSettled below is written so one source failing
+ * cannot fail the endpoint; a combined floor of 3 quietly undid that.
+ *
+ * A per-source floor was considered and rejected: it reintroduces the
+ * same fragility from the other direction, since it makes each feed's
+ * filtered yield individually load-bearing on a day it happens to be
+ * thin.
+ *
+ * The downside of a low floor is now small rather than ugly. Serving 1
+ * or 2 real headlines is strictly better than blanking the section,
+ * and the genuine zero-item case — the only one that should ever go
+ * dark — has an honest empty state waiting for it in Research.tsx
+ * rather than rendering a void. Deliberately NOT mirroring watch.ts's
+ * MIN_VALID_ROWS any more: a market-watch table with two rows is a
+ * broken table, whereas two headlines is a quiet news day.
  */
-const MIN_ITEMS = 3;
+const MIN_ITEMS = 1;
 
 /** How many newest items the endpoint returns. */
 const MAX_ITEMS = 20;
@@ -350,8 +374,13 @@ async function fetchLatestNews(): Promise<NewsFeedResponse> {
   const items = dedupe(merged);
 
   if (items.length < MIN_ITEMS) {
+    /*
+     * Reached only when EVERY source yielded nothing, so this is a
+     * total failure, not a thin day: one reachable publisher with a
+     * single relevant story clears the floor and is served.
+     */
     throw new Error(
-      `Combined news yielded only ${items.length} items — all sources may be down or blocked`,
+      `Combined news yielded ${items.length} items (floor ${MIN_ITEMS}) — every source is down, blocked, or returned nothing relevant`,
     );
   }
 
