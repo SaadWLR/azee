@@ -54,12 +54,36 @@ with JSON endpoints that are publicly reachable.
 | Endpoint | Result | Content |
 | --- | --- | --- |
 | `GET /timeseries/int/KSE100` | `200`, `application/json`, 43 KB | Intraday series `[[epochSec, value, volume], …]` at ~15-second resolution; returned the live session level (181,259.67) |
-| `GET /timeseries/eod/KSE100` | `200`, `application/json`, 52 KB | Daily series `[[epochSec, close, volume, value], …]`, multi-year history |
+| `GET /timeseries/eod/KSE100` | `200`, `application/json`, 52 KB | Daily series, multi-year history. **Re-verified Aug 28 2026** — see the correction below: the envelope and the fourth column are not what this row originally recorded. |
 | `GET /market-watch` | `200`, HTML, 476 KB | Full market table for every listed symbol (LDCP, current, change, volume) — parseable server-side |
 | `GET /indices` | `200`, HTML | All PSX indices with levels and changes |
 | `GET /company/HBL` | `200`, HTML | Per-company quote, profile, and fundamentals page |
 | `GET /download/mkt_summary/2026-07-07.Z` | `200`, `application/octet-stream`, 23 KB | Official end-of-day market summary file (per-date archive) |
 | CORS preflight with `Origin` header | **No `Access-Control-Allow-Origin`** | Browser calls impossible; server proxy required |
+
+#### Correction — `timeseries/eod` shape (re-probed Aug 28 2026)
+
+Two details in the row above were wrong, and both would mislead an
+implementer:
+
+1. **It is not a bare array.** The response is
+   `{ status, message, data: [...] }`; the rows live under `data`.
+2. **The fourth column is NOT traded value.** It is an index LEVEL.
+   Measured across all 1,240 sessions returned: it correlates with the
+   *close* at **0.9998**, spans the same range the close does
+   (38,347–189,789 against 38,342–189,167), and sits within 3% of that
+   session's close on 98.2% of days — sometimes above it, sometimes
+   below. Traded value would run to billions of rupees and would track
+   volume, which it does not (correlation 0.65). PSX does not document
+   what the column is; it is carried through the adapter as
+   `indexAverage` rather than `value` so nobody reaches for it as money.
+
+So the real row shape is `[epochSeconds, close, volumeInShares,
+someIndexLevel]`, newest-first. **There is no traded-value column in
+this feed** — anything needing rupees traded has to come from
+elsewhere.
+
+Series as probed: 1,240 sessions, 2021-08-30 → 2026-08-27 (~5 years).
 
 **Assessment:**
 

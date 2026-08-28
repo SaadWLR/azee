@@ -1,176 +1,435 @@
 import type { MarketBreadth, MarketWatchResponse } from "../types";
 import type {
-  MarketPulseResponse,
+  BreadthPoint,
+  EodPoint,
+  KseHistoryResponse,
+} from "../types/history";
+import type {
+  FearOptimismResponse,
   SentimentSignal,
   SentimentZone,
 } from "../types/sentiment";
 
 /**
- * Market Pulse scoring.
+ * The Fear and Optimism Index — scoring.
  *
- * Pure functions over already-fetched data — no fetch calls, no React,
- * no formatting. Everything here is arithmetic on real PSX numbers,
+ * Pure functions over already-fetched data. No fetch calls, no React,
+ * no formatting: everything here is arithmetic on real PSX numbers,
  * which is what makes it testable and what keeps the "never fabricate"
- * rule enforceable in one place: if a signal cannot be computed, the
- * only thing this file will emit for it is `status: "calibrating"`.
+ * rule enforceable in one place. A signal that cannot be computed gets
+ * `status: "calibrating"` and nothing else.
+ *
+ * THE METHOD CHANGED IN THIS PASS, and the change is the point.
+ * Signals used to map a raw reading onto 0-100 through a fixed
+ * formula, which meant the number depended entirely on constants
+ * someone chose. They are now PERCENTILE RANKS against the same
+ * signal's own trailing history: a score of 80 means "higher than 80%
+ * of the last two years", which is a statement about this market
+ * rather than about a curve someone picked.
+ *
+ * That has a hard consequence, and it is why Breadth was demoted. A
+ * percentile needs history, and history is the one thing a live feed
+ * cannot give you retroactively. Three signals can be ranked today
+ * because PSX publishes a five-year end-of-day archive. Breadth cannot,
+ * because PSX publishes no breadth archive at all — so it is recorded
+ * daily from here and stays calibrating until enough sessions exist to
+ * rank it fairly.
  */
 
 /**
  * Zone bands, half-open upward: a score sits in the first band whose
  * upper bound it is below, and 100 lands in the top band.
  *
- * The boundaries themselves are the published Fear & Greed bands
- * (30 / 45 / 55 / 70) rather than anything derived here — the point of
- * matching them is that a reader who knows the convention reads this
- * gauge the same way.
+ * The boundaries are the published Fear & Greed thresholds so a reader
+ * who knows the convention reads this the same way. Only the warm
+ * label differs — see SentimentZone.
  */
 const ZONE_BANDS: { max: number; zone: SentimentZone }[] = [
   { max: 30, zone: "Extreme Fear" },
   { max: 45, zone: "Fear" },
   { max: 55, zone: "Neutral" },
-  { max: 70, zone: "Greed" },
-  { max: Infinity, zone: "Extreme Greed" },
+  { max: 70, zone: "Optimism" },
+  { max: Infinity, zone: "Extreme Optimism" },
 ];
 
 export function zoneForScore(score: number): SentimentZone {
   return ZONE_BANDS.find((band) => score < band.max)!.zone;
 }
 
-const clamp = (value: number, lo: number, hi: number) =>
-  Math.min(Math.max(value, lo), hi);
+/* ── The percentile engine ──────────────────────────────────────── */
+
+/**
+ * Percentile rank of `value` within `history` (0-100).
+ *
+ * Ties count as half. Counting only values strictly below would put
+ * every member of a run of identical readings at the run's start, and
+ * counting "below or equal" would put them all at its end; a market
+ * that has sat at the same reading for a month should rank in the
+ * middle of that run, not at whichever edge the comparison operator
+ * happened to choose.
+ *
+ * An empty history has no answer, and 50 would be a fabricated one, so
+ * callers must check first — this returns NaN rather than inventing a
+ * midpoint, and every caller here guards on sample size long before it
+ * gets that far.
+ */
+export function percentileRank(value: number, history: number[]): number {
+  if (history.length === 0) return NaN;
+  let below = 0;
+  let equal = 0;
+  for (const past of history) {
+    if (past < value) below++;
+    else if (past === value) equal++;
+  }
+  return ((below + equal / 2) / history.length) * 100;
+}
+
+/* ── Lookback windows, in trading sessions ──────────────────────── */
+
+const MOMENTUM_SHORT = 30;
+const MOMENTUM_LONG = 90;
+const VOL_WINDOW = 20;
+const VOL_AVG_WINDOW = 50;
+const VOLUME_SHORT = 20;
+const VOLUME_LONG = 90;
+
+/**
+ * How much of a signal's own past it is ranked against: ~500 sessions,
+ * about two years of PSX trading.
+ *
+ * Required in full rather than treated as a maximum. A percentile
+ * against forty prior readings is arithmetic, not evidence — it would
+ * produce a confident-looking number off a sample too small to mean
+ * anything, which is precisely the kind of false precision the rest of
+ * this file exists to avoid. Better to stay calibrating until the
+ * window is genuinely there.
+ */
+const RANK_WINDOW = 500;
+
+const mean = (xs: number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;
+
+/**
+ * Rank `series[i]` against the RANK_WINDOW readings immediately before
+ * it, or undefined if that many do not exist.
+ *
+ * Strictly prior: today is ranked against its history, never against
+ * itself, so a reading cannot nudge its own percentile.
+ */
+function rankAt(series: (number | undefined)[], i: number): number | undefined {
+  const start = i - RANK_WINDOW;
+  if (start < 0) return undefined;
+  const history: number[] = [];
+  for (let j = start; j < i; j++) {
+    const raw = series[j];
+    if (raw !== undefined) history.push(raw);
+  }
+  if (history.length < RANK_WINDOW) return undefined;
+  const today = series[i];
+  if (today === undefined) return undefined;
+  return percentileRank(today, history);
+}
+
+/* ── Raw signal series ──────────────────────────────────────────── */
+
+/*
+ * Each returns an array aligned index-for-index with `points`, holding
+ * that session's RAW reading or undefined where the lookback does not
+ * reach. Computing the whole series once is what lets today's live
+ * score and the multi-year historical reconstruction share exactly one
+ * implementation — the number on the gauge is produced by the same
+ * code that produced the number a year ago.
+ *
+ * `points` must be oldest-first; the API sorts it that way.
+ */
+
+/** 30-session close trend against the 90-session trend, scaled by it. */
+function momentumRawSeries(points: EodPoint[]): (number | undefined)[] {
+  const out: (number | undefined)[] = new Array(points.length).fill(undefined);
+  for (let i = MOMENTUM_LONG - 1; i < points.length; i++) {
+    const short = mean(
+      points.slice(i - MOMENTUM_SHORT + 1, i + 1).map((p) => p.close),
+    );
+    const long = mean(
+      points.slice(i - MOMENTUM_LONG + 1, i + 1).map((p) => p.close),
+    );
+    if (long <= 0) continue;
+    out[i] = (short - long) / long;
+  }
+  return out;
+}
+
+/** 20-session realized volatility against its own 50-session average. */
+function volatilityRawSeries(points: EodPoint[]): (number | undefined)[] {
+  const n = points.length;
+  // Daily returns; index t is the return INTO session t, so [0] is
+  // undefined by construction.
+  const returns: (number | undefined)[] = new Array(n).fill(undefined);
+  for (let t = 1; t < n; t++) {
+    const prev = points[t - 1].close;
+    if (prev > 0) returns[t] = points[t].close / prev - 1;
+  }
+
+  // Rolling standard deviation of those returns.
+  const vol: (number | undefined)[] = new Array(n).fill(undefined);
+  for (let t = VOL_WINDOW; t < n; t++) {
+    const window: number[] = [];
+    for (let j = t - VOL_WINDOW + 1; j <= t; j++) {
+      const r = returns[j];
+      if (r !== undefined) window.push(r);
+    }
+    if (window.length < VOL_WINDOW) continue;
+    const m = mean(window);
+    vol[t] = Math.sqrt(mean(window.map((r) => (r - m) ** 2)));
+  }
+
+  // Current volatility relative to its own recent norm. The ratio, not
+  // the level, is what says "unusually turbulent for this market".
+  const out: (number | undefined)[] = new Array(n).fill(undefined);
+  for (let i = VOL_WINDOW + VOL_AVG_WINDOW - 1; i < n; i++) {
+    const window: number[] = [];
+    for (let j = i - VOL_AVG_WINDOW + 1; j <= i; j++) {
+      const v = vol[j];
+      if (v !== undefined) window.push(v);
+    }
+    if (window.length < VOL_AVG_WINDOW) continue;
+    const avg = mean(window);
+    const today = vol[i];
+    if (today === undefined || avg <= 0) continue;
+    out[i] = today / avg;
+  }
+  return out;
+}
+
+/**
+ * 20-session average volume against the 90-session average, SIGNED by
+ * the direction price moved over the same stretch.
+ *
+ * Volume on its own has no mood. A surge is panic or euphoria
+ * depending entirely on which way the market went while it happened,
+ * so an unsigned volume ratio would score a crash and a rally
+ * identically. Multiplying by the direction of the 20-session price
+ * change is what turns "a lot of trading" into "a lot of buying" or "a
+ * lot of selling".
+ *
+ * Uses SHARE VOLUME, not traded value. PSX's end-of-day archive
+ * carries volume in shares and does not publish a traded-value column
+ * at all — see EodPoint.indexAverage for what the fourth field turned
+ * out to be. Shares are the quantity this signal is named for anyway.
+ */
+function volumeRawSeries(points: EodPoint[]): (number | undefined)[] {
+  const out: (number | undefined)[] = new Array(points.length).fill(undefined);
+  for (let i = VOLUME_LONG - 1; i < points.length; i++) {
+    const short = mean(
+      points.slice(i - VOLUME_SHORT + 1, i + 1).map((p) => p.volume),
+    );
+    const long = mean(
+      points.slice(i - VOLUME_LONG + 1, i + 1).map((p) => p.volume),
+    );
+    if (long <= 0) continue;
+    const direction = Math.sign(points[i].close - points[i - VOLUME_SHORT].close);
+    out[i] = (short / long - 1) * direction;
+  }
+  return out;
+}
+
+/* ── The signals ────────────────────────────────────────────────── */
+
+interface SignalSpec {
+  key: string;
+  label: string;
+  description: string;
+  /** Sessions of raw lookback the formula itself needs. */
+  lookback: number;
+  series: (points: EodPoint[]) => (number | undefined)[];
+  /** True when a HIGH raw reading means fear rather than optimism. */
+  inverted?: boolean;
+}
+
+const MOMENTUM: SignalSpec = {
+  key: "momentum",
+  label: "Momentum",
+  description: "KSE-100's 30-session trend against its 90-session trend",
+  lookback: MOMENTUM_LONG,
+  series: momentumRawSeries,
+};
+
+const VOLATILITY: SignalSpec = {
+  key: "volatility",
+  label: "Volatility",
+  description: "Recent daily swings against their own longer-run average",
+  lookback: VOL_WINDOW + VOL_AVG_WINDOW,
+  series: volatilityRawSeries,
+  // A market swinging harder than usual is a frightened one, so the
+  // rank is flipped: high volatility ranks toward fear.
+  inverted: true,
+};
+
+const VOLUME_MOMENTUM: SignalSpec = {
+  key: "volumeMomentum",
+  label: "Volume Momentum",
+  description: "Recent traded volume against its longer-run average, signed by price direction",
+  lookback: VOLUME_LONG,
+  series: volumeRawSeries,
+};
+
+/** Sessions needed before a spec can produce its first ranked score. */
+const requiredPoints = (spec: SignalSpec) => spec.lookback + RANK_WINDOW;
+
+function signalFrom(spec: SignalSpec, points: EodPoint[]): SentimentSignal {
+  const base = { key: spec.key, label: spec.label, description: spec.description };
+
+  /*
+   * Defensive rather than expected: PSX's archive currently runs to
+   * ~1,240 sessions, comfortably past the ~590 this needs. It matters
+   * anyway — an archive that came back short would otherwise rank
+   * against whatever it had and present the result with the same
+   * confidence as a full window.
+   */
+  if (points.length < requiredPoints(spec)) {
+    return {
+      ...base,
+      status: "calibrating",
+      calibratingNote: `Needs ~${requiredPoints(spec)} sessions of KSE-100 history to rank against; the archive currently returns ${points.length}`,
+    };
+  }
+
+  const raw = spec.series(points);
+  const rank = rankAt(raw, points.length - 1);
+  if (rank === undefined || !Number.isFinite(rank)) {
+    return {
+      ...base,
+      status: "calibrating",
+      calibratingNote:
+        "The latest session could not be ranked against its own history",
+    };
+  }
+
+  return {
+    ...base,
+    status: "live",
+    score: Math.round(spec.inverted ? 100 - rank : rank),
+  };
+}
+
+export function computeMomentumSignal(points: EodPoint[]): SentimentSignal {
+  return signalFrom(MOMENTUM, points);
+}
+
+export function computeVolatilitySignal(points: EodPoint[]): SentimentSignal {
+  return signalFrom(VOLATILITY, points);
+}
+
+export function computeVolumeMomentumSignal(
+  points: EodPoint[],
+): SentimentSignal {
+  return signalFrom(VOLUME_MOMENTUM, points);
+}
+
+/* ── Breadth ────────────────────────────────────────────────────── */
 
 const BREADTH_DESCRIPTION =
   "Advancing vs declining stocks, weighted by the volume behind each side";
 
 /**
- * The one live signal: an Arms Index (TRIN) read of session breadth.
+ * One session's Arms Index (TRIN), or null when the session cannot
+ * produce one.
  *
  *   TRIN = (advancers / decliners) / (advancingVolume / decliningVolume)
  *
  * The ratio-of-ratios is what makes this worth computing rather than
- * just counting winners. A day where advancers outnumber decliners two
- * to one sounds bullish, but if the declining side carried most of the
- * volume, the buying was spread thin across small names while the
- * selling was concentrated in large ones. TRIN catches that; a raw
- * advance/decline line does not.
+ * counting winners: a day where advancers outnumber decliners two to
+ * one looks bullish until you notice the declining side carried most
+ * of the volume, meaning the buying was spread thin across small names
+ * while the selling was concentrated in large ones.
  *
- *   TRIN < 1 → volume is concentrated on the advancing side → greed
- *   TRIN > 1 → volume is concentrated on the declining side → fear
+ * Every divide-by-zero is answered BEFORE the division, so none can
+ * reach a caller as NaN or Infinity. The one-sided cases return the
+ * extreme they actually represent; the two no-data cases return null,
+ * because an absence of readings is not a neutral market and must not
+ * be recorded as one.
  *
- * MAPPING TO 0-100. TRIN is a ratio, so it is treated geometrically:
- *
- *   score = 50 − 25 · log2(TRIN)
- *
- * A log map is the honest choice for a ratio — TRIN 2 and TRIN 0.5 are
- * the same distance from neutral in opposite directions, and only a
- * log makes them land symmetrically (25 and 75). A linear map would
- * squash every bullish reading into the narrow 0-1 half of the range.
- *
- * The 25 is a deliberate calibration, not a derived constant: it puts
- * TRIN 2.0 at 25 and TRIN 0.5 at 75, so the conventional "strongly
- * oversold / strongly overbought" thresholds land inside the Extreme
- * bands rather than somewhere arbitrary. Saturation is at TRIN 4 and
- * TRIN 0.25.
+ * This logic is unchanged from when it drove a live score directly —
+ * it simply feeds the recorder and the percentile path now instead of
+ * a fixed formula.
  */
-export function computeBreadthSignal(breadth: MarketBreadth): SentimentSignal {
+export function computeTrin(breadth: MarketBreadth): number | null {
   const { advancers, decliners, advancingVolume, decliningVolume } = breadth;
 
+  if (advancers + decliners === 0) return null;
+  if (advancingVolume + decliningVolume === 0) return null;
+
+  // Maximal one-sidedness. TRIN's own scale is unbounded below and
+  // above, so these use finite sentinels well outside any real
+  // session's range rather than 0 and Infinity.
+  if (decliners === 0 || decliningVolume === 0) return 0.01;
+  if (advancers === 0 || advancingVolume === 0) return 100;
+
+  return advancers / decliners / (advancingVolume / decliningVolume);
+}
+
+/**
+ * Breadth's slot.
+ *
+ * DEMOTED IN THIS PASS, deliberately and visibly. It previously showed
+ * a live score from a fixed TRIN-to-100 curve. That number was real
+ * arithmetic on real data, but it was not comparable to the other
+ * signals: theirs say "higher than N% of the last two years", and a
+ * fixed curve says "wherever a constant someone chose puts it". Mixing
+ * the two in one average would have made the composite partly a
+ * percentile and partly a formula.
+ *
+ * So it waits, exactly as Foreign Flows does — the difference being
+ * that this one has a recorder running, and graduates on its own the
+ * moment the history is deep enough. Nothing needs to be deployed for
+ * that to happen.
+ *
+ * A LOW TRIN IS OPTIMISM, so the rank is inverted.
+ */
+export function computeBreadthSignal(
+  breadth?: MarketBreadth,
+  trinHistory?: BreadthPoint[],
+): SentimentSignal {
   const base = {
     key: "breadth",
     label: "Breadth",
     description: BREADTH_DESCRIPTION,
   };
 
-  /*
-   * No directional movement at all in the feed. This is not a neutral
-   * market — it is an absence of data, and the two must not render the
-   * same. Returning 50 here would be inventing a reading.
-   */
-  if (advancers + decliners === 0) {
-    return {
-      ...base,
-      status: "calibrating",
-      calibratingNote:
-        "No advancing or declining symbols in the current feed — waiting on the next session",
-    };
+  const history = trinHistory ?? [];
+  const today = breadth ? computeTrin(breadth) : null;
+
+  if (today !== null && history.length >= RANK_WINDOW) {
+    const window = history.slice(-RANK_WINDOW).map((p) => p.trin);
+    const rank = percentileRank(today, window);
+    if (Number.isFinite(rank)) {
+      return { ...base, status: "live", score: Math.round(100 - rank) };
+    }
   }
 
-  /*
-   * Directional counts exist but nothing traded, so the volume half of
-   * the ratio is undefined. Falling back to the raw advance/decline
-   * line would silently show a DIFFERENT measure under the same label,
-   * so it calibrates instead.
-   */
-  if (advancingVolume + decliningVolume === 0) {
-    return {
-      ...base,
-      status: "calibrating",
-      calibratingNote:
-        "No traded volume in the current feed — breadth needs volume to weight",
-    };
-  }
-
-  /*
-   * The one-sided cases, handled before the division rather than after
-   * it: each is a real, maximal reading, and each would otherwise
-   * arrive as Infinity or NaN. No decliners at all — or no volume on
-   * the declining side — is as one-sided as breadth gets.
-   */
-  if (decliners === 0 || decliningVolume === 0) return { ...base, status: "live", score: 100 };
-  if (advancers === 0 || advancingVolume === 0) return { ...base, status: "live", score: 0 };
-
-  const trin =
-    advancers / decliners / (advancingVolume / decliningVolume);
-  const score = clamp(50 - 25 * Math.log2(trin), 0, 100);
-
-  return { ...base, status: "live", score: Math.round(score) };
+  return {
+    ...base,
+    status: "calibrating",
+    calibratingNote: `Collecting live history — will join the composite once it has enough sessions to be ranked fairly (same treatment as Foreign Flows). ${history.length} of ${RANK_WINDOW} recorded so far`,
+  };
 }
 
-/**
- * The seven signals the finished index needs and this phase cannot
- * compute.
- *
- * They ship visible and named rather than hidden, because a gauge
- * showing one signal out of one reads as complete when it is not. Each
- * note says what would actually unlock it, so the list doubles as the
- * roadmap — and none of them can accidentally acquire a number, since
- * `score` is simply never set here.
- */
-const CALIBRATING: SentimentSignal[] = [
-  {
-    key: "momentum",
-    label: "Momentum",
-    description: "KSE-100's short-term trend vs its longer-term trend",
-    status: "calibrating",
-    calibratingNote: "Needs ~90 sessions of price history — pending Phase 2",
-  },
-  {
-    key: "volatility",
-    label: "Volatility",
-    description: "Recent daily swings vs their own longer-run average",
-    status: "calibrating",
-    calibratingNote: "Needs ~50 sessions of price history — pending Phase 2",
-  },
+/* ── The signals that are still blocked ─────────────────────────── */
+
+const BLOCKED: SentimentSignal[] = [
   {
     key: "priceStrength",
     label: "Price Strength",
     description: "Share of stocks near 52-week highs vs near lows",
     status: "calibrating",
-    calibratingNote: "Needs 52-week price history — pending Phase 2",
-  },
-  {
-    key: "volumeMomentum",
-    label: "Volume Momentum",
-    description: "Recent trading volume vs its longer-run average",
-    status: "calibrating",
-    calibratingNote: "Needs ~90 sessions of volume history — pending Phase 2",
+    calibratingNote:
+      "Needs per-symbol 52-week ranges; PSX publishes no such archive",
   },
   {
     key: "safeHaven",
     label: "Safe Haven Demand",
     description: "Gold and USD demand relative to the KSE-100",
     status: "calibrating",
-    calibratingNote: "Needs a 2-week price baseline — pending Phase 2",
+    calibratingNote: "Needs a 2-week price baseline — not yet recorded",
   },
   {
     key: "derivatives",
@@ -184,65 +443,188 @@ const CALIBRATING: SentimentSignal[] = [
     label: "Foreign Flows",
     description: "Net foreign investor buying vs selling",
     status: "calibrating",
-    calibratingNote: "Blocked on NCCPL data access (same as elsewhere in the roadmap)",
+    calibratingNote:
+      "Blocked on NCCPL data access (same as elsewhere in the roadmap)",
   },
 ];
 
-/** Breadth's slot when the payload carries no breadth data at all. */
-const BREADTH_UNAVAILABLE: SentimentSignal = {
-  key: "breadth",
-  label: "Breadth",
-  description: BREADTH_DESCRIPTION,
+/** The archive is absent entirely — a different state from "too short". */
+const HISTORY_UNAVAILABLE = (spec: SignalSpec): SentimentSignal => ({
+  key: spec.key,
+  label: spec.label,
+  description: spec.description,
   status: "calibrating",
-  calibratingNote: "Waiting on the next live market-watch payload",
-};
+  calibratingNote: "Waiting on the KSE-100 history feed",
+});
 
-/**
- * Compose the gauge from one market-watch payload.
- *
- * The composite averages the LIVE signals only — a calibrating signal
- * contributes nothing rather than contributing a neutral 50, which
- * would drag every reading toward the middle and quietly make the
- * gauge mostly a measure of how much is still unbuilt.
- *
- * With one live signal that average is just that signal's score; the
- * mean is written out anyway so Phase 2 adds signals without touching
- * this, and so the "live only" rule lives in code rather than in a
- * comment about a special case.
- */
-export function buildMarketPulse(
-  watch: MarketWatchResponse,
-): MarketPulseResponse {
-  /*
-   * `breadth` is optional on the wire and its absence is a real state,
-   * not a bug: the handler serves a warm in-memory lastGood payload,
-   * and the edge cache holds up to 30 minutes outside session hours,
-   * so requests genuinely arrive without it for a while after a
-   * deploy. Absent means "not known yet", never zero.
-   */
-  const breadthSignal = watch.breadth
-    ? computeBreadthSignal(watch.breadth)
-    : BREADTH_UNAVAILABLE;
+/* ── The composite ──────────────────────────────────────────────── */
 
-  const signals: SentimentSignal[] = [breadthSignal, ...CALIBRATING];
-
+/** Mean of the live signals only, or undefined when none are. */
+function compositeOf(signals: SentimentSignal[]): number | undefined {
   const live = signals.filter(
     (s): s is SentimentSignal & { score: number } =>
       s.status === "live" && typeof s.score === "number",
   );
+  if (!live.length) return undefined;
+  return Math.round(live.reduce((sum, s) => sum + s.score, 0) / live.length);
+}
 
-  // No live signal means no composite. Left undefined rather than
-  // defaulted — see the note on MarketPulseResponse.score.
-  const score = live.length
-    ? Math.round(live.reduce((sum, s) => sum + s.score, 0) / live.length)
-    : undefined;
+export function buildFearAndOptimismIndex(
+  watch: MarketWatchResponse,
+  history?: KseHistoryResponse,
+): FearOptimismResponse {
+  const points = history?.points ?? [];
+  const haveHistory = points.length > 0;
+
+  const signals: SentimentSignal[] = [
+    haveHistory ? computeMomentumSignal(points) : HISTORY_UNAVAILABLE(MOMENTUM),
+    haveHistory
+      ? computeVolatilitySignal(points)
+      : HISTORY_UNAVAILABLE(VOLATILITY),
+    haveHistory
+      ? computeVolumeMomentumSignal(points)
+      : HISTORY_UNAVAILABLE(VOLUME_MOMENTUM),
+    computeBreadthSignal(watch.breadth, history?.breadthHistory),
+    ...BLOCKED,
+  ];
+
+  const score = compositeOf(signals);
 
   return {
     score,
     zone: score === undefined ? undefined : zoneForScore(score),
     signals,
-    asOf: watch.asOf,
-    source: watch.source,
-    stale: watch.stale,
+    // The index is only as fresh as the slower of its two inputs, and
+    // the history feed is the slower one whenever it is present.
+    asOf: history?.asOf ?? watch.asOf,
+    source: history?.source === "cache" ? "cache" : watch.source,
+    stale: watch.stale || history?.stale,
+  };
+}
+
+/* ── Reconstructed history ──────────────────────────────────────── */
+
+export interface HistoricalScore {
+  date: string;
+  score: number;
+  zone: SentimentZone;
+}
+
+/**
+ * The composite, rebuilt for every past session the archive can
+ * support.
+ *
+ * This is possible only because the three live signals are functions
+ * of the EOD series alone — every past day's score is computed by the
+ * same code that computes today's, ranked against the 500 sessions
+ * that preceded THAT day rather than against today's window. It is a
+ * reconstruction, not a recording, and it is honest because nothing in
+ * it uses information the market did not have on the day.
+ *
+ * ONE THING TO WATCH when Breadth graduates: this series will still be
+ * the three history-backed signals, because no reconstruction of
+ * breadth is possible before the recorder started. Today that is
+ * invisible — the same three signals are live in both places — but
+ * once Breadth joins the live composite, today's score will average
+ * four signals while every historical point averages three. That is a
+ * real methodological seam, and the comparison chips built on this
+ * series will need to say so rather than imply a like-for-like
+ * comparison.
+ */
+export function buildHistoricalSeries(
+  history: KseHistoryResponse,
+): HistoricalScore[] {
+  const points = history.points;
+  const specs = [MOMENTUM, VOLATILITY, VOLUME_MOMENTUM];
+
+  // Each raw series computed once for the whole archive, then ranked
+  // per day — rather than recomputing the lookbacks inside the loop.
+  const series = specs.map((spec) => ({
+    spec,
+    raw: spec.series(points),
+  }));
+
+  const firstRankable = Math.max(...specs.map(requiredPoints)) - 1;
+  const out: HistoricalScore[] = [];
+
+  for (let i = firstRankable; i < points.length; i++) {
+    const scores: number[] = [];
+    for (const { spec, raw } of series) {
+      const rank = rankAt(raw, i);
+      if (rank === undefined || !Number.isFinite(rank)) continue;
+      scores.push(spec.inverted ? 100 - rank : rank);
+    }
+    // A day is only emitted with the full set. A point averaging two
+    // signals sitting in a line of three-signal points would be a
+    // different measurement wearing the same axis.
+    if (scores.length !== specs.length) continue;
+    const score = Math.round(mean(scores));
+    out.push({ date: points[i].date, score, zone: zoneForScore(score) });
+  }
+
+  return out;
+}
+
+export interface ComparisonChips {
+  /** Today's score minus the previous session's. */
+  vsPreviousClose: number;
+  oneWeekAgo?: HistoricalScore;
+  oneMonthAgo?: HistoricalScore;
+  oneYearAgo?: HistoricalScore;
+}
+
+/**
+ * Find the series entry nearest to `daysBack` calendar days before the
+ * latest one, or undefined if the series does not reach that far.
+ *
+ * Matched on real DATES rather than counting sessions back, because
+ * "a week ago" means a week — an index that counts five rows back
+ * silently drifts every time the exchange closes for a holiday, and
+ * PSX closes often.
+ *
+ * The tolerance stops a near-miss becoming a confident answer: a
+ * request for one year ago will accept the nearest session within a
+ * fortnight of the target and otherwise return nothing, rather than
+ * handing back the oldest point it has and calling it a year.
+ */
+function entryNear(
+  series: HistoricalScore[],
+  daysBack: number,
+  toleranceDays: number,
+): HistoricalScore | undefined {
+  if (!series.length) return undefined;
+  const latest = new Date(`${series[series.length - 1].date}T00:00:00Z`);
+  const target = new Date(latest);
+  target.setUTCDate(target.getUTCDate() - daysBack);
+
+  let best: HistoricalScore | undefined;
+  let bestGap = Infinity;
+  for (const entry of series) {
+    const gap = Math.abs(
+      (new Date(`${entry.date}T00:00:00Z`).getTime() - target.getTime()) /
+        86_400_000,
+    );
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = entry;
+    }
+  }
+  return bestGap <= toleranceDays ? best : undefined;
+}
+
+export function computeComparisonChips(
+  series: HistoricalScore[],
+): ComparisonChips {
+  const latest = series[series.length - 1];
+  const previous = series[series.length - 2];
+
+  return {
+    vsPreviousClose:
+      latest && previous ? latest.score - previous.score : 0,
+    // Tolerances scale with the distance asked for: a few days' slack
+    // on a week, a fortnight on a year.
+    oneWeekAgo: entryNear(series, 7, 4),
+    oneMonthAgo: entryNear(series, 30, 7),
+    oneYearAgo: entryNear(series, 365, 14),
   };
 }

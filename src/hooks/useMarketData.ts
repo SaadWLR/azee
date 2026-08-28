@@ -7,12 +7,13 @@ import {
   getGlobalFutures,
   getMarketIndices,
   getMarketSnapshot,
+  getKseHistory,
   getMarketWatch,
   getMarketWatchStats,
   getTickerQuotes,
 } from "../services/marketService";
-import { buildMarketPulse } from "../services/sentimentService";
-import type { MarketPulseResponse } from "../types/sentiment";
+import { buildFearAndOptimismIndex } from "../services/sentimentService";
+import type { FearOptimismResponse } from "../types/sentiment";
 import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
@@ -141,8 +142,24 @@ export function useTickerQuotes() {
  * the fetcher changes, so an inline arrow here would refetch on every
  * render.
  */
-const fetchMarketPulse = async (): Promise<MarketPulseResponse> =>
-  buildMarketPulse(await getMarketWatch());
+const fetchFearOptimism = async (): Promise<FearOptimismResponse> => {
+  /*
+   * Both inputs in parallel. They are independent endpoints with very
+   * different cadences — the watch feed is minutes old, the archive is
+   * a day old — and serialising them would make the gauge wait for the
+   * slower one twice over.
+   *
+   * The archive is allowed to fail without taking the index with it:
+   * its absence downgrades three signals to calibrating, which is a
+   * state this index is built to express, whereas throwing would blank
+   * the whole panel over one of its two sources.
+   */
+  const [watch, history] = await Promise.all([
+    getMarketWatch(),
+    getKseHistory().catch(() => undefined),
+  ]);
+  return buildFearAndOptimismIndex(watch, history);
+};
 
 /**
  * The homepage sentiment gauge.
@@ -152,8 +169,19 @@ const fetchMarketPulse = async (): Promise<MarketPulseResponse> =>
  * request: apiGet's dedup window collapses concurrent same-URL GETs,
  * so this rides the watch feed the hero is already pulling.
  */
-export function useMarketPulse() {
-  return useAsyncData(fetchMarketPulse, { intervalMs: 75_000 });
+export function useFearOptimismIndex() {
+  return useAsyncData(fetchFearOptimism, { intervalMs: 75_000 });
+}
+
+/**
+ * The KSE-100 archive on its own, for consumers that want the series
+ * rather than the score.
+ *
+ * No polling, matching useForex: the upstream publishes once daily
+ * after close, so a poll would re-read an identical 52KB payload.
+ */
+export function useKseHistory() {
+  return useAsyncData(getKseHistory);
 }
 
 export function useAllMarketQuotes() {

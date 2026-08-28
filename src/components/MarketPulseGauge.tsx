@@ -1,22 +1,22 @@
-import { useMarketPulse } from "../hooks/useMarketData";
+import { useFearOptimismIndex } from "../hooks/useMarketData";
 import type { SentimentSignal, SentimentZone } from "../types/sentiment";
 
 /**
- * Market Pulse — a sentiment gauge built only from what PSX actually
- * gives us today.
+ * The Fear and Optimism Index — a sentiment gauge built only from what
+ * PSX actually gives us today.
  *
  * WHAT THIS SHOWS, AND WHAT IT REFUSES TO. The finished index needs
- * eight signals. One of them, Breadth, can be computed right now from
- * the advancer/decliner/volume figures already in the market-watch
- * feed. The other seven cannot, so they are rendered PRESENT AND
- * MARKED — named, described, and carrying a note saying what would
- * unlock them. None of them shows a number, and none of them is
- * hidden to make the list look finished. A gauge with one live signal
- * that looks like a gauge with eight is a lie about how much the
- * reading is worth.
+ * eight signals. Three of them — Momentum, Volatility and Volume
+ * Momentum — are live, each a percentile rank of today's reading
+ * against roughly two years of the same measure. The other five are
+ * rendered PRESENT AND MARKED: named, described, and carrying a note
+ * saying what would unlock them. None of them shows a number, and none
+ * is hidden to make the list look finished. A gauge with three live
+ * signals that looks like a gauge with eight is a lie about how much
+ * the reading is worth.
  *
- * The needle therefore points at a composite of one signal today, and
- * the header says so rather than leaving the reader to assume the
+ * The needle therefore points at a composite of three signals today,
+ * and the header says so rather than leaving the reader to assume the
  * eight-signal version.
  *
  * THE GEOMETRY IS REAL. Every band, tick and needle position is
@@ -63,8 +63,8 @@ const BANDS: { from: number; to: number; zone: SentimentZone; stroke: string }[]
     { from: 0, to: 30, zone: "Extreme Fear", stroke: "rgb(var(--azee-blue) / 0.9)" },
     { from: 30, to: 45, zone: "Fear", stroke: "rgb(var(--azee-blue) / 0.45)" },
     { from: 45, to: 55, zone: "Neutral", stroke: "rgb(var(--azee-chalk) / 0.3)" },
-    { from: 55, to: 70, zone: "Greed", stroke: "rgb(var(--azee-orange) / 0.5)" },
-    { from: 70, to: 100, zone: "Extreme Greed", stroke: "rgb(var(--azee-orange))" },
+    { from: 55, to: 70, zone: "Optimism", stroke: "rgb(var(--azee-orange) / 0.5)" },
+    { from: 70, to: 100, zone: "Extreme Optimism", stroke: "rgb(var(--azee-orange))" },
   ];
 
 /** Arc sweep between two scores, at radius `r`. */
@@ -86,8 +86,8 @@ function Dial({ score, zone }: { score?: number; zone?: SentimentZone }) {
       role="img"
       aria-label={
         score === undefined
-          ? "Market Pulse gauge — no live signal yet"
-          : `Market Pulse: ${score} out of 100, ${zone}`
+          ? "Fear and Optimism Index — no live signal yet"
+          : `Fear and Optimism Index: ${score} out of 100, ${zone}`
       }
     >
       {/* The five zone bands. A gap between them comes from the
@@ -150,7 +150,7 @@ function Dial({ score, zone }: { score?: number; zone?: SentimentZone }) {
         className="fill-[rgb(var(--azee-orange))] text-[9px] font-semibold uppercase"
         style={{ letterSpacing: "0.08em" }}
       >
-        Greed
+        Optimism
       </text>
     </svg>
   );
@@ -187,19 +187,19 @@ function SignalRow({ signal }: { signal: SentimentSignal }) {
 }
 
 export function MarketPulseGauge() {
-  const { data, loading, error } = useMarketPulse();
+  const { data, loading, error } = useFearOptimismIndex();
 
   const liveCount =
     data?.signals.filter((s) => s.status === "live").length ?? 0;
 
   return (
     <section
-      aria-label="Market Pulse"
+      aria-label="Fear and Optimism Index"
       className="rounded-3xl border border-white/12 bg-[rgb(var(--azee-navy)/0.55)] p-6 backdrop-blur-xl"
     >
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[rgb(var(--azee-orange))]">
-          Market Pulse
+          Fear and Optimism Index
         </h2>
         {data?.zone ? (
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">
@@ -210,8 +210,8 @@ export function MarketPulseGauge() {
 
       {error ? (
         <p className="mt-4 text-[13px] leading-relaxed text-white/60">
-          Market Pulse is unavailable right now — the PSX market-watch
-          feed did not respond.
+          The Fear and Optimism Index is unavailable right now — the PSX
+          feeds did not respond.
         </p>
       ) : (
         /*
@@ -266,7 +266,8 @@ export function MarketPulseGauge() {
       )}
 
       <p className="mt-5 border-t border-white/10 pt-4 text-[11px] leading-relaxed text-white/45">
-        Market Pulse is an information tool, not investment advice — it
+        The Fear and Optimism Index is an information tool, not investment
+        advice — it
         describes market sentiment, not a recommendation to buy or sell.
       </p>
     </section>

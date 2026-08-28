@@ -1,5 +1,6 @@
 /**
- * Market Pulse — a sentiment read composed from live PSX signals.
+ * The Fear and Optimism Index — a sentiment read composed from live
+ * PSX signals.
  *
  * THE HONESTY CONTRACT IS THE POINT OF THESE TYPES. The gauge shows
  * eight signals because eight is what the finished index needs; only
@@ -10,12 +11,22 @@
  * gets quietly dropped from the list so the page looks complete.
  */
 
+/**
+ * The five bands, named for what they describe.
+ *
+ * "Greed" became "Optimism". The published Fear & Greed convention
+ * uses the harsher word, but this sits on a licensed broker's own
+ * homepage, where telling visitors the market is greedy reads as a
+ * judgement on them rather than a description of conditions. The
+ * bands, the thresholds and the direction are unchanged — only the
+ * label at the warm end.
+ */
 export type SentimentZone =
   | "Extreme Fear"
   | "Fear"
   | "Neutral"
-  | "Greed"
-  | "Extreme Greed";
+  | "Optimism"
+  | "Extreme Optimism";
 
 export interface SentimentSignal {
   key: string;
@@ -28,7 +39,7 @@ export interface SentimentSignal {
   description: string;
 }
 
-export interface MarketPulseResponse {
+export interface FearOptimismResponse {
   /**
    * Composite 0-100, averaged over the LIVE signals only.
    *

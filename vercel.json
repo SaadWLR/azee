@@ -1,4 +1,11 @@
 {
+  "crons": [
+    {
+      "comment": "Records one KSE breadth reading per trading day so Breadth can eventually be percentile-ranked like the other signals — PSX keeps no breadth archive, so the only way to have this history is to write it down daily. 11:00 UTC is 16:00 PKT, half an hour after the PSX close, and Mon-Fri because the exchange does not trade at weekends. Hobby allows daily-or-slower schedules, which this is.",
+      "path": "/api/cron/record-breadth",
+      "schedule": "0 11 * * 1-5"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/market/commodities",
