@@ -166,27 +166,60 @@ test("every white section tells the nav it is light", async ({ page }) => {
   expect(mismatches, "white sections must opt into the light nav").toEqual([]);
 });
 
-test("each redesigned section leads with the serif display face", async ({
-  page,
-}) => {
+test("the whole site sets in one typeface", async ({ page }) => {
+  /*
+   * This used to require a SERIF on each section's headline, against a
+   * sans body — the two-typeface system a display face was added for.
+   * That face has been reverted, so the invariant flipped: headline
+   * and body must now be the SAME family, and that family is Inter.
+   *
+   * Still worth asserting rather than deleting. A second face
+   * reappearing — through .font-display, a stray font-family, or the
+   * variable being repointed — fails here, which is the only automated
+   * notice anyone would get that the site had quietly gone bi-typeface
+   * again.
+   */
   await page.goto("/");
 
-  for (const id of REDESIGNED) {
-    const family = await page
-      .locator(`${id} h2`)
+  const familyOf = (selector: string) =>
+    page
+      .locator(selector)
       .first()
       .evaluate((el) => getComputedStyle(el).fontFamily);
-    expect(family, `${id} headline must use the display serif`).toMatch(
-      /Playfair/i,
-    );
+
+  for (const id of REDESIGNED) {
+    expect(
+      await familyOf(`${id} h2`),
+      `${id} headline must set in Inter`,
+    ).toMatch(/Inter/i);
   }
 
-  // Body copy stays sans — the serif is reserved for headlines only.
   const bodyFamily = await page
     .locator("#about p")
     .last()
     .evaluate((el) => getComputedStyle(el).fontFamily);
   expect(bodyFamily).toMatch(/Inter/i);
+
+  // Headline and body resolve to the same stack, not merely to two
+  // stacks that both happen to start with Inter.
+  expect(await familyOf("#about h2")).toBe(bodyFamily);
+
+  /*
+   * And the display class still carries its SIZE treatment. The face
+   * went; the tightened tracking and close leading did not, because
+   * oversized type of any family needs them.
+   */
+  const display = await page
+    .locator("#about h2")
+    .first()
+    .evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { tracking: cs.letterSpacing, leading: cs.lineHeight, size: cs.fontSize };
+    });
+  expect(parseFloat(display.tracking)).toBeLessThan(0);
+  expect(parseFloat(display.leading)).toBeLessThan(
+    parseFloat(display.size) * 1.2,
+  );
 });
 
 test("headlines take the colour their own ground calls for", async ({
