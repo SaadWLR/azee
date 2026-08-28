@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Reveal } from "./Reveal";
 import { IconExternalLink } from "./Icons";
 import { useLatestNews } from "../hooks/useNews";
@@ -168,7 +168,7 @@ const GRID_HEADLINES_DEFAULT = 3;
 
 /** The live news channel: the real feed, in its established layout. */
 function NewsChannel() {
-  const { data: news } = useLatestNews();
+  const { data: news, loading } = useLatestNews();
   const [expanded, setExpanded] = useState(false);
   const items = news?.items ?? [];
   const [lead, ...rest] = items;
@@ -179,7 +179,28 @@ function NewsChannel() {
     : gridHeadlines.slice(0, GRID_HEADLINES_DEFAULT);
   const hiddenCount = gridHeadlines.length - GRID_HEADLINES_DEFAULT;
 
-  if (items.length === 0) return null;
+  /*
+   * Nothing to say yet on the very first load — the section's heading,
+   * tabs and standfirst are already up, and a flash of "unavailable"
+   * before the feed has had a chance to answer would be a lie.
+   */
+  if (loading) return null;
+
+  /*
+   * No headlines to show. Say so, rather than rendering the heading,
+   * the tabs and the standfirst above an empty void — the bug this
+   * replaces, where an outage was indistinguishable from a layout
+   * failure. Mirrors how the rest of the site reports an outage (see
+   * MarketPulseGauge): name what did not respond, promise nothing, and
+   * never substitute placeholder or invented articles.
+   *
+   * Keyed on "are there items", NOT on the hook's `error`: a failed
+   * BACKGROUND poll sets `error` while useAsyncData deliberately keeps
+   * the last good headlines, and those are real, attributed articles
+   * that should stay on screen. What matters is whether we have
+   * anything true to show, not whether the most recent fetch failed.
+   */
+  if (items.length === 0) return <UnavailableChannel />;
 
   return (
     <>
@@ -261,17 +282,58 @@ function NewsChannel() {
   );
 }
 
-/** Honest empty state for a channel that has no content yet. */
-function PendingChannel({ channel }: { channel: Channel }) {
+/**
+ * The section's one empty-state panel: a label and a plain explanation,
+ * in the same outline-card language as the headline cards.
+ *
+ * Deliberately carries NO outbound link. The two states that use it
+ * (nothing written yet, feed unreachable) both mean "there is nothing
+ * true to show here"; a link would render as `#research a[href]` and
+ * read — to a person skimming and to the specs alike — as an article
+ * card, which is the exact confusion this panel exists to remove.
+ */
+function ChannelNotice({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div className="mt-14 rounded-[28px] border border-[rgb(var(--azee-navy)/0.14)] px-8 py-20 text-center sm:px-12">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[rgb(var(--azee-navy)/0.62)]">
-        Not yet published
+        {label}
       </p>
       <p className="mx-auto mt-6 max-w-md text-base leading-relaxed text-[rgb(var(--azee-navy)/0.6)]">
-        {channel.pendingNote}
+        {children}
       </p>
     </div>
+  );
+}
+
+/** Honest empty state for a channel that has no content yet. */
+function PendingChannel({ channel }: { channel: Channel }) {
+  return (
+    <ChannelNotice label="Not yet published">{channel.pendingNote}</ChannelNotice>
+  );
+}
+
+/**
+ * Honest outage state for the live news channel.
+ *
+ * Names the publishers, because the failure is theirs to us, not ours
+ * to the reader — and says the headlines are coming back rather than
+ * implying the section is empty by design (which is what the pending
+ * blog panel means, and the two must not read alike).
+ */
+function UnavailableChannel() {
+  return (
+    <ChannelNotice label="Headlines unavailable">
+      Live headlines are unavailable right now — the Business Recorder and
+      Express Tribune feeds did not respond. Nothing is shown in their place:
+      AZEE does not author this news. The headlines return on their own once
+      the publishers are reachable again.
+    </ChannelNotice>
   );
 }
 

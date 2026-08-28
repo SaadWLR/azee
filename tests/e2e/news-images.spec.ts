@@ -162,3 +162,55 @@ test("cards degrade gracefully when publisher images fail to load", async ({
   // nothing should have thrown.
   expect(pageErrors).toEqual([]);
 });
+
+test("#research says the feed is down rather than rendering an empty void", async ({
+  page,
+}) => {
+  /*
+   * Stands in for the endpoint's own graceful-degradation body, which
+   * production really does serve when both publisher feeds are
+   * unreachable from Vercel (observed Aug 28 2026, when Business
+   * Recorder briefly stopped answering the Edge Runtime).
+   *
+   * Before this, the section rendered its heading, tabs and standfirst
+   * and then simply stopped — an outage was visually indistinguishable
+   * from a broken layout. The rule this locks in is the same one the
+   * rest of the site follows (MarketPulseGauge, the PSX lookup): when
+   * a feed is down, say so.
+   */
+  await page.route("**/api/news/latest*", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Market news is temporarily unavailable" }),
+    }),
+  );
+
+  await page.goto("/");
+  const research = page.locator("#research");
+  await research.scrollIntoViewIfNeeded();
+
+  // The outage is stated in words, and names what did not answer.
+  await expect(research).toContainText(/headlines unavailable/i);
+  await expect(research).toContainText(/did not respond/i);
+
+  /*
+   * Nothing is invented to fill the space: no story cards at all. This
+   * also keeps the notice from being mistaken for an article — it
+   * carries no outbound link, so `a[target="_blank"]` stays the
+   * unambiguous "this is a real story" selector the specs above rely on.
+   */
+  expect(await research.locator('a[target="_blank"]').count()).toBe(0);
+
+  /*
+   * The section occupies real height instead of collapsing to the void
+   * this replaces — the reader sees an explanation, not a gap.
+   */
+  const noticeHeight = await research.evaluate((section) => {
+    const notice = [...section.querySelectorAll("div")].find((el) =>
+      /headlines unavailable/i.test((el as HTMLElement).innerText ?? ""),
+    );
+    return notice ? notice.getBoundingClientRect().height : 0;
+  });
+  expect(noticeHeight).toBeGreaterThan(100);
+});
