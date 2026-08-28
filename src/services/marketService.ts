@@ -1,5 +1,6 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type { ForexResponse } from "../types/forex";
+import type { EodPoint, KseHistoryResponse } from "../types/history";
 import type {
   MarketBreadth,
   EtfQuote,
@@ -476,7 +477,7 @@ export async function getMarketWatchStats(): Promise<MarketStat[]> {
  */
 /**
  * The WHOLE market-watch payload, for consumers that need more than
- * one of its fields — today the Market Pulse gauge, which reads
+ * one of its fields — today the sentiment index, which reads
  * `breadth` plus the freshness metadata (`asOf`/`source`/`stale`).
  *
  * Not a new fetch cadence and not a new endpoint: the same
@@ -498,6 +499,69 @@ export async function getMarketWatch(): Promise<MarketWatchResponse> {
     });
   }
   return apiGet<MarketWatchResponse>("/api/market/watch");
+}
+
+/**
+ * Development fixture for the KSE-100 archive.
+ *
+ * SYNTHETIC, and unavoidably so. The percentile engine needs ~590
+ * sessions before it will rank anything, and there is no way to hand
+ * it a handful of representative rows the way the other fixtures do —
+ * a short series does not produce a wrong number here, it produces no
+ * number at all, so local development would only ever see the
+ * calibrating state.
+ *
+ * It is a seeded random walk rather than copied real data: 700
+ * sessions of ~60KB of genuine PSX history would ship in the source
+ * tree to serve `vite dev` alone. Seeded so every run is identical and
+ * a local reading is reproducible.
+ *
+ * This never reaches production — the DEV branch below is the only
+ * caller, and deployed builds always fetch the real archive.
+ */
+function devKseSeries(): EodPoint[] {
+  let seed = 20260827;
+  const rand = () => {
+    // Numerical Recipes LCG: deterministic, and adequate for a fixture.
+    seed = (1664525 * seed + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const points: EodPoint[] = [];
+  let close = 120_000;
+  const start = new Date("2023-01-02T00:00:00Z");
+  for (let i = 0; i < 700; i++) {
+    // A mild upward drift with fat-ish daily noise, so momentum and
+    // volatility both have something to rank.
+    close *= 1 + (rand() - 0.47) * 0.02;
+    const day = new Date(start);
+    day.setUTCDate(day.getUTCDate() + Math.floor(i * 1.4));
+    points.push({
+      date: day.toISOString().slice(0, 10),
+      close: Math.round(close * 100) / 100,
+      volume: Math.round(150_000_000 + rand() * 400_000_000),
+      indexAverage: Math.round(close * (0.99 + rand() * 0.02) * 100) / 100,
+    });
+  }
+  return points;
+}
+
+/**
+ * The KSE-100 end-of-day archive, plus any recorded breadth history.
+ *
+ * Fetched once per page load rather than polled — the upstream
+ * publishes once a day after close, so the same reasoning getForex
+ * uses applies here even more strongly.
+ */
+export async function getKseHistory(): Promise<KseHistoryResponse> {
+  if (import.meta.env.DEV) {
+    return mockResponse({
+      points: devKseSeries(),
+      breadthHistory: [],
+      asOf: new Date().toISOString(),
+      source: "psx" as const,
+    });
+  }
+  return apiGet<KseHistoryResponse>("/api/market/history");
 }
 
 export async function getAllMarketQuotes(): Promise<StockQuote[]> {

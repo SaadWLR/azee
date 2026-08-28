@@ -29,7 +29,12 @@ export type { CompanyInfo, RegulatoryInfo } from "./company";
 export type { NewsFeedItem, NewsFeedResponse } from "./news";
 export type { CorporateMeeting, MeetingCalendarResponse } from "./calendar";
 export type {
-  MarketPulseResponse,
+  FearOptimismResponse,
   SentimentSignal,
   SentimentZone,
 } from "./sentiment";
+export type {
+  BreadthPoint,
+  EodPoint,
+  KseHistoryResponse,
+} from "./history";
