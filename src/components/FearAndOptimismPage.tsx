@@ -370,15 +370,29 @@ export function FearAndOptimismPage() {
         </div>
       </section>
 
-      {/* ── C. Historical chart ───────────────────────────────── */}
-      <section
-        data-nav-theme-section="light"
-        className="relative bg-[rgb(var(--azee-paper))] px-4 py-20 sm:px-6 lg:px-12"
-      >
+      {/*
+       * ── C. Historical chart ─────────────────────────────────
+       *
+       * NAVY, like the sections either side of it. This was white with
+       * the chart floating inside a navy card — one light section
+       * wedged between the gauge above and the drivers below, which
+       * read as a mistake rather than a rhythm.
+       *
+       * The inner card went with it, because it was never a design
+       * decision: SentimentChart is built for a navy backdrop
+       * throughout — white-alpha text and borders, chalk headings, and
+       * a latest-point dot ringed in --azee-navy to punch it out of
+       * the ground behind. The card existed to hand it the ground it
+       * expected. With the section itself navy, the chart sits
+       * directly on it, exactly as "What's driving it" does.
+       *
+       * No data-nav-theme-section here: the Navbar themes itself from
+       * that attribute, so a navy section still claiming to be light
+       * would put a white bar over it.
+       */}
+      <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-3xl bg-[rgb(var(--azee-navy))] p-6 sm:p-10">
-            <SentimentChart series={series} />
-          </div>
+          <SentimentChart series={series} />
         </div>
       </section>
 

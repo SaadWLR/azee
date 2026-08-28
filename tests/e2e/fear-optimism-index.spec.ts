@@ -172,6 +172,59 @@ test("the page renders every section", async ({ page }) => {
   ).toEqual([]);
 });
 
+test("every section's ground agrees with what it tells the nav", async ({
+  page,
+}) => {
+  /*
+   * The navbar is opaque and themes itself from
+   * data-nav-theme-section, so a section whose attribute disagrees
+   * with its own background puts the wrong bar over it — a white bar
+   * on navy, or a navy bar on white.
+   *
+   * This page shipped with exactly that: the chart section was white
+   * with the chart floating in a navy card, and it both broke the
+   * navy run either side of it and had to carry a light attribute to
+   * stay legible. Making it navy meant removing the attribute too, and
+   * the pair is easy to get half-right — hence a check that reads the
+   * PAINTED ground and requires the attribute to match it, rather than
+   * a list of which sections are which.
+   */
+  await page.goto(PAGE);
+  await expect(page.locator("h1")).toBeVisible();
+
+  const sections = await page.evaluate(() =>
+    [...document.querySelectorAll("main > section")].map((el) => ({
+      heading: el.querySelector("h1, h2")?.textContent?.trim().slice(0, 30) ?? "(no heading)",
+      background: getComputedStyle(el).backgroundColor,
+      claimsLight: el.getAttribute("data-nav-theme-section") === "light",
+    })),
+  );
+  expect(sections.length, "the page has its seven sections").toBe(7);
+
+  const disagreements = sections.filter(
+    (s) => (s.background === "rgb(255, 255, 255)") !== s.claimsLight,
+  );
+  expect(
+    disagreements,
+    "a white section must claim light, and a navy one must not",
+  ).toEqual([]);
+
+  // And the rhythm itself: the four-section navy run is the point of
+  // the fix, so a white section reappearing inside it fails here.
+  const rhythm = sections.map((s) =>
+    s.background === "rgb(255, 255, 255)" ? "white" : "navy",
+  );
+  expect(rhythm).toEqual([
+    "navy", // header
+    "navy", // gauge
+    "navy", // chart
+    "navy", // drivers
+    "white", // how to read it
+    "navy", // methodology
+    "white", // FAQ
+  ]);
+});
+
 test("the page never claims more signals are live than are", async ({
   page,
 }) => {
