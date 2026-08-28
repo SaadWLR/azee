@@ -98,14 +98,40 @@ test("scroll-spy still activates section anchors on the homepage (unaffected by 
   page,
 }) => {
   await page.goto("/");
-  // Centre the Research section in the viewport so it falls inside the
-  // scroll-spy observer's middle band.
-  await page.locator("#research").evaluate((el) =>
-    el.scrollIntoView({ block: "center" }),
-  );
-  // The Research top-level anchor should light up (its underline grows).
-  await expect(page.locator('header nav a[href="#research"]')).toHaveClass(
-    /is-active/,
-    { timeout: 10_000 },
-  );
+
+  /*
+   * Re-centre on every attempt rather than scrolling once and waiting.
+   *
+   * The old form scrolled immediately after goto and then waited up to
+   * ten seconds for the anchor to light. That is a race the homepage
+   * usually lost: it is still growing while it loads — video, fonts,
+   * two live feeds — so a scroll issued at that moment lands somewhere
+   * else by the time the page stops moving, and nothing scrolls again.
+   * The spy is then correctly reporting whichever section actually
+   * ended up in its band, and the assertion blames the spy for the
+   * test's own timing.
+   *
+   * It went from passing to failing four runs in five when the display
+   * face was reverted, because Inter reflows the sections above this
+   * one and changed how far the page shifts after load — the race was
+   * always there, that just tipped which way it usually fell.
+   *
+   * Scrolling inside the poll makes it immune: each attempt puts
+   * #research back in the middle of whatever the layout is NOW.
+   * Instant, because the smooth scrolling the site sets is not what
+   * this test is about.
+   */
+  await expect
+    .poll(
+      async () => {
+        await page.locator("#research").evaluate((el) =>
+          el.scrollIntoView({ block: "center", behavior: "instant" }),
+        );
+        return page
+          .locator('header nav a[href="#research"]')
+          .evaluate((el) => el.className);
+      },
+      { timeout: 15_000 },
+    )
+    .toMatch(/is-active/);
 });
