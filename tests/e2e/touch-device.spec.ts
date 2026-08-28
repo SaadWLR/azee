@@ -201,7 +201,7 @@ test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
     "ETFs",
     "Announcements",
     "Calendar",
-    "Economic Dashboard",
+    "Fear and Optimism Index",
   ]) {
     await expect(menu.getByRole("link", { name: tool, exact: true })).toHaveCount(0);
   }
@@ -231,7 +231,7 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
     "ETFs",
     "Announcements",
     "Calendar",
-    "Economic Dashboard",
+    "Fear and Optimism Index",
   ]);
   // Group headings carried over from the desktop dropdown.
   await expect(menu).toContainText("Markets");

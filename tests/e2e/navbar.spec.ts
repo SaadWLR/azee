@@ -42,7 +42,7 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
   for (const name of ["Market Watch", "Indices", "Commodity Futures", "ETFs"]) {
     await expect(groups.nth(0).getByRole("menuitem", { name })).toBeVisible();
   }
-  for (const name of ["Announcements", "Calendar", "Economic Dashboard"]) {
+  for (const name of ["Announcements", "Calendar", "Fear and Optimism Index"]) {
     await expect(groups.nth(1).getByRole("menuitem", { name })).toBeVisible();
   }
 
@@ -85,9 +85,11 @@ test("dropdown link navigates, closes the menu, and highlights Tools on the new 
   await trigger.click();
   // Uses a Research-group item: Knowledge Centre left Tools for the
   // footer, and this also exercises the newer of the two groups.
-  await page.getByRole("menuitem", { name: "Economic Dashboard" }).click();
+  await page
+    .getByRole("menuitem", { name: "Fear and Optimism Index" })
+    .click();
 
-  await expect(page).toHaveURL(/\/economic-dashboard$/);
+  await expect(page).toHaveURL(/\/fear-and-optimism-index$/);
   await expect(trigger).toHaveClass(/is-active/); // Tools active on that route
   await expect(trigger).toHaveAttribute("aria-expanded", "false"); // closed after nav
 });

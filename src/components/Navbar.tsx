@@ -89,8 +89,14 @@ const NAV_LINKS: NavLink[] = [
  * inside the existing panel buys the clarity without spending a slot.
  *
  * "Markets" is live-price tooling; "Research" is reference, disclosure
- * and macro. The same grouping renders on mobile, so the two surfaces
- * describe the site identically.
+ * and market context. The same grouping renders on mobile, so the two
+ * surfaces describe the site identically — this array is the only
+ * definition of either, so a change here moves both.
+ *
+ * The Economic Dashboard held the third Research slot and is UNLINKED
+ * rather than removed: its page and its route are untouched and it
+ * still loads at /economic-dashboard by direct URL. Only its shortcut
+ * is gone.
  *
  * "Commodity Futures" is named in full to disambiguate it from the
  * top-level "Forex & Commodities" — this one is PMEX futures
@@ -117,7 +123,7 @@ const TOOL_GROUPS: { heading: string; links: { label: string; to: string }[] }[]
       links: [
         { label: "Announcements", to: "/announcements" },
         { label: "Calendar", to: "/corporate-calendar" },
-        { label: "Economic Dashboard", to: "/economic-dashboard" },
+        { label: "Fear and Optimism Index", to: "/fear-and-optimism-index" },
       ],
     },
   ];
