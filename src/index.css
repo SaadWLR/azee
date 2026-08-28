@@ -3,13 +3,20 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   /*
-   * Display face for the single largest headline in a redesigned
-   * homepage section. High letterform contrast (thick/thin stroke
-   * variation) is the point — it is reserved for those moments and
-   * never used for body copy, secondary headings or UI labels.
+   * The display face, reverted to Inter.
+   *
+   * A separate high-contrast serif carried the largest headline in
+   * each redesigned section (added in c097754, reverted here). The
+   * site is back to a single typeface, so this now resolves to exactly
+   * --font-sans.
+   *
+   * Kept as a variable rather than deleted, and .font-display kept as
+   * a class, because 25 components reference it. Repointing one value
+   * reverts every one of them; hunting down each className would be a
+   * large diff for the same result, and would throw away the seam that
+   * makes a future display face a one-line change again.
    */
-  --font-display: "Playfair Display", ui-serif, Georgia, "Times New Roman",
-    serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -94,10 +101,11 @@
 }
 
 /*
- * The display face, applied only to a section's single largest
- * headline. Generous tracking and a tight-but-not-cramped leading are
- * part of the treatment: oversized serif type needs the extra optical
- * room, and the spec calls for it explicitly.
+ * The display treatment, applied to a section's single largest
+ * headline. The face is now Inter like everything else, so what is
+ * left here is the SIZE treatment: slightly tightened tracking and a
+ * close leading, which oversized type of any family needs to stop
+ * reading as loose.
  */
 .font-display {
   font-family: var(--font-display);
