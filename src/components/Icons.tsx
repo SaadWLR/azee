@@ -184,3 +184,65 @@ export function IconX(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+/* ── Sentiment signals ──────────────────────────────────────────────
+ * One mark per signal on the Fear and Optimism Index. Each draws what
+ * the signal actually measures rather than a generic chart glyph, so
+ * the eight are distinguishable at 20px.
+ */
+
+/** Volatility — an oscillating trace. */
+export function IconWaves(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M2 12c2-4 3.5-4 5.5 0s3.5 4 5.5 0 3.5-4 5.5 0" />
+      <path d="M2 17c2-2.5 3.5-2.5 5.5 0s3.5 2.5 5.5 0 3.5-2.5 5.5 0" />
+    </svg>
+  );
+}
+
+/** Price Strength — highs against lows. */
+export function IconPeaks(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 19h18M6 19V9l4 5 4-9 4 14" />
+    </svg>
+  );
+}
+
+/** Volume Momentum — traded bars. */
+export function IconBars(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 21h18M6 21v-6M10 21v-11M14 21v-8M18 21v-14" />
+    </svg>
+  );
+}
+
+/** Breadth — advancers weighed against decliners. */
+export function IconScales(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 4v16M7 20h10M4 8h16M4 8l-2 5a3 3 0 0 0 6 0L6 8M20 8l-2 5a3 3 0 0 0 6 0l-2-5" />
+    </svg>
+  );
+}
+
+/** Derivatives — a contract layered over the ready market. */
+export function IconLayers(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5" />
+    </svg>
+  );
+}
+
+/** Foreign Flows — capital crossing a border. */
+export function IconGlobe(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+    </svg>
+  );
+}

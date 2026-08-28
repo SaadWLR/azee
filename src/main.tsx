@@ -34,6 +34,12 @@ const CommoditiesPage = lazy(() =>
   })),
 );
 
+const FearAndOptimismPage = lazy(() =>
+  import("./components/FearAndOptimismPage").then((m) => ({
+    default: m.FearAndOptimismPage,
+  })),
+);
+
 const LegalPage = lazy(() =>
   import("./components/LegalPage").then((m) => ({
     default: m.LegalPage,
@@ -172,6 +178,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <MarketWatchPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/fear-and-optimism-index",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <FearAndOptimismPage />
           </Suspense>
         ),
       },

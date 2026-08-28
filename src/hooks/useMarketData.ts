@@ -12,7 +12,15 @@ import {
   getMarketWatchStats,
   getTickerQuotes,
 } from "../services/marketService";
-import { buildFearAndOptimismIndex } from "../services/sentimentService";
+import {
+  buildFearAndOptimismIndex,
+  buildHistoricalSeries,
+  computeComparisonChips,
+} from "../services/sentimentService";
+import type {
+  ComparisonChips,
+  HistoricalScore,
+} from "../services/sentimentService";
 import type { FearOptimismResponse } from "../types/sentiment";
 import { useAsyncData } from "./useAsyncData";
 
@@ -182,6 +190,39 @@ export function useFearOptimismIndex() {
  */
 export function useKseHistory() {
   return useAsyncData(getKseHistory);
+}
+
+export interface FearOptimismDetail {
+  index: FearOptimismResponse;
+  series: HistoricalScore[];
+  chips: ComparisonChips;
+}
+
+/**
+ * Everything the dedicated index page needs, from one pair of fetches.
+ *
+ * The page wants the index, the reconstructed series and the
+ * comparison chips, and all three are derived from the same two
+ * payloads. Composing them here rather than calling three hooks means
+ * the series is walked once instead of once per consumer, and — more
+ * to the point — the chart, the chips and the needle are guaranteed to
+ * describe the same moment rather than three fetches of it.
+ */
+const fetchFearOptimismDetail = async (): Promise<FearOptimismDetail> => {
+  const [watch, history] = await Promise.all([
+    getMarketWatch(),
+    getKseHistory().catch(() => undefined),
+  ]);
+  const series = history ? buildHistoricalSeries(history) : [];
+  return {
+    index: buildFearAndOptimismIndex(watch, history),
+    series,
+    chips: computeComparisonChips(series),
+  };
+};
+
+export function useFearOptimismDetail() {
+  return useAsyncData(fetchFearOptimismDetail, { intervalMs: 75_000 });
 }
 
 export function useAllMarketQuotes() {
