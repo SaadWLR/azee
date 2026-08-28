@@ -126,7 +126,7 @@ function SignalCard({ signal }: { signal: SentimentSignal }) {
 
       {live ? (
         <>
-          <p className="font-display mt-5 text-[2.75rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
+          <p className="font-display mt-5 text-[2.25rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
             {signal.score}
           </p>
           <ScoreBar score={signal.score!} />
@@ -166,7 +166,7 @@ function StatCard({
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
         {label}
       </p>
-      <p className="font-display mt-2 text-[1.75rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
+      <p className="font-display mt-2 text-[1.5rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
         {value}
       </p>
       {zone ? (
@@ -254,7 +254,7 @@ export function FearAndOptimismPage() {
       <section className="relative bg-[rgb(var(--azee-navy))] px-4 pb-16 pt-[calc(var(--nav-height)+2.5rem)] sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">Market Sentiment</p>
-          <h1 className="font-display mt-6 text-[2.75rem] text-[rgb(var(--azee-chalk))] sm:text-6xl">
+          <h1 className="font-display mt-6 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
             Fear and Optimism Index
           </h1>
           <p className="mt-6 max-w-3xl text-[15px] leading-relaxed text-white/65 sm:text-base">
@@ -339,7 +339,7 @@ export function FearAndOptimismPage() {
               />
               {index?.score !== undefined ? (
                 <>
-                  <p className="font-display -mt-2 text-[4.5rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
+                  <p className="font-display -mt-2 text-[3.5rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))] sm:text-[4rem]">
                     {index.score}
                   </p>
                   <div className="mt-4">
@@ -386,7 +386,7 @@ export function FearAndOptimismPage() {
       <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">What&apos;s driving it</p>
-          <h2 className="font-display mt-6 text-[2rem] text-[rgb(var(--azee-chalk))] sm:text-[2.5rem]">
+          <h2 className="font-display mt-6 text-[1.75rem] text-[rgb(var(--azee-chalk))] sm:text-[2rem]">
             Every signal, and where it stands
           </h2>
           <p className="mt-5 max-w-3xl text-[15px] leading-relaxed text-white/60">
@@ -412,7 +412,7 @@ export function FearAndOptimismPage() {
       >
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">How to read it</p>
-          <h2 className="font-display mt-6 max-w-3xl text-[2rem] text-[rgb(var(--azee-navy))] sm:text-[2.5rem]">
+          <h2 className="font-display mt-6 max-w-3xl text-[1.75rem] text-[rgb(var(--azee-navy))] sm:text-[2rem]">
             &ldquo;Be fearful when others are greedy, and greedy when others are
             fearful.&rdquo;
           </h2>
@@ -459,7 +459,7 @@ export function FearAndOptimismPage() {
       <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">Methodology</p>
-          <h2 className="font-display mt-6 text-[2rem] text-[rgb(var(--azee-chalk))] sm:text-[2.5rem]">
+          <h2 className="font-display mt-6 text-[1.75rem] text-[rgb(var(--azee-chalk))] sm:text-[2rem]">
             How the number is produced
           </h2>
 
@@ -547,7 +547,7 @@ export function FearAndOptimismPage() {
       >
         <div className="mx-auto max-w-3xl">
           <p className="eyebrow">Questions</p>
-          <h2 className="font-display mt-6 text-[2rem] text-[rgb(var(--azee-navy))] sm:text-[2.5rem]">
+          <h2 className="font-display mt-6 text-[1.75rem] text-[rgb(var(--azee-navy))] sm:text-[2rem]">
             Common questions
           </h2>
 
