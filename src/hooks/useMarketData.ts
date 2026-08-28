@@ -135,7 +135,7 @@ export function useTickerQuotes() {
 }
 
 /*
- * Market Pulse composes rather than fetches: the fetch is the same
+ * The index composes rather than fetches: the fetches are the same
  * /api/market/watch call the hooks around it already make, and the
  * scoring is pure logic in sentimentService. Declared at module scope
  * so its identity is stable — useAsyncData reruns its whole cycle when

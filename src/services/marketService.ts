@@ -477,7 +477,7 @@ export async function getMarketWatchStats(): Promise<MarketStat[]> {
  */
 /**
  * The WHOLE market-watch payload, for consumers that need more than
- * one of its fields — today the Market Pulse gauge, which reads
+ * one of its fields — today the sentiment index, which reads
  * `breadth` plus the freshness metadata (`asOf`/`source`/`stale`).
  *
  * Not a new fetch cadence and not a new endpoint: the same

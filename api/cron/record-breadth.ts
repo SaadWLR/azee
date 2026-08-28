@@ -28,6 +28,19 @@ import type { BreadthPoint } from "../../src/types/history";
  * already just an authenticated HTTP call.
  */
 
+/*
+ * SCHEDULE: "0 11 * * 1-5" in vercel.json — 11:00 UTC is 16:00 PKT,
+ * half an hour after the PSX close, Mon-Fri because the exchange does
+ * not trade at weekends. Hobby allows one cron at daily-or-slower
+ * frequency, which this is.
+ *
+ * That reasoning lives here rather than beside the entry because
+ * vercel.json is validated against a strict schema: an explanatory
+ * "comment" key inside a crons entry is not an unknown-but-ignored
+ * property, it fails the deployment outright. Learned the hard way —
+ * the first attempt at this shipped one and the whole deploy was
+ * rejected while the previous build kept serving.
+ */
 const HISTORY_KEY = "breadth:trin:history";
 
 /**

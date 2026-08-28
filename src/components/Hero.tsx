@@ -38,7 +38,8 @@ export function Hero() {
    * The hero is a flex column in normal document flow: a spacer the
    * exact height of the fixed navbar, the ticker, then the content
    * stack centered in the remaining space. That stack is the
-   * headline/snapshot row followed by the Market Pulse band, centred
+   * headline/snapshot row followed by the sentiment-index band,
+   * centred
    * together (justify-center on the stack) rather than the row
    * centring itself. min-h-screen fills the first viewport but never
    * locks it — taller content simply extends the page and scrolls.
@@ -193,7 +194,8 @@ export function Hero() {
         </div>
 
         {/*
-         * Market Pulse closes the hero's live-market zone: same
+         * The Fear and Optimism Index closes the hero's live-market
+         * zone: same
          * #markets anchor, same market-watch feed at the same cadence
          * as the snapshot above it.
          *
