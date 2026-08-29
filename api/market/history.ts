@@ -3,23 +3,25 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   BreadthPoint,
   EodPoint,
+  GoldPoint,
   KseHistoryResponse,
 } from "../../src/types/history";
 
 /**
  * GET /api/market/history
  *
- * The KSE-100's end-of-day archive, plus whatever live breadth the
- * daily recorder has managed to accumulate.
+ * The KSE-100's end-of-day archive, plus the two histories the daily
+ * recorder keeps: market breadth, and gold/USD-PKR for Safe Haven
+ * Demand.
  *
- * WHY THE TWO TRAVEL TOGETHER. They are unrelated in origin — one is
- * PSX's own multi-year archive, the other is a file this site writes a
- * day at a time because PSX publishes no breadth history at all. They
- * share an endpoint for one reason: the Hobby plan allows twelve
- * serverless functions and this project is close enough to that
- * ceiling that a second history route would be a poor way to spend
- * one. Both are "history the sentiment index ranks against", both are
- * fetched once per page load, and neither changes more than daily.
+ * WHY THEY TRAVEL TOGETHER. They are unrelated in origin — one is
+ * PSX's own multi-year archive, the others are files this site writes
+ * because nobody publishes them for us. They share an endpoint for one
+ * reason: the Hobby plan allows twelve serverless functions and this
+ * project sits at eleven, so a separate route per history would be a
+ * poor way to spend the last one. All three are "history the sentiment
+ * index ranks against", all are fetched once per page load, and none
+ * changes more than daily.
  *
  * ADAPTER IS INLINED. Vercel builds each function in `api/` as its own
  * bundle, so runtime imports BETWEEN them do not resolve — the same
@@ -132,32 +134,54 @@ async function fetchEod(): Promise<EodPoint[]> {
  * reported to Sentry and then treated the same way, because a history
  * we could not read is not a history of zero readings.
  */
-async function fetchBreadthHistory(): Promise<BreadthPoint[] | undefined> {
+async function readKvHistory<T extends { date: string }>(
+  key: string,
+  valid: (row: T) => boolean,
+): Promise<T[] | undefined> {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return undefined;
 
   try {
-    const response = await fetch(`${url}/get/breadth:trin:history`, {
+    const response = await fetch(`${url}/get/${key}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) throw new Error(`KV responded ${response.status}`);
     const body = (await response.json()) as { result?: string | null };
     if (!body.result) return [];
-    const parsed = JSON.parse(body.result) as BreadthPoint[];
+    const parsed = JSON.parse(body.result) as T[];
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter(
-        (p) =>
-          typeof p?.date === "string" && Number.isFinite(p?.trin) && p.trin > 0,
-      )
+      .filter((p) => typeof p?.date === "string" && valid(p))
       .sort((a, b) => (a.date < b.date ? -1 : 1));
   } catch (cause) {
     Sentry.captureException(cause);
     return undefined;
   }
 }
+
+const fetchBreadthHistory = () =>
+  readKvHistory<BreadthPoint>(
+    "breadth:trin:history",
+    (p) => Number.isFinite(p.trin) && p.trin > 0,
+  );
+
+/*
+ * Same store, same reader, same absent-is-not-empty rule. The value
+ * check mirrors the recorder's own sanity bounds, so a row that could
+ * not have been written by this codebase is dropped on the way out
+ * rather than reaching a signal.
+ */
+const fetchGoldHistory = () =>
+  readKvHistory<GoldPoint>(
+    "gold:history",
+    (p) =>
+      Number.isFinite(p.xauUsd) &&
+      Number.isFinite(p.usdPkr) &&
+      p.xauUsd > 500 &&
+      p.usdPkr > 50,
+  );
 
 /** Survives warm invocations; the graceful answer when PSX is down. */
 let lastGood: EodPoint[] | null = null;
@@ -166,6 +190,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   // The breadth read never blocks the archive: they are independent
   // sources and one being unavailable must not cost the other.
   const breadthPromise = fetchBreadthHistory();
+  const goldPromise = fetchGoldHistory();
 
   try {
     const points = await fetchEod();
@@ -183,6 +208,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     const body: KseHistoryResponse = {
       points,
       breadthHistory: await breadthPromise,
+      goldHistory: await goldPromise,
       asOf: new Date().toISOString(),
       source: "psx",
     };
@@ -194,6 +220,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       const body: KseHistoryResponse = {
         points: lastGood,
         breadthHistory: await breadthPromise,
+        goldHistory: await goldPromise,
         asOf: new Date().toISOString(),
         source: "cache",
         stale: true,

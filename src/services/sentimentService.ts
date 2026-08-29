@@ -2,6 +2,7 @@ import type { MarketBreadth, MarketWatchResponse } from "../types";
 import type {
   BreadthPoint,
   EodPoint,
+  GoldPoint,
   KseHistoryResponse,
 } from "../types/history";
 import type {
@@ -413,6 +414,115 @@ export function computeBreadthSignal(
   };
 }
 
+/* ── Safe Haven Demand ──────────────────────────────────────────── */
+
+const SAFE_HAVEN_DESCRIPTION =
+  "Two-week returns on gold in rupees and US dollars against the KSE-100";
+
+/** Sessions in a "two-week" return — a fortnight of PSX trading. */
+const SAFE_HAVEN_LOOKBACK = 10;
+
+/**
+ * Money hiding in gold reads as fear.
+ *
+ * The metric is gold's two-week return measured against the KSE-100's
+ * over the same stretch, in BOTH currencies:
+ *
+ *   goldUsd = xauUsd[d] / xauUsd[d-10] - 1
+ *   goldPkr = (xauUsd[d] * usdPkr[d]) / (xauUsd[d-10] * usdPkr[d-10]) - 1
+ *   kse     = close[d] / close[d-10] - 1
+ *   raw     = ((goldUsd - kse) + (goldPkr - kse)) / 2
+ *
+ * Both currencies, averaged rather than chosen between, because they
+ * answer different questions for a Pakistani investor: the dollar leg
+ * is the global flight-to-safety trade, the rupee leg is what a local
+ * holder actually experienced, and a rupee sliding against the dollar
+ * shows up in one and not the other.
+ *
+ * INVERTED. Gold outperforming equities is fear, so a high raw reading
+ * ranks toward the fearful end — the same inversion Volatility and
+ * Breadth's TRIN use.
+ *
+ * ALIGNED BY DATE, NEVER BY INDEX. The two series come from different
+ * places and have gaps in different places: PSX closes for local
+ * holidays the currency CDN publishes straight through, and the CDN
+ * misses days PSX traded. Walking two arrays in step would silently
+ * compare a Tuesday's gold against the previous Thursday's index the
+ * moment either side skipped a row.
+ */
+export function computeSafeHavenSignal(
+  goldHistory: GoldPoint[] | undefined,
+  kseHistory: EodPoint[],
+): SentimentSignal {
+  const base = {
+    key: "safeHaven",
+    label: "Safe Haven Demand",
+    description: SAFE_HAVEN_DESCRIPTION,
+  };
+
+  const gold = goldHistory ?? [];
+  const closeOn = new Map(kseHistory.map((p) => [p.date, p.close]));
+
+  /*
+   * Only sessions BOTH sources describe, in date order. The lookback
+   * counts back through this shared calendar rather than through
+   * either source's own, so "ten sessions ago" means ten sessions the
+   * signal can actually see.
+   */
+  const shared = gold
+    .filter((g) => closeOn.has(g.date))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const raws: number[] = [];
+  for (let i = SAFE_HAVEN_LOOKBACK; i < shared.length; i++) {
+    const now = shared[i];
+    const then = shared[i - SAFE_HAVEN_LOOKBACK];
+    const closeNow = closeOn.get(now.date)!;
+    const closeThen = closeOn.get(then.date)!;
+    if (
+      !(now.xauUsd > 0) ||
+      !(then.xauUsd > 0) ||
+      !(now.usdPkr > 0) ||
+      !(then.usdPkr > 0) ||
+      !(closeThen > 0)
+    ) {
+      continue;
+    }
+    const goldUsd = now.xauUsd / then.xauUsd - 1;
+    const goldPkr =
+      (now.xauUsd * now.usdPkr) / (then.xauUsd * then.usdPkr) - 1;
+    const kse = closeNow / closeThen - 1;
+    raws.push((goldUsd - kse + (goldPkr - kse)) / 2);
+  }
+
+  /*
+   * Same window as every other signal, and required in full for the
+   * same reason: a percentile against forty prior readings is
+   * arithmetic, not evidence.
+   */
+  if (raws.length <= RANK_WINDOW) {
+    return {
+      ...base,
+      status: "calibrating",
+      calibratingNote: `Backfilling gold and USD/PKR history — ${raws.length} of ${RANK_WINDOW} sessions ranked so far`,
+    };
+  }
+
+  const today = raws[raws.length - 1];
+  const window = raws.slice(-(RANK_WINDOW + 1), -1);
+  const rank = percentileRank(today, window);
+  if (!Number.isFinite(rank)) {
+    return {
+      ...base,
+      status: "calibrating",
+      calibratingNote:
+        "The latest session could not be ranked against its own history",
+    };
+  }
+
+  return { ...base, status: "live", score: Math.round(100 - rank) };
+}
+
 /* ── The signals that are still blocked ─────────────────────────── */
 
 const BLOCKED: SentimentSignal[] = [
@@ -423,13 +533,6 @@ const BLOCKED: SentimentSignal[] = [
     status: "calibrating",
     calibratingNote:
       "Needs per-symbol 52-week ranges; PSX publishes no such archive",
-  },
-  {
-    key: "safeHaven",
-    label: "Safe Haven Demand",
-    description: "Gold and USD demand relative to the KSE-100",
-    status: "calibrating",
-    calibratingNote: "Needs a 2-week price baseline — not yet recorded",
   },
   {
     key: "derivatives",
@@ -485,6 +588,7 @@ export function buildFearAndOptimismIndex(
       ? computeVolumeMomentumSignal(points)
       : HISTORY_UNAVAILABLE(VOLUME_MOMENTUM),
     computeBreadthSignal(watch.breadth, history?.breadthHistory),
+    computeSafeHavenSignal(history?.goldHistory, points),
     ...BLOCKED,
   ];
 

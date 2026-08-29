@@ -36,5 +36,6 @@ export type {
 export type {
   BreadthPoint,
   EodPoint,
+  GoldPoint,
   KseHistoryResponse,
 } from "./history";

@@ -5,10 +5,19 @@ import { expect, test } from "./fixtures";
  * page.
  *
  * The thing worth guarding is not that a gauge renders; it is that it
- * tells the truth about how much it knows. Three signals are live,
- * five are not, and the failures this file exists to catch are a
- * change that lets any of the five acquire a number, and a page whose
- * prose claims more is live than actually is.
+ * tells the truth about how much it knows. The failures this file
+ * exists to catch are a signal with no source acquiring a number, and
+ * a page whose prose claims more is live than actually is.
+ *
+ * WHY THE LIVE COUNT IS NOT A LITERAL. It used to be: three live,
+ * five calibrating. Safe Haven Demand ended that — it is live exactly
+ * when the recorder has backfilled enough gold history to rank
+ * against, so both counts are correct at different times and pinning
+ * either one bakes in a lie. The count is now READ from the page and
+ * the prose is checked against what was read, which is the property
+ * the test is named for. What stays pinned is the list of signals
+ * that have no source at all: those must never show a number, and no
+ * amount of recorded history can change that.
  */
 test.beforeEach(() => {
   test.skip(
@@ -20,24 +29,40 @@ test.beforeEach(() => {
 const TEASER = 'section[aria-label="Fear and Optimism Index"]';
 const PAGE = "/fear-and-optimism-index";
 
-/** Ranked against PSX's own archive, so live today. */
-const LIVE = ["Momentum", "Volatility", "Volume Momentum"];
+/**
+ * Ranked against PSX's own multi-year archive, which every visitor
+ * gets on every page load. These are live now and stay live.
+ */
+const ALWAYS_LIVE = ["Momentum", "Volatility", "Volume Momentum"];
 
 /**
- * Not computable yet — INCLUDING Breadth.
+ * Live if and only if the daily recorder has banked enough history.
  *
  * Breadth showed a live score until the percentile pass demoted it: a
  * fixed-curve number is not comparable to a percentile rank, so
- * averaging the two made the composite part formula. It now waits for
- * its own recorded history, and this list is where that stays pinned.
+ * averaging the two made the composite part formula. It now waits on
+ * a history this site records itself, because nobody publishes one.
+ * Safe Haven Demand is the same shape — it ranks gold against the
+ * index over a fortnight, and needs the recorder's backfilled gold
+ * and USD/PKR series to do it.
+ *
+ * Either state is legitimate. What is NOT legitimate is a score
+ * without the history behind it, so these are checked for internal
+ * consistency rather than pinned to one status.
  */
-const CALIBRATING = [
-  "Breadth",
-  "Price Strength",
-  "Safe Haven Demand",
-  "Derivatives Activity",
-  "Foreign Flows",
-];
+const RECORDER_BACKED = ["Breadth", "Safe Haven Demand"];
+
+/**
+ * No source at all — not blocked on volume of history, blocked on
+ * data that does not exist for us to read. PSX publishes no
+ * short-interest or foreign-flow feed we can reach, and the
+ * derivatives figures are not in any endpoint this site calls.
+ *
+ * This is the hard line. A number appearing on any of these means
+ * something is being invented, which on a licensed brokerage's site
+ * is the worst failure available. It must fail the build.
+ */
+const NEVER_LIVE = ["Price Strength", "Derivatives Activity", "Foreign Flows"];
 
 const api = () =>
   process.env.E2E_BYPASS_SECRET
@@ -232,6 +257,11 @@ test("the page never claims more signals are live than are", async ({
   const main = page.locator("main");
 
   /*
+   * Wait for the page to settle before counting anything. The three
+   * archive-backed signals are always live, so their badges are the
+   * signal that both fetches have landed — without this the count
+   * below races a page that is still filling in.
+   *
    * An auto-waiting assertion, not locator.count(). count() resolves
    * immediately against whatever is in the DOM at that instant, and
    * this page is lazy-loaded and then fills in from two async
@@ -243,8 +273,24 @@ test("the page never claims more signals are live than are", async ({
   const liveBadges = main.locator("text=/^Live$/i");
   await expect(
     liveBadges,
-    "the breakdown lists exactly the live signals",
-  ).toHaveCount(LIVE.length);
+    "the archive-backed signals are live",
+  ).toHaveCount(ALWAYS_LIVE.length, { timeout: 15_000 });
+
+  /*
+   * Now read the truth off the page rather than asserting a literal.
+   * Anything above the floor is a recorder-backed signal that has
+   * earned its history; anything at or below it means one of the
+   * always-live three has broken.
+   */
+  const liveNow = await liveBadges.count();
+  expect(
+    liveNow,
+    "at least the archive-backed signals are live",
+  ).toBeGreaterThanOrEqual(ALWAYS_LIVE.length);
+  expect(
+    liveNow,
+    "no more signals are live than the index actually has sources for",
+  ).toBeLessThanOrEqual(ALWAYS_LIVE.length + RECORDER_BACKED.length);
 
   // Safe to read the prose now that the data has arrived.
   const text = await main.innerText();
@@ -252,13 +298,13 @@ test("the page never claims more signals are live than are", async ({
   expect(claims.length, "the reading states its denominator").toBeGreaterThan(0);
   for (const claim of claims) {
     expect(Number(claim[1]), `"${claim[0]}" must match the live cards`).toBe(
-      LIVE.length,
+      liveNow,
     );
     expect(Number(claim[2])).toBe(8);
   }
 
   // The methodology paragraph carries the same count.
-  expect(text).toContain(`currently ${LIVE.length} of 8`);
+  expect(text).toContain(`currently ${liveNow} of 8`);
 
   /*
    * And so does the FAQ — but that answer has to be opened first. The
@@ -273,16 +319,16 @@ test("the page never claims more signals are live than are", async ({
     .filter({ hasText: /How is it calculated/i })
     .click();
   await expect(page.locator("main")).toContainText(
-    `currently live: ${LIVE.length} of 8`,
+    `currently live: ${liveNow} of 8`,
   );
 
-  for (const label of LIVE) {
+  for (const label of ALWAYS_LIVE) {
     const card = signalCard(page, label);
     await expect(card, `${label} card`).toHaveCount(1);
     expect(await card.innerText(), `${label} shows a score`).toMatch(/\d/);
   }
 
-  for (const label of CALIBRATING) {
+  for (const label of NEVER_LIVE) {
     const card = signalCard(page, label);
     await expect(card, `${label} card`).toHaveCount(1);
     const body = await card.innerText();
@@ -292,6 +338,28 @@ test("the page never claims more signals are live than are", async ({
       body.replace(/calibrating/i, "").trim().length,
       `${label} explains what unlocks it`,
     ).toBeGreaterThan(20);
+  }
+
+  /*
+   * The recorder-backed pair may be in either state, but not in a
+   * state that misrepresents itself: a live card carries a number, a
+   * calibrating card carries a note saying what it is still waiting
+   * for. The one thing neither may do is show a bare score with no
+   * history behind it, which is what the calibrating branch of each
+   * signal exists to prevent.
+   */
+  for (const label of RECORDER_BACKED) {
+    const card = signalCard(page, label);
+    await expect(card, `${label} card`).toHaveCount(1);
+    const body = await card.innerText();
+    if (/calibrating/i.test(body)) {
+      expect(
+        body.replace(/calibrating/i, "").trim().length,
+        `${label} explains what it is waiting for`,
+      ).toBeGreaterThan(20);
+    } else {
+      expect(body, `${label} is live, so it shows a score`).toMatch(/\d/);
+    }
   }
 });
 

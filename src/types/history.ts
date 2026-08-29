@@ -44,6 +44,30 @@ export interface BreadthPoint {
   trin: number;
 }
 
+/**
+ * One recorded session of gold and USD/PKR, for Safe Haven Demand.
+ *
+ * NOT from PSX. Both legs come from the same public currency CDN the
+ * gold estimate on /forex already uses, which publishes dated
+ * snapshots as well as today's — so unlike breadth, this history could
+ * be backfilled in one pass rather than accumulated a day at a time.
+ *
+ * That archive is shallower than it looks: it begins around
+ * 2024-03-02, roughly 650 trading sessions back. Enough for the
+ * 500-session ranking window plus the ten sessions a two-week return
+ * consumes, but with little to spare — which is why the recorder
+ * backfills every PSX session it can reach rather than a round number
+ * of days.
+ */
+export interface GoldPoint {
+  /** ISO date (YYYY-MM-DD) the reading was taken. */
+  date: string;
+  /** Spot gold, USD per troy ounce, as of that date. */
+  xauUsd: number;
+  /** USD/PKR mid rate, as of that date. */
+  usdPkr: number;
+}
+
 export interface KseHistoryResponse {
   /** Full available EOD series, oldest first. */
   points: EodPoint[];
@@ -58,6 +82,17 @@ export interface KseHistoryResponse {
    * provisioned yet.
    */
   breadthHistory?: BreadthPoint[];
+  /**
+   * Gold and USD/PKR readings recorded by the daily cron, oldest
+   * first.
+   *
+   * NOT from PSX either, and served from this endpoint for the same
+   * reason breadthHistory is: a second history route would spend a
+   * Vercel function this project cannot spare. Empty until the
+   * recorder has run, and absent entirely if the KV store is not
+   * provisioned yet.
+   */
+  goldHistory?: GoldPoint[];
   asOf: string;
   source: "psx" | "cache";
   stale?: boolean;
