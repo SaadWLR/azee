@@ -79,7 +79,7 @@ function ModuleView({ module }: { module: KnowledgeModule }) {
           </span>
         </div>
 
-        <h1 className="font-display mt-4 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
           {module.title}
         </h1>
         {/* Brand-signature stripe — same motif as the hero and the other
@@ -138,7 +138,7 @@ function ModuleNotFound() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300/90">
           Knowledge Centre
         </p>
-        <h1 className="font-display mt-3 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
           Module not found
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-gray-400">

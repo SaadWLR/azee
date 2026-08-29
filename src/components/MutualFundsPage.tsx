@@ -60,7 +60,7 @@ export function MutualFundsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300/90">
             Markets
           </p>
-          <h1 className="font-display mt-3 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
             Mutual Funds
           </h1>
           {/* Brand-signature stripe — same motif as the other pages. */}

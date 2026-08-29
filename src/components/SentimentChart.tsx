@@ -83,7 +83,7 @@ export function SentimentChart({ series }: { series: HistoricalScore[] }) {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-display text-[1.75rem] text-[rgb(var(--azee-chalk))] sm:text-[2rem]">
+          <h2 className="text-2xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-3xl">
             Sentiment over time
           </h2>
           {view ? (

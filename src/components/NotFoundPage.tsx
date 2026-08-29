@@ -46,7 +46,7 @@ export function NotFoundPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-300/90">
             Error 404
           </p>
-          <h1 className="font-display mt-3 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
             We can&apos;t find that page
           </h1>
           <div className="mt-4 h-[3px] w-16 rounded-full bg-gradient-to-r from-[rgb(var(--azee-orange))] to-[rgb(var(--azee-orange)/0)]" />

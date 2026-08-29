@@ -405,7 +405,7 @@ export function Products() {
           </Reveal>
           {/* Level 1 — hero statement */}
           <Reveal delay={100}>
-            <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-navy))] sm:text-[4rem]">
+            <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-navy))] sm:text-4xl lg:text-5xl">
               Every market,
               <br />
               one relationship.
@@ -449,7 +449,7 @@ export function Products() {
             {PRODUCTS.map((product, i) => {
               const body = (
                 <>
-                  <span className="font-display text-[1.6rem] text-[rgb(var(--azee-navy))] transition-colors duration-300 group-hover:text-[rgb(var(--azee-orange))] sm:text-[1.9rem]">
+                  <span className="text-xl font-semibold tracking-tight text-[rgb(var(--azee-navy))] transition-colors duration-300 group-hover:text-[rgb(var(--azee-orange))]">
                     {product.title}
                   </span>
                   <span className="mt-2 max-w-md text-sm leading-relaxed text-[rgb(var(--azee-navy)/0.68)] lg:mt-0 lg:max-w-[19rem] lg:shrink-0 lg:text-right">

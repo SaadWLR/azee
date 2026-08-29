@@ -174,10 +174,9 @@ test("the whole site sets in one typeface", async ({ page }) => {
    * and body must now be the SAME family, and that family is Inter.
    *
    * Still worth asserting rather than deleting. A second face
-   * reappearing — through .font-display, a stray font-family, or the
-   * variable being repointed — fails here, which is the only automated
-   * notice anyone would get that the site had quietly gone bi-typeface
-   * again.
+   * reappearing — through a stray font-family or a reintroduced
+   * display variable — fails here, which is the only automated notice
+   * anyone would get that the site had quietly gone bi-typeface again.
    */
   await page.goto("/");
 
@@ -205,17 +204,29 @@ test("the whole site sets in one typeface", async ({ page }) => {
   expect(await familyOf("#about h2")).toBe(bodyFamily);
 
   /*
-   * And the display class still carries its SIZE treatment. The face
-   * went; the tightened tracking and close leading did not, because
-   * oversized type of any family needs them.
+   * And the headline carries the treatment it had BEFORE the redesign,
+   * restored: bold, tightly tracked, close-leaded.
+   *
+   * The .font-display class that used to supply this is gone — it set
+   * weight 500 and -0.015em, and every heading now states its own
+   * weight and tracking in Tailwind classes instead. Weight is the
+   * assertion that matters: 500 against 700 is exactly the difference
+   * that made the live site stop matching its own screenshots, and it
+   * is invisible in a diff that only reads class names.
    */
   const display = await page
     .locator("#about h2")
     .first()
     .evaluate((el) => {
       const cs = getComputedStyle(el);
-      return { tracking: cs.letterSpacing, leading: cs.lineHeight, size: cs.fontSize };
+      return {
+        weight: cs.fontWeight,
+        tracking: cs.letterSpacing,
+        leading: cs.lineHeight,
+        size: cs.fontSize,
+      };
     });
+  expect(Number(display.weight), "section headlines are bold").toBe(700);
   expect(parseFloat(display.tracking)).toBeLessThan(0);
   expect(parseFloat(display.leading)).toBeLessThan(
     parseFloat(display.size) * 1.2,

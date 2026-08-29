@@ -62,7 +62,7 @@ export function MarketPulseGauge() {
 
           <div className="min-w-0 flex-1">
             {data?.score !== undefined ? (
-              <p className="font-display text-[3rem] leading-none tabular-nums text-[rgb(var(--azee-chalk))]">
+              <p className="text-4xl font-bold leading-none tabular-nums tracking-tight text-[rgb(var(--azee-chalk))]">
                 {data.score}
               </p>
             ) : (

@@ -201,7 +201,7 @@ export function ClosingCTA() {
             Start investing
           </p>
 
-          <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-chalk))] sm:text-6xl">
+          <h2 className="mt-8 text-4xl font-bold leading-[1.05] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-5xl lg:text-6xl">
             <span className="closing-fade-up block" style={{ animationDelay: "0.25s" }}>
               The market&apos;s live.
             </span>

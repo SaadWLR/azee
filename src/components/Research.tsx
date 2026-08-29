@@ -378,7 +378,7 @@ export function Research() {
             <p className="eyebrow">News &amp; Insights</p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="font-display mt-8 text-[2.75rem] text-[rgb(var(--azee-navy))] sm:text-6xl lg:text-7xl">
+            <h2 className="mt-8 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-navy))] sm:text-4xl lg:text-5xl">
               Headlines moving
               <br />
               Pakistan&apos;s markets.

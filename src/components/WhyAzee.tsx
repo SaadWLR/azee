@@ -87,7 +87,7 @@ function SealCard({ item }: { item: Credential }) {
         {item.label}
       </p>
       {/* Level 4 — the datum. Serif, because this is the object's face. */}
-      <p className="font-display mt-3 text-[1.75rem] leading-none text-[rgb(var(--azee-chalk))]">
+      <p className="mt-3 text-2xl font-semibold leading-none tracking-tight text-[rgb(var(--azee-chalk))]">
         {item.value}
       </p>
       {/* Level 5 — metadata. */}
@@ -144,7 +144,7 @@ export function WhyAzee() {
 
             {/* Level 1 — the hero statement */}
             <Reveal delay={100}>
-              <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem] lg:text-[4.5rem]">
+              <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl lg:text-5xl">
                 {years} years.
                 <br />
                 Fully accountable.

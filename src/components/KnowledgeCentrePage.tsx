@@ -86,7 +86,7 @@ export function KnowledgeCentrePage() {
               AZEE Knowledge Centre
             </p>
 
-            <h1 className="font-display mt-5 max-w-3xl text-[3rem] text-[rgb(var(--azee-chalk))] sm:text-[4rem] lg:text-[4.5rem]">
+            <h1 className="mt-5 max-w-3xl text-4xl font-bold leading-[1.05] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-5xl lg:text-6xl">
               <span className="kc-fade-up block" style={{ animationDelay: "0.25s" }}>
                 Understand the market.
               </span>

@@ -230,7 +230,7 @@ export function AppShowcase() {
             <p className="eyebrow">AZEE Stockify</p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="font-display mt-10 text-[3rem] text-[rgb(var(--azee-navy))] sm:text-[4rem] lg:text-[4.5rem]">
+            <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-navy))] sm:text-4xl lg:text-5xl">
               The exchange,
               <br />
               in one hand.

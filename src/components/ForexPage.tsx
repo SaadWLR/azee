@@ -65,7 +65,7 @@ export function ForexPage() {
           </p>
           {/* Matches the top-level nav label: the page carries both
               currency rates and the local gold estimate below. */}
-          <h1 className="font-display mt-3 text-[2.5rem] text-[rgb(var(--azee-chalk))] sm:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
             Forex &amp; Commodities
           </h1>
           {/* Brand-signature stripe — same motif as the other page
