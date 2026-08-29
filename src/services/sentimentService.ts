@@ -110,6 +110,25 @@ const RANK_WINDOW = 500;
 const mean = (xs: number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;
 
 /**
+ * Turn a percentile rank into a score on the fear/optimism axis.
+ *
+ * The ONE place the inversion rule is applied. Every signal declares
+ * `inverted` on its spec and nothing else decides what that means, so
+ * the live path and the reconstructed-history path cannot disagree
+ * about which end of the dial a reading belongs at. Unrounded on
+ * purpose: callers that average several signals round once at the end
+ * rather than rounding each term first.
+ */
+const orient = (rank: number, inverted?: boolean) =>
+  inverted ? 100 - rank : rank;
+
+/** A raw reading tagged with the session it belongs to. */
+interface DatedRaw {
+  date: string;
+  raw: number;
+}
+
+/**
  * Rank `series[i]` against the RANK_WINDOW readings immediately before
  * it, or undefined if that many do not exist.
  *
@@ -308,7 +327,7 @@ function signalFrom(spec: SignalSpec, points: EodPoint[]): SentimentSignal {
   return {
     ...base,
     status: "live",
-    score: Math.round(spec.inverted ? 100 - rank : rank),
+    score: Math.round(orient(rank, spec.inverted)),
   };
 }
 
@@ -386,24 +405,44 @@ export function computeTrin(breadth: MarketBreadth): number | null {
  *
  * A LOW TRIN IS OPTIMISM, so the rank is inverted.
  */
+/**
+ * The recorded TRIN readings, in date order.
+ *
+ * Guards mirror the ones api/market/history.ts already applies on the
+ * way out of the store. Duplicated deliberately: this function is the
+ * last thing standing between a corrupted row and a percentile, and a
+ * signal that trusts its caller to have filtered is a signal that
+ * silently ranks against a zero.
+ */
+function breadthRawSeries(trinHistory?: BreadthPoint[]): DatedRaw[] {
+  return (trinHistory ?? [])
+    .filter((p) => Number.isFinite(p.trin) && p.trin > 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((p) => ({ date: p.date, raw: p.trin }));
+}
+
 export function computeBreadthSignal(
   breadth?: MarketBreadth,
   trinHistory?: BreadthPoint[],
 ): SentimentSignal {
   const base = {
-    key: "breadth",
-    label: "Breadth",
-    description: BREADTH_DESCRIPTION,
+    key: BREADTH.key,
+    label: BREADTH.label,
+    description: BREADTH.description,
   };
 
-  const history = trinHistory ?? [];
+  const history = breadthRawSeries(trinHistory);
   const today = breadth ? computeTrin(breadth) : null;
 
   if (today !== null && history.length >= RANK_WINDOW) {
-    const window = history.slice(-RANK_WINDOW).map((p) => p.trin);
+    const window = history.slice(-RANK_WINDOW).map((p) => p.raw);
     const rank = percentileRank(today, window);
     if (Number.isFinite(rank)) {
-      return { ...base, status: "live", score: Math.round(100 - rank) };
+      return {
+        ...base,
+        status: "live",
+        score: Math.round(orient(rank, BREADTH.inverted)),
+      };
     }
   }
 
@@ -450,16 +489,10 @@ const SAFE_HAVEN_LOOKBACK = 10;
  * compare a Tuesday's gold against the previous Thursday's index the
  * moment either side skipped a row.
  */
-export function computeSafeHavenSignal(
+function safeHavenRawSeries(
   goldHistory: GoldPoint[] | undefined,
   kseHistory: EodPoint[],
-): SentimentSignal {
-  const base = {
-    key: "safeHaven",
-    label: "Safe Haven Demand",
-    description: SAFE_HAVEN_DESCRIPTION,
-  };
-
+): DatedRaw[] {
   const gold = goldHistory ?? [];
   const closeOn = new Map(kseHistory.map((p) => [p.date, p.close]));
 
@@ -473,7 +506,7 @@ export function computeSafeHavenSignal(
     .filter((g) => closeOn.has(g.date))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 
-  const raws: number[] = [];
+  const raws: DatedRaw[] = [];
   for (let i = SAFE_HAVEN_LOOKBACK; i < shared.length; i++) {
     const now = shared[i];
     const then = shared[i - SAFE_HAVEN_LOOKBACK];
@@ -492,8 +525,23 @@ export function computeSafeHavenSignal(
     const goldPkr =
       (now.xauUsd * now.usdPkr) / (then.xauUsd * then.usdPkr) - 1;
     const kse = closeNow / closeThen - 1;
-    raws.push((goldUsd - kse + (goldPkr - kse)) / 2);
+    raws.push({ date: now.date, raw: (goldUsd - kse + (goldPkr - kse)) / 2 });
   }
+
+  return raws;
+}
+
+export function computeSafeHavenSignal(
+  goldHistory: GoldPoint[] | undefined,
+  kseHistory: EodPoint[],
+): SentimentSignal {
+  const base = {
+    key: SAFE_HAVEN.key,
+    label: SAFE_HAVEN.label,
+    description: SAFE_HAVEN.description,
+  };
+
+  const raws = safeHavenRawSeries(goldHistory, kseHistory).map((r) => r.raw);
 
   /*
    * Same window as every other signal, and required in full for the
@@ -520,7 +568,84 @@ export function computeSafeHavenSignal(
     };
   }
 
-  return { ...base, status: "live", score: Math.round(100 - rank) };
+  return {
+    ...base,
+    status: "live",
+    score: Math.round(orient(rank, SAFE_HAVEN.inverted)),
+  };
+}
+
+/* ── The recorder-backed signals, as one description ────────────── */
+
+/**
+ * What Breadth and Safe Haven Demand have in common, in one place.
+ *
+ * Both are ranked against a history this site records rather than one
+ * PSX publishes, both invert, and both are read by TWO callers: the
+ * live signal functions above, and buildHistoricalSeries below, which
+ * re-ranks every past day. Those two paths agreeing is not a
+ * coincidence to be maintained by hand — they read the same `raws` and
+ * the same `inverted` off these objects, so a change to either reaches
+ * both or neither.
+ */
+interface RecordedSpec {
+  key: string;
+  label: string;
+  description: string;
+  /** True when a HIGH raw reading means fear rather than optimism. */
+  inverted: boolean;
+  raws: (history: KseHistoryResponse) => DatedRaw[];
+}
+
+const BREADTH: RecordedSpec = {
+  key: "breadth",
+  label: "Breadth",
+  description: BREADTH_DESCRIPTION,
+  // A low TRIN is optimism.
+  inverted: true,
+  raws: (h) => breadthRawSeries(h.breadthHistory),
+};
+
+const SAFE_HAVEN: RecordedSpec = {
+  key: "safeHaven",
+  label: "Safe Haven Demand",
+  description: SAFE_HAVEN_DESCRIPTION,
+  // Gold outrunning the index is fear.
+  inverted: true,
+  raws: (h) => safeHavenRawSeries(h.goldHistory, h.points),
+};
+
+const RECORDED: RecordedSpec[] = [BREADTH, SAFE_HAVEN];
+
+/**
+ * Every past session this recorded signal can score, by date.
+ *
+ * Ranked WITHIN the signal's own series, not against the KSE-100
+ * calendar: each reading is compared with the RANK_WINDOW readings the
+ * recorder actually captured before it, which is the same window the
+ * live function uses. Ranking against archive positions instead would
+ * mean a single missing recording — one cron failure, one holiday the
+ * upstream skipped — left a 500-wide hole that never closed.
+ *
+ * Empty until the recorder has banked more than RANK_WINDOW readings,
+ * which is why this is invisible in production today and stays that
+ * way until real data exists.
+ */
+function rankedByDate(
+  spec: RecordedSpec,
+  history: KseHistoryResponse,
+): Map<string, number> {
+  const raws = spec.raws(history);
+  const values = raws.map((r) => r.raw);
+  const byDate = new Map<string, number>();
+
+  for (let i = RANK_WINDOW; i < raws.length; i++) {
+    const rank = rankAt(values, i);
+    if (rank === undefined || !Number.isFinite(rank)) continue;
+    byDate.set(raws[i].date, orient(rank, spec.inverted));
+  }
+
+  return byDate;
 }
 
 /* ── The signals that are still blocked ─────────────────────────── */
@@ -625,30 +750,48 @@ export interface HistoricalScore {
  * reconstruction, not a recording, and it is honest because nothing in
  * it uses information the market did not have on the day.
  *
- * ONE THING TO WATCH when Breadth graduates: this series will still be
- * the three history-backed signals, because no reconstruction of
- * breadth is possible before the recorder started. Today that is
- * invisible — the same three signals are live in both places — but
- * once Breadth joins the live composite, today's score will average
- * four signals while every historical point averages three. That is a
- * real methodological seam, and the comparison chips built on this
- * series will need to say so rather than imply a like-for-like
- * comparison.
+ * EACH DAY AVERAGES WHAT THAT DAY COULD ACTUALLY RANK, which is the
+ * same rule compositeOf applies to today. Two kinds of signal go into
+ * the loop:
+ *
+ *   - The three archive-backed signals are REQUIRED. They decide
+ *     whether a day is emitted at all, and a day missing any of them
+ *     does not appear. That floor is unchanged.
+ *   - The recorder-backed signals are FOLDED IN where they exist. On a
+ *     date whose own window was not yet full they are simply absent,
+ *     and the day averages the required three exactly as before.
+ *
+ * So the number of signals behind a point varies along the line — three
+ * for the older stretch, four from whatever date the recorder's window
+ * first closed. That is the honest shape, and it is the same thing the
+ * "N of 8 signals live" figure has already done once.
+ *
+ * The alternative was to keep every point on three signals and mark the
+ * seam where today's composite starts averaging four. That documents
+ * the inconsistency rather than removing it; this removes it.
  */
 export function buildHistoricalSeries(
   history: KseHistoryResponse,
 ): HistoricalScore[] {
   const points = history.points;
-  const specs = [MOMENTUM, VOLATILITY, VOLUME_MOMENTUM];
+  const required = [MOMENTUM, VOLATILITY, VOLUME_MOMENTUM];
 
   // Each raw series computed once for the whole archive, then ranked
   // per day — rather than recomputing the lookbacks inside the loop.
-  const series = specs.map((spec) => ({
+  const series = required.map((spec) => ({
     spec,
     raw: spec.series(points),
   }));
 
-  const firstRankable = Math.max(...specs.map(requiredPoints)) - 1;
+  /*
+   * Every date the recorded signals can score, resolved up front for
+   * the same reason. Empty maps while their histories are short, which
+   * makes every line below behave exactly as it did before they
+   * existed.
+   */
+  const recorded = RECORDED.map((spec) => rankedByDate(spec, history));
+
+  const firstRankable = Math.max(...required.map(requiredPoints)) - 1;
   const out: HistoricalScore[] = [];
 
   for (let i = firstRankable; i < points.length; i++) {
@@ -656,14 +799,26 @@ export function buildHistoricalSeries(
     for (const { spec, raw } of series) {
       const rank = rankAt(raw, i);
       if (rank === undefined || !Number.isFinite(rank)) continue;
-      scores.push(spec.inverted ? 100 - rank : rank);
+      scores.push(orient(rank, spec.inverted));
     }
-    // A day is only emitted with the full set. A point averaging two
-    // signals sitting in a line of three-signal points would be a
+    // A day is only emitted with the full REQUIRED set. A point
+    // averaging two of them sitting in a line of three would be a
     // different measurement wearing the same axis.
-    if (scores.length !== specs.length) continue;
+    if (scores.length !== required.length) continue;
+
+    /*
+     * Looked up by date, never by archive position: these series keep
+     * their own calendars, and the recorder can miss a session PSX
+     * traded.
+     */
+    const date = points[i].date;
+    for (const byDate of recorded) {
+      const score = byDate.get(date);
+      if (score !== undefined) scores.push(score);
+    }
+
     const score = Math.round(mean(scores));
-    out.push({ date: points[i].date, score, zone: zoneForScore(score) });
+    out.push({ date, score, zone: zoneForScore(score) });
   }
 
   return out;
