@@ -25,7 +25,15 @@ const REDESIGNED = ["#about", "#trading", "#research", "#start-investing"];
  * with a cream bone. --azee-ink and --azee-bone no longer exist.
  */
 const NAVY = "rgb(12, 24, 66)";
-const PAPER = "rgb(255, 255, 255)";
+/*
+ * Not #fff any more. --azee-paper came off true white to a cool
+ * off-white, because a full-white section between navy neighbours read
+ * as glare. The literal is kept rather than resolved at runtime so the
+ * expected value stays visible in the diff, and a test below asserts
+ * it still equals the token — so moving the token again fails with one
+ * clear message instead of five confusing ground mismatches.
+ */
+const PAPER = "rgb(249, 250, 252)";
 /** The hero's bar is darker than the navy sections: black with a blue cast. */
 const HERO_BAR = "rgb(7, 10, 22)";
 /** Display type on the dark ground — off-white, never pure #fff. */
@@ -120,6 +128,21 @@ test("sections commit to one flat colour, alternating navy and white", async ({
    * it carries a ground in this system and would otherwise be the one
    * section free to drift.
    */
+  /*
+   * The two ground constants above are copies of --azee-navy and
+   * --azee-paper. Check the copies still match the tokens FIRST, so
+   * that moving a token reports itself here in one line rather than as
+   * a handful of sections all mysteriously being the wrong colour.
+   */
+  const tokens = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const rgb = (name: string) =>
+      `rgb(${root.getPropertyValue(name).trim().split(/\s+/).join(", ")})`;
+    return { navy: rgb("--azee-navy"), paper: rgb("--azee-paper") };
+  });
+  expect(tokens.navy, "NAVY still matches --azee-navy").toBe(NAVY);
+  expect(tokens.paper, "PAPER still matches --azee-paper").toBe(PAPER);
+
   const colours: Record<string, string> = {};
   for (const id of [...REDESIGNED, "#products"]) {
     colours[id] = await page
@@ -153,10 +176,14 @@ test("every white section tells the nav it is light", async ({ page }) => {
    * attribute fails here rather than in a screenshot.
    */
   const mismatches = await page.evaluate(() => {
+    // Resolved from the token, so this keeps working if the paper
+    // ground is re-tuned again.
+    const root = getComputedStyle(document.documentElement);
+    const paper = `rgb(${root.getPropertyValue("--azee-paper").trim().split(/\s+/).join(", ")})`;
     const bad: string[] = [];
     for (const el of document.querySelectorAll("section[id]")) {
       const bg = getComputedStyle(el).backgroundColor;
-      if (bg !== "rgb(255, 255, 255)") continue;
+      if (bg !== paper) continue;
       if (el.getAttribute("data-nav-theme-section") !== "light") {
         bad.push(el.id);
       }

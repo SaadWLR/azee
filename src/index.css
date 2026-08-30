@@ -83,10 +83,25 @@
    * and from a long shadow, which is how a plate set INTO a surface
    * actually reads.
    *
-   * --azee-paper is the white ground. True white, not a cream: the
-   * whole reason the bone sections needed apologising for is that an
-   * off-white large enough to be a section reads as aged paper, and
-   * "classic blue and white" wants the white to be white.
+   * --azee-paper is the white ground, a hair off true white.
+   *
+   * It WAS #fff, and the reasoning still holds as far as it went: an
+   * off-white large enough to be a section reads as aged paper, which
+   * is what sank the old bone tone, and "classic blue and white" wants
+   * the white to be white. What that argument missed is that these
+   * sections do not appear on their own — each one lands between
+   * near-black and navy neighbours, and true white against that ground
+   * reads as glare rather than as paper.
+   *
+   * So: a 4.5% drop in luminance, and cool rather than warm. The
+   * direction matters more than the amount. Pulling the blue channel
+   * DOWN (250 250 248 and similar) is the bone mistake in miniature —
+   * a yellow cast, just a fainter one. This leans the other way, blue
+   * a touch above red, which reads as clean white paper rather than
+   * aged white paper. It is Tailwind's slate-50, so it sits in the
+   * same palette family as the blues already used across the site.
+   * Navy body copy on it scores 16.4:1, so nothing about legibility
+   * moved.
    *
    * --azee-chalk is the headline colour on dark: a slightly desaturated
    * off-white, never pure #fff, which is what keeps oversized display
@@ -94,7 +109,7 @@
    * the site, not just these sections.
    */
   --azee-panel: 8 17 48;
-  --azee-paper: 255 255 255;
+  --azee-paper: 249 250 252;
   --azee-chalk: 232 230 225;
 }
 

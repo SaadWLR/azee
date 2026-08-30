@@ -217,18 +217,25 @@ test("every section's ground agrees with what it tells the nav", async ({
   await page.goto(PAGE);
   await expect(page.locator("h1")).toBeVisible();
 
-  const sections = await page.evaluate(() =>
-    [...document.querySelectorAll("main > section")].map((el) => ({
+  const sections = await page.evaluate(() => {
+    /*
+     * The light ground is read from --azee-paper rather than written
+     * out as #fff. It came off true white once already — a full-white
+     * section between navy neighbours read as glare — and a literal
+     * here would have to be chased every time it is re-tuned.
+     */
+    const root = getComputedStyle(document.documentElement);
+    const paper = `rgb(${root.getPropertyValue("--azee-paper").trim().split(/\s+/).join(", ")})`;
+    return [...document.querySelectorAll("main > section")].map((el) => ({
       heading: el.querySelector("h1, h2")?.textContent?.trim().slice(0, 30) ?? "(no heading)",
       background: getComputedStyle(el).backgroundColor,
+      isPaper: getComputedStyle(el).backgroundColor === paper,
       claimsLight: el.getAttribute("data-nav-theme-section") === "light",
-    })),
-  );
+    }));
+  });
   expect(sections.length, "the page has its seven sections").toBe(7);
 
-  const disagreements = sections.filter(
-    (s) => (s.background === "rgb(255, 255, 255)") !== s.claimsLight,
-  );
+  const disagreements = sections.filter((s) => s.isPaper !== s.claimsLight);
   expect(
     disagreements,
     "a white section must claim light, and a navy one must not",
@@ -236,9 +243,7 @@ test("every section's ground agrees with what it tells the nav", async ({
 
   // And the rhythm itself: the four-section navy run is the point of
   // the fix, so a white section reappearing inside it fails here.
-  const rhythm = sections.map((s) =>
-    s.background === "rgb(255, 255, 255)" ? "white" : "navy",
-  );
+  const rhythm = sections.map((s) => (s.isPaper ? "white" : "navy"));
   expect(rhythm).toEqual([
     "navy", // header
     "navy", // gauge
