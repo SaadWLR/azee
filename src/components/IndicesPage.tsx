@@ -2,14 +2,20 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
-import { useFullIndices, useGlobalFutures } from "../hooks/useMarketData";
+import {
+  useFullIndices,
+  useGlobalFutures,
+  useIndexHistory,
+} from "../hooks/useMarketData";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { getIndexConstituents } from "../services/marketService";
+import { IndexHistoryChart } from "./IndexHistoryChart";
 import type {
   FullIndexQuote,
   GlobalFuturesQuote,
   IndexConstituentsResponse,
 } from "../types";
+import type { SymbolHistoryResponse } from "../types/history";
 
 /*
  * /indices has two tabs (Corporate-Calendar pattern):
@@ -142,7 +148,9 @@ function ConstituentsPanel({
 
   const { constituents, count } = state.data;
   return (
-    <div className="bg-white/[0.02] px-3 py-3 sm:px-5">
+    // The panel tint lives on DrilldownPanel's wrapper now that this
+    // shares it with the price chart; the padding stays here.
+    <div className="px-3 py-3 sm:px-5">
       <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-300/80">
         {count} constituents
       </p>
@@ -187,6 +195,110 @@ function ConstituentsPanel({
 }
 
 /**
+ * The price chart's own loading/error/empty states.
+ *
+ * Deliberately the same three states, in the same voice and the same
+ * type, as ConstituentsPanel above — the two live in one panel and
+ * would read as two different products otherwise.
+ *
+ * The cached value is rendered directly rather than waiting on the
+ * hook, so re-opening an index that has already been fetched paints
+ * immediately instead of flashing "Loading…" for a frame.
+ */
+function PriceHistoryPanel({
+  code,
+  cache,
+}: {
+  code: string;
+  cache: Map<string, SymbolHistoryResponse>;
+}) {
+  const cached = cache.get(code);
+  const { data, loading, error } = useIndexHistory(code, cache);
+  const history = cached ?? data;
+
+  if (!history) {
+    return (
+      <div className="px-5 py-6 text-center text-xs text-gray-400">
+        {loading && !error
+          ? "Loading price history…"
+          : "Price history is temporarily unavailable."}
+      </div>
+    );
+  }
+
+  if (!history.points.length) {
+    return (
+      <div className="px-5 py-6 text-center text-xs text-gray-400">
+        No price history is published for this index.
+      </div>
+    );
+  }
+
+  return <IndexHistoryChart points={history.points} />;
+}
+
+type DrilldownTab = "constituents" | "history";
+
+const DRILLDOWN_TABS: { key: DrilldownTab; label: string }[] = [
+  { key: "constituents", label: "Constituents" },
+  { key: "history", label: "Price History" },
+];
+
+/**
+ * The expanded row: what used to be ConstituentsPanel alone.
+ *
+ * Constituents stays the default, so expanding a row shows exactly
+ * what it showed before and nothing changes for anyone who does not
+ * click. Price History mounts only when selected, which is what keeps
+ * the archive from being fetched for a row somebody opened to read the
+ * constituent list.
+ */
+function DrilldownPanel({
+  code,
+  constituentsCache,
+  historyCache,
+}: {
+  code: string;
+  constituentsCache: Map<string, IndexConstituentsResponse>;
+  historyCache: Map<string, SymbolHistoryResponse>;
+}) {
+  const [tab, setTab] = useState<DrilldownTab>("constituents");
+
+  return (
+    <div className="bg-white/[0.02]">
+      <div
+        role="tablist"
+        aria-label={`${code} details`}
+        className="flex items-center gap-1 px-3 pt-3 sm:px-5"
+      >
+        {DRILLDOWN_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-full px-4 py-1.5 text-[11px] font-semibold transition-colors duration-300 ${
+              tab === t.key
+                ? "bg-[rgb(var(--azee-chalk))] text-[rgb(var(--azee-navy))]"
+                : "text-white/60 hover:text-white"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "constituents" ? (
+        <ConstituentsPanel code={code} cache={constituentsCache} />
+      ) : (
+        <PriceHistoryPanel code={code} cache={historyCache} />
+      )}
+    </div>
+  );
+}
+
+/**
  * PSX benchmark indices table + drill-down. Extracted verbatim from the
  * pre-tabs IndicesPage — its data fetching (useFullIndices), sort, and
  * constituent drill-down are unchanged; only the surrounding page chrome
@@ -204,6 +316,10 @@ function PsxIndicesView() {
   // constituents so re-expanding never refetches.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const cacheRef = useRef<Map<string, IndexConstituentsResponse>>(new Map());
+  // The same idea for price archives, kept in its own Map rather than a
+  // union type — two caches of two shapes read more plainly than one
+  // keyed structure holding either.
+  const historyCacheRef = useRef<Map<string, SymbolHistoryResponse>>(new Map());
 
   function toggleSort(column: SortColumn) {
     setSort((prev) =>
@@ -337,9 +453,10 @@ function PsxIndicesView() {
                       {isOpen && (
                         <tr className="border-b border-white/5 last:border-b-0">
                           <td colSpan={COLUMNS.length} className="p-0">
-                            <ConstituentsPanel
+                            <DrilldownPanel
                               code={index.code}
-                              cache={cacheRef.current}
+                              constituentsCache={cacheRef.current}
+                              historyCache={historyCacheRef.current}
                             />
                           </td>
                         </tr>

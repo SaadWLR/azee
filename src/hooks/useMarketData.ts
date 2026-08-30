@@ -5,6 +5,7 @@ import {
   getForex,
   getFullIndices,
   getGlobalFutures,
+  getIndexHistory,
   getMarketIndices,
   getMarketSnapshot,
   getKseHistory,
@@ -21,7 +22,9 @@ import type {
   ComparisonChips,
   HistoricalScore,
 } from "../services/sentimentService";
+import type { SymbolHistoryResponse } from "../types/history";
 import type { FearOptimismResponse } from "../types/sentiment";
+import { useCallback } from "react";
 import { useAsyncData } from "./useAsyncData";
 
 export function useMarketSnapshot() {
@@ -190,6 +193,35 @@ export function useFearOptimismIndex() {
  */
 export function useKseHistory() {
   return useAsyncData(getKseHistory);
+}
+
+/**
+ * One benchmark index's price archive.
+ *
+ * No polling, for the reason above — PSX publishes once a day and that
+ * does not vary by index. The fetcher is rebuilt when the code changes
+ * so switching indices refetches rather than serving the previous
+ * one's series under a new name.
+ *
+ * OPTIONALLY CACHED, because useAsyncData refetches whenever it mounts
+ * and /indices mounts this every time a row is re-expanded. Passing the
+ * page's session Map makes a second look at an index free, the way
+ * re-opening a constituents panel already is. Callers without a Map —
+ * a future per-stock page, say — simply fetch each time.
+ */
+export function useIndexHistory(
+  code: string,
+  cache?: Map<string, SymbolHistoryResponse>,
+) {
+  const fetcher = useCallback(() => {
+    const hit = cache?.get(code);
+    if (hit) return Promise.resolve(hit);
+    return getIndexHistory(code).then((response) => {
+      cache?.set(code, response);
+      return response;
+    });
+  }, [code, cache]);
+  return useAsyncData(fetcher);
 }
 
 export interface FearOptimismDetail {

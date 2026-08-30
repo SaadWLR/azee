@@ -5,14 +5,27 @@ import type {
   EodPoint,
   GoldPoint,
   KseHistoryResponse,
+  SymbolHistoryResponse,
 } from "../../src/types/history";
 
 /**
  * GET /api/market/history
+ * GET /api/market/history?symbol=<CODE>
  *
- * The KSE-100's end-of-day archive, plus the two histories the daily
- * recorder keeps: market breadth, and gold/USD-PKR for Safe Haven
- * Demand.
+ * Without a symbol: the KSE-100's end-of-day archive, plus the two
+ * histories the daily recorder keeps — market breadth, and
+ * gold/USD-PKR for Safe Haven Demand. This is the Fear and Optimism
+ * Index's own data path and its shape is fixed.
+ *
+ * With a symbol: that PSX benchmark index's price archive alone, for
+ * the price-history charts on /indices. Same upstream, same parser,
+ * same cache policy; a leaner body, because breadth and gold are
+ * Fear-and-Optimism inputs rather than facts about an index.
+ *
+ * ONE ROUTE, TWO SHAPES, deliberately. The Hobby plan allows twelve
+ * serverless functions and this project sits at eleven, so a second
+ * route to run the same fetch-and-parse against a different path
+ * segment would spend the last slot on a branch.
  *
  * WHY THEY TRAVEL TOGETHER. They are unrelated in origin — one is
  * PSX's own multi-year archive, the others are files this site writes
@@ -33,7 +46,41 @@ import type {
  * PSX. This follows forex.ts's once-daily reasoning instead.
  */
 
-const EOD_URL = "https://dps.psx.com.pk/timeseries/eod/KSE100";
+const EOD_BASE = "https://dps.psx.com.pk/timeseries/eod";
+
+/** The KSE-100, and the symbol the no-query path is really asking for. */
+const DEFAULT_SYMBOL = "KSE100";
+
+/**
+ * Which codes this route will fetch, and nothing else.
+ *
+ * An allowlist rather than passthrough: `?symbol=` reaching straight
+ * into a URL would turn this function into an open proxy for
+ * dps.psx.com.pk, letting anyone spend this project's Vercel quota on
+ * requests it has no interest in serving. These are exactly the ten
+ * benchmark indices /indices renders, all verified against the live
+ * archive — every one returns the same envelope and row shape parseEod
+ * already handles.
+ *
+ * Three of them are SHORTER than the rest (PSXDIV20 from 2022-09-05,
+ * BKTI and OGTI from 2021-10-25, against 2021-08-30 for the other
+ * seven). Those indices launched later; the archive is complete and
+ * the chart draws what exists rather than padding a start nobody
+ * published. Adding stock symbols here is the natural next step for a
+ * per-stock chart, and is deliberately not done yet.
+ */
+const ALLOWED_SYMBOLS = new Set([
+  "KSE100",
+  "KSE30",
+  "ALLSHR",
+  "KMI30",
+  "KMIALLSHR",
+  "UPP9",
+  "NITPGI",
+  "PSXDIV20",
+  "BKTI",
+  "OGTI",
+]);
 
 /** Sanity floor: PSX's archive runs to thousands of sessions. */
 const MIN_VALID_POINTS = 200;
@@ -107,13 +154,13 @@ function parseEod(payload: unknown): EodPoint[] {
   return points;
 }
 
-async function fetchEod(): Promise<EodPoint[]> {
-  const response = await fetch(EOD_URL, {
+async function fetchEod(symbol: string): Promise<EodPoint[]> {
+  const response = await fetch(`${EOD_BASE}/${symbol}`, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
-    throw new Error(`PSX EOD responded ${response.status}`);
+    throw new Error(`PSX EOD responded ${response.status} for ${symbol}`);
   }
   return parseEod(await response.json());
 }
@@ -183,18 +230,95 @@ const fetchGoldHistory = () =>
       p.usdPkr > 50,
   );
 
-/** Survives warm invocations; the graceful answer when PSX is down. */
-let lastGood: EodPoint[] | null = null;
+/**
+ * Survives warm invocations; the graceful answer when PSX is down.
+ *
+ * KEYED BY SYMBOL, and that is the whole point. A single shared slot
+ * would mean the last symbol fetched became every symbol's fallback:
+ * ask for BKTI while PSX is failing and you would be served the
+ * KSE-100's archive under BKTI's name, with `source: "cache"` as the
+ * only hint — a chart of the wrong index, drawn confidently. The
+ * symbol-less path and `?symbol=KSE100` share the DEFAULT_SYMBOL entry
+ * rather than keeping two copies of the same archive.
+ */
+const lastGood = new Map<string, EodPoint[]>();
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+/**
+ * One index's price archive — the `?symbol=` branch.
+ *
+ * Leaner than the default response on purpose: no breadth, no gold.
+ * Those are recorded for the Fear and Optimism Index and say nothing
+ * about the Bank Index. Same cache policy, because the constraint is
+ * PSX's once-a-day publish and that does not vary by symbol; Vercel's
+ * edge cache keys on the full URL, so each symbol caches separately
+ * with no extra plumbing.
+ */
+async function serveSymbol(symbol: string, res: VercelResponse) {
+  try {
+    const points = await fetchEod(symbol);
+    lastGood.set(symbol, points);
+    res.setHeader(
+      "Cache-Control",
+      "s-maxage=21600, stale-while-revalidate=86400",
+    );
+    const body: SymbolHistoryResponse = {
+      symbol,
+      points,
+      asOf: new Date().toISOString(),
+      source: "psx",
+    };
+    res.status(200).json(body);
+  } catch (cause) {
+    Sentry.captureException(cause);
+    const cached = lastGood.get(symbol);
+    if (cached) {
+      res.setHeader("Cache-Control", "s-maxage=300");
+      const body: SymbolHistoryResponse = {
+        symbol,
+        points: cached,
+        asOf: new Date().toISOString(),
+        source: "cache",
+        stale: true,
+      };
+      res.status(200).json(body);
+      return;
+    }
+    res.setHeader("Cache-Control", "no-store");
+    res.status(503).json({
+      error: `${symbol} history is temporarily unavailable`,
+    });
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /*
+   * A symbol turns this into the plain price-archive route. Absent, it
+   * stays exactly what it has always been — the Fear and Optimism
+   * Index's own data path, which must not change shape.
+   */
+  const raw = req.query.symbol;
+  const requested = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof requested === "string" && requested.length > 0) {
+    const symbol = requested.toUpperCase();
+    if (!ALLOWED_SYMBOLS.has(symbol)) {
+      res.setHeader("Cache-Control", "no-store");
+      res.status(400).json({
+        error: `Unknown symbol "${requested}" — this route serves the PSX benchmark indices only`,
+      });
+      return;
+    }
+    await serveSymbol(symbol, res);
+    return;
+  }
+
   // The breadth read never blocks the archive: they are independent
   // sources and one being unavailable must not cost the other.
   const breadthPromise = fetchBreadthHistory();
   const goldPromise = fetchGoldHistory();
 
   try {
-    const points = await fetchEod();
-    lastGood = points;
+    const points = await fetchEod(DEFAULT_SYMBOL);
+    lastGood.set(DEFAULT_SYMBOL, points);
     /*
      * A full trading day of edge cache. The upstream updates once,
      * after close; anything shorter re-fetches 52 KB to be told the
@@ -215,10 +339,11 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     res.status(200).json(body);
   } catch (cause) {
     Sentry.captureException(cause);
-    if (lastGood) {
+    const cached = lastGood.get(DEFAULT_SYMBOL);
+    if (cached) {
       res.setHeader("Cache-Control", "s-maxage=300");
       const body: KseHistoryResponse = {
-        points: lastGood,
+        points: cached,
         breadthHistory: await breadthPromise,
         goldHistory: await goldPromise,
         asOf: new Date().toISOString(),

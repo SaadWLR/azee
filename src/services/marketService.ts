@@ -1,6 +1,10 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type { ForexResponse } from "../types/forex";
-import type { EodPoint, KseHistoryResponse } from "../types/history";
+import type {
+  EodPoint,
+  KseHistoryResponse,
+  SymbolHistoryResponse,
+} from "../types/history";
 import type {
   MarketBreadth,
   EtfQuote,
@@ -519,17 +523,21 @@ export async function getMarketWatch(): Promise<MarketWatchResponse> {
  * This never reaches production — the DEV branch below is the only
  * caller, and deployed builds always fetch the real archive.
  */
-function devKseSeries(): EodPoint[] {
-  let seed = 20260827;
+function devKseSeries(
+  seedValue = 20260827,
+  sessions = 700,
+  startLevel = 120_000,
+): EodPoint[] {
+  let seed = seedValue;
   const rand = () => {
     // Numerical Recipes LCG: deterministic, and adequate for a fixture.
     seed = (1664525 * seed + 1013904223) % 4294967296;
     return seed / 4294967296;
   };
   const points: EodPoint[] = [];
-  let close = 120_000;
+  let close = startLevel;
   const start = new Date("2023-01-02T00:00:00Z");
-  for (let i = 0; i < 700; i++) {
+  for (let i = 0; i < sessions; i++) {
     // A mild upward drift with fat-ish daily noise, so momentum and
     // volatility both have something to rank.
     close *= 1 + (rand() - 0.47) * 0.02;
@@ -562,6 +570,46 @@ export async function getKseHistory(): Promise<KseHistoryResponse> {
     });
   }
   return apiGet<KseHistoryResponse>("/api/market/history");
+}
+
+/**
+ * One benchmark index's price archive, for the /indices charts.
+ *
+ * Not polled, for the same reason getKseHistory is not: PSX publishes
+ * end-of-day data once, after close, and that is true of every index
+ * alike.
+ *
+ * The DEV fixture reuses devKseSeries rather than copying its random
+ * walk, seeded from the code so each index draws a different but
+ * reproducible line — and shortened for the three indices that really
+ * are shorter, so the truncation note is reachable locally instead of
+ * only against production.
+ */
+export async function getIndexHistory(
+  code: string,
+): Promise<SymbolHistoryResponse> {
+  if (import.meta.env.DEV) {
+    const seed = [...code].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+    /*
+     * The three genuinely-shorter indices get a genuinely shorter
+     * fixture — and a much shorter one than reality, on purpose. Their
+     * real archives run to ~4.8 years, so no range tab up to 1Y ever
+     * reaches past their start and the chart's truncation branch never
+     * fires against production. 200 sessions is under a year, which
+     * makes that path reachable under `vite dev` instead of only in
+     * theory.
+     */
+    const short = code === "PSXDIV20" || code === "BKTI" || code === "OGTI";
+    return mockResponse({
+      symbol: code,
+      points: devKseSeries(seed, short ? 200 : 700, 8_000 + (seed % 90_000)),
+      asOf: new Date().toISOString(),
+      source: "psx" as const,
+    });
+  }
+  return apiGet<SymbolHistoryResponse>(
+    `/api/market/history?symbol=${encodeURIComponent(code)}`,
+  );
 }
 
 export async function getAllMarketQuotes(): Promise<StockQuote[]> {

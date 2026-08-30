@@ -97,3 +97,28 @@ export interface KseHistoryResponse {
   source: "psx" | "cache";
   stale?: boolean;
 }
+
+/**
+ * One PSX index's price archive, and nothing else.
+ *
+ * Deliberately NOT KseHistoryResponse with the symbol bolted on. That
+ * type carries breadthHistory and goldHistory, which exist to feed the
+ * Fear and Optimism Index and are meaningless for, say, the Bank
+ * Index — a response that always shipped them as undefined would
+ * invite a reader to wonder whether BKTI's breadth had simply not been
+ * recorded yet, when in truth no such thing is defined for it.
+ *
+ * `points` reuses EodPoint unchanged. Despite living in a file named
+ * around the KSE-100's history, nothing in that shape is specific to
+ * the KSE-100 — it is a date, a close, a volume and the fourth column
+ * PSX serves for every index alike.
+ */
+export interface SymbolHistoryResponse {
+  /** The PSX index/symbol code this history is for. */
+  symbol: string;
+  /** Full available EOD series, oldest first. */
+  points: EodPoint[];
+  asOf: string;
+  source: "psx" | "cache";
+  stale?: boolean;
+}
