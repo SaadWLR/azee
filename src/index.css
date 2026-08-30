@@ -20,6 +20,19 @@
   --azee-navy: 12 24 66;
   --azee-royal: 0 25 141;
   /*
+   * --azee-sky is Tailwind v4's default blue-300 — this project's own
+   * Tailwind build resolves that utility to oklch(80.9% 0.105 251.813),
+   * confirmed by rendering it and reading back the actual sRGB pixel
+   * (142 197 255) rather than converting the OKLCH by hand. Sampled from
+   * the same shade already used for labels, borders and badges on
+   * Indices, Market Watch, Corporate Calendar and most other inner
+   * pages, lifted here as a named token for the ONE place outside those
+   * pages that needs it: the Fear and Optimism Index's "fear" coloring.
+   * Deliberately not a replacement for --azee-blue, which keeps its own
+   * job as the site's ambient glow color everywhere else.
+   */
+  --azee-sky: 142 197 255;
+  /*
    * Brand orange, sampled directly from the logo mark (#e95126). A
    * deliberately RARE accent — the site stays predominantly navy/blue.
    * Reserved for the primary "Open a Trading Account" conversion action

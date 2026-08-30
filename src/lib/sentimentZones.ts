@@ -15,11 +15,21 @@ import type { SentimentZone } from "../types/sentiment";
  * sits on the chart's y-axis — and the pair is covered by a test that
  * asserts they agree, so the picture cannot drift from the arithmetic.
  *
- * COOL TO WARM, in the site's own palette. --azee-blue at the fear
- * end, --azee-orange at the optimism end, desaturated chalk between.
+ * COOL TO WARM, in the site's own palette. --azee-sky at the fear end,
+ * --azee-orange at the optimism end, desaturated chalk between.
  * Deliberately not red/green: on this site red and green already mean
  * a price moved down or up, and borrowing them here would read as a
  * loss and a gain rather than a mood.
+ *
+ * SKY, NOT --azee-blue, and the distinction is the point. --azee-blue
+ * is the site's ambient glow — it appears at 0.05-0.35 alpha behind
+ * buttons and panel edges and is never asked to be a colour you look
+ * AT. The fear zones use their colour at full strength on a wedge, a
+ * chart line and a legend chip, and the deep royal read as a different
+ * blue from the one every other page labels things with. This is that
+ * lighter blue-300, the shade Indices, Market Watch and the calendar
+ * already use for labels and badges, so the index looks like the rest
+ * of the site rather than like a second palette.
  */
 export interface ZoneBand {
   zone: SentimentZone;
@@ -40,17 +50,17 @@ export const ZONE_BANDS: ZoneBand[] = [
     zone: "Extreme Fear",
     from: 0,
     to: 30,
-    stroke: "rgb(var(--azee-blue))",
-    text: "rgb(var(--azee-blue))",
-    wash: "rgb(var(--azee-blue) / 0.14)",
+    stroke: "rgb(var(--azee-sky))",
+    text: "rgb(var(--azee-sky))",
+    wash: "rgb(var(--azee-sky) / 0.14)",
   },
   {
     zone: "Fear",
     from: 30,
     to: 45,
-    stroke: "rgb(var(--azee-blue) / 0.5)",
-    text: "rgb(var(--azee-blue) / 0.85)",
-    wash: "rgb(var(--azee-blue) / 0.08)",
+    stroke: "rgb(var(--azee-sky) / 0.5)",
+    text: "rgb(var(--azee-sky) / 0.85)",
+    wash: "rgb(var(--azee-sky) / 0.08)",
   },
   {
     zone: "Neutral",

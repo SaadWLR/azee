@@ -232,7 +232,7 @@ export function SentimentDial({
             x={geo.cx - geo.r}
             y={geo.cy + 16}
             textAnchor="middle"
-            className="fill-[rgb(var(--azee-blue))] text-[9px] font-semibold uppercase"
+            className="fill-[rgb(var(--azee-sky))] text-[9px] font-semibold uppercase"
             style={{ letterSpacing: "0.08em" }}
           >
             Fear
