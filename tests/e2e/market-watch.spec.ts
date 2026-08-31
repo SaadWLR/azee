@@ -27,11 +27,18 @@ async function symbols(page: Page) {
   return page.locator(`${ROWS} td:first-child`).allInnerTexts();
 }
 
-/** Just the ticker text — the first span inside the symbol cell. */
+/**
+ * Just the ticker text.
+ *
+ * The ticker is an ANCHOR now, linking to that symbol's detail page —
+ * it used to be a bare span, and a `span span:first-child` selector
+ * silently started matching the index badge instead. Targeting the link
+ * is both correct and more specific: nothing else in the cell is one.
+ */
+const TICKER_LINK = `${ROWS} td:first-child a[href^="/market-watch/"]`;
+
 async function tickers(page: Page) {
-  return page
-    .locator(`${ROWS} td:first-child span span:first-child`)
-    .allInnerTexts();
+  return page.locator(TICKER_LINK).allInnerTexts();
 }
 
 /**
@@ -69,6 +76,15 @@ test("loads directly via URL (SPA rewrite) with real PSX data", async ({
   // element, since the cell around it now also carries the company name.
   const firstTicker = (await tickers(page))[0];
   expect(firstTicker).toMatch(/^[A-Z0-9.\-]{1,12}$/);
+
+  /*
+   * And the ticker points at its own detail page. A real anchor rather
+   * than a click handler on the row is what makes the table keyboard
+   * navigable, so the href is worth pinning: it is the whole reason
+   * this is a link and not a span.
+   */
+  const firstLink = page.locator(TICKER_LINK).first();
+  await expect(firstLink).toHaveAttribute("href", `/market-watch/${firstTicker}`);
 
   // Real price, not a zero/placeholder.
   const firstPrice = Number.parseFloat(
