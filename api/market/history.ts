@@ -17,10 +17,14 @@ import type {
  * gold/USD-PKR for Safe Haven Demand. This is the Fear and Optimism
  * Index's own data path and its shape is fixed.
  *
- * With a symbol: that PSX benchmark index's price archive alone, for
- * the price-history charts on /indices. Same upstream, same parser,
+ * With a symbol: that instrument's price archive alone — either one of
+ * the ten benchmark indices, for the charts on /indices, or any PSX
+ * stock ticker, for the charts on /market-watch/:symbol. PSX serves
+ * both from the same path under the same envelope, so one code path
+ * covers them; only the validation in front of it distinguishes a
+ * named index from a well-formed ticker. Same upstream, same parser,
  * same cache policy; a leaner body, because breadth and gold are
- * Fear-and-Optimism inputs rather than facts about an index.
+ * Fear-and-Optimism inputs rather than facts about an instrument.
  *
  * ONE ROUTE, TWO SHAPES, deliberately. The Hobby plan allows twelve
  * serverless functions and this project sits at eleven, so a second
@@ -52,22 +56,19 @@ const EOD_BASE = "https://dps.psx.com.pk/timeseries/eod";
 const DEFAULT_SYMBOL = "KSE100";
 
 /**
- * Which codes this route will fetch, and nothing else.
+ * The ten benchmark indices, by name.
  *
- * An allowlist rather than passthrough: `?symbol=` reaching straight
- * into a URL would turn this function into an open proxy for
- * dps.psx.com.pk, letting anyone spend this project's Vercel quota on
- * requests it has no interest in serving. These are exactly the ten
- * benchmark indices /indices renders, all verified against the live
- * archive — every one returns the same envelope and row shape parseEod
- * already handles.
+ * A closed, hand-verified set: every one was checked against the live
+ * archive and returns the same envelope and row shape parseEod already
+ * handles. Index codes do not follow the ticker format stocks do
+ * (ALLSHR, KMIALLSHR, UPP9), so they cannot be recognised by shape and
+ * are listed instead.
  *
  * Three of them are SHORTER than the rest (PSXDIV20 from 2022-09-05,
  * BKTI and OGTI from 2021-10-25, against 2021-08-30 for the other
  * seven). Those indices launched later; the archive is complete and
  * the chart draws what exists rather than padding a start nobody
- * published. Adding stock symbols here is the natural next step for a
- * per-stock chart, and is deliberately not done yet.
+ * published.
  */
 const ALLOWED_SYMBOLS = new Set([
   "KSE100",
@@ -81,6 +82,22 @@ const ALLOWED_SYMBOLS = new Set([
   "BKTI",
   "OGTI",
 ]);
+
+/**
+ * A real PSX ticker shape: uppercase letters/digits, 2 to 8 characters
+ * (covers everything from "786" to "LOTCHEM"). This is a FORMAT check,
+ * not a membership check — it exists so this route can't be driven as
+ * an open proxy for arbitrary dps.psx.com.pk paths, not to pre-validate
+ * that the symbol is currently listed. A well-formed but nonexistent or
+ * delisted symbol reaches fetchEod and fails there, the same way a real
+ * symbol PSX is temporarily not serving does today — this route already
+ * has a fallback-cache/503 path for exactly that, unchanged by this.
+ *
+ * The alternative was a 493-entry allowlist of currently-listed stocks,
+ * which would need re-verifying every time a company lists or delists
+ * and would answer 400 for a symbol PSX itself still serves.
+ */
+const STOCK_SYMBOL_RE = /^[A-Z0-9]{2,8}$/;
 
 /** Sanity floor: PSX's archive runs to thousands of sessions. */
 const MIN_VALID_POINTS = 200;
@@ -300,10 +317,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requested = Array.isArray(raw) ? raw[0] : raw;
   if (typeof requested === "string" && requested.length > 0) {
     const symbol = requested.toUpperCase();
-    if (!ALLOWED_SYMBOLS.has(symbol)) {
+    if (!ALLOWED_SYMBOLS.has(symbol) && !STOCK_SYMBOL_RE.test(symbol)) {
       res.setHeader("Cache-Control", "no-store");
       res.status(400).json({
-        error: `Unknown symbol "${requested}" — this route serves the PSX benchmark indices only`,
+        error: `"${requested}" doesn't look like a PSX index or stock symbol`,
       });
       return;
     }

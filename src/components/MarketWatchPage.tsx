@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useAllMarketQuotes } from "../hooks/useMarketData";
@@ -307,9 +308,16 @@ export function MarketWatchPage() {
                       >
                         <td className="px-5 py-3">
                           <span className="flex items-center gap-2">
-                            <span className="font-semibold tracking-wide text-white">
+                            {/* A real anchor on the symbol, not a
+                                clickable row: the row would need its own
+                                keyboard and focus handling to be usable,
+                                and this is already both. */}
+                            <Link
+                              to={`/market-watch/${quote.symbol}`}
+                              className="font-semibold tracking-wide text-white transition-colors duration-300 hover:text-blue-300"
+                            >
                               {quote.symbol}
-                            </span>
+                            </Link>
                             {membershipBadge(quote) && (
                               <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-300">
                                 {membershipBadge(quote)}

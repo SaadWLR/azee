@@ -22,6 +22,17 @@ const MarketWatchPage = lazy(() =>
   })),
 );
 
+/*
+ * The per-symbol detail page, split off Market Watch's own chunk: a
+ * visitor reading the table does not download the chart until they
+ * click a ticker.
+ */
+const StockDetailPage = lazy(() =>
+  import("./components/StockDetailPage").then((m) => ({
+    default: m.StockDetailPage,
+  })),
+);
+
 const IndicesPage = lazy(() =>
   import("./components/IndicesPage").then((m) => ({
     default: m.IndicesPage,
@@ -178,6 +189,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <MarketWatchPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/market-watch/:symbol",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <StockDetailPage />
           </Suspense>
         ),
       },
