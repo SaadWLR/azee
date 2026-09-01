@@ -5,11 +5,24 @@ import type { AnnouncementsResponse } from "../types/announcements";
 
 /**
  * Development fixture mirroring /api/calendar/agm. Every entry is a
- * real meeting copied from the live endpoint (verified Jul 17 2026),
- * covering the mid-July EOGM cluster that follows Pakistan's June
- * fiscal year-end plus two later AGMs. As with PAYOUTS_FIXTURE below,
- * do not invent or re-attribute entries — production always serves
- * live PSX data, and a dev fixture that looks real must be real.
+ * real meeting copied from the live endpoint (verified Jul 17 2026,
+ * extended Sep 1 2026), covering the mid-July EOGM cluster that
+ * follows Pakistan's June fiscal year-end plus two later AGMs. As
+ * with PAYOUTS_FIXTURE below, do not invent or re-attribute entries —
+ * production always serves live PSX data, and a dev fixture that
+ * looks real must be real.
+ *
+ * The tail deliberately carries the two awkward shapes the live feed
+ * turned out to have, so both are exercised under `vite dev`:
+ *
+ *   • SPAC2 appears TWICE, byte-identical — PSX really does publish a
+ *     notice twice. Rows must therefore be keyed by source position;
+ *     keying on symbol+date+type collided and left React unable to
+ *     unmount one of them, stranding an AGM row inside the EOGM
+ *     filter (a shareholder could prepare for the wrong meeting).
+ *   • FHAM is an ARM — a modaraba's Annual Review Meeting. The type
+ *     is not limited to AGM/EOGM, so the filter chips are derived
+ *     from the data rather than hardcoded to that pair.
  */
 const CALENDAR_FIXTURE: MeetingCalendarResponse = {
   meetings: [
@@ -58,12 +71,41 @@ const CALENDAR_FIXTURE: MeetingCalendarResponse = {
       city: "Karachi",
       periodEnd: "2026-06-30",
     },
+    // Duplicated upstream — see the note above. Both rows are kept.
+    {
+      symbol: "SPAC2",
+      companyName: "LSE SPAC-II Limited",
+      meetingType: "AGM",
+      date: "2026-09-19",
+      time: "09:30",
+      city: "Lahore",
+      periodEnd: "2026-06-30",
+    },
+    {
+      symbol: "SPAC2",
+      companyName: "LSE SPAC-II Limited",
+      meetingType: "AGM",
+      date: "2026-09-19",
+      time: "09:30",
+      city: "Lahore",
+      periodEnd: "2026-06-30",
+    },
+    // A third meeting type: modaraba Annual Review Meeting.
+    {
+      symbol: "FHAM",
+      companyName: "First Habib Modaraba",
+      meetingType: "ARM",
+      date: "2026-10-07",
+      time: "15:00",
+      city: "Karachi",
+      periodEnd: "2026-06-30",
+    },
   ],
   asOf: "2026-07-15T09:00:00.000Z",
   source: "psx",
 };
 
-/** Upcoming AGM/EOGM corporate meetings from the PSX calendar. */
+/** Upcoming corporate meetings from the PSX calendar. */
 export async function getCorporateCalendar(): Promise<MeetingCalendarResponse> {
   if (import.meta.env.DEV) {
     // Vercel serverless routes don't run under `vite dev`; the fixture

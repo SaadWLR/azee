@@ -26,7 +26,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const TAB_INTRO: Record<Tab, string> = {
   meetings:
-    "Upcoming AGM and EOGM meetings of PSX-listed companies over the next 90 days — dates, times, and venues as reported to the Pakistan Stock Exchange.",
+    "Upcoming shareholder meetings of PSX-listed companies over the next 90 days — AGMs, EOGMs and every other meeting type PSX reports, with dates, times, and venues as filed with the Pakistan Stock Exchange.",
   payouts:
     "Recent dividend, bonus, and rights announcements from PSX-listed companies — shown exactly as the company reported them, with book closure dates where set.",
 };
@@ -51,17 +51,40 @@ function formatTime(time: string | undefined): string {
   return `${displayHours}:${match[2]} ${suffix}`;
 }
 
-/* ── Meetings view (unchanged behavior) ───────────────────────── */
+/* ── Meetings view ────────────────────────────────────────────── */
 
-type TypeFilter = "all" | "AGM" | "EOGM";
+/** "all", or a meetingType exactly as PSX reported it. */
+type TypeFilter = string;
 type SortColumn = "date" | "company";
 type SortDir = "asc" | "desc";
 
-const TYPE_FILTERS: { id: TypeFilter; label: string }[] = [
-  { id: "all", label: "All Meetings" },
-  { id: "AGM", label: "AGM" },
-  { id: "EOGM", label: "EOGM" },
-];
+/**
+ * AGM and EOGM lead the chips — they are the bulk of the calendar.
+ * Every other type PSX reports follows, alphabetically.
+ */
+const LEAD_TYPES = ["AGM", "EOGM"];
+
+/**
+ * The distinct types present, ordered for display.
+ *
+ * Derived from the data rather than a hardcoded AGM/EOGM pair: PSX
+ * reports more than those two — modaraba companies file an ARM
+ * (Annual Review Meeting), five of which were live when this was
+ * written — and against a fixed list those rows had no chip naming
+ * the type their own badge showed, reachable only under "All
+ * Meetings". Deriving the list means a type we have not seen before
+ * still gets its own filter instead of quietly becoming unfilterable,
+ * and every row stays reachable under its real type and no other.
+ */
+function typesPresent(meetings: CorporateMeeting[]): string[] {
+  const rank = (t: string) => {
+    const i = LEAD_TYPES.indexOf(t);
+    return i === -1 ? LEAD_TYPES.length : i;
+  };
+  return [...new Set(meetings.map((m) => m.meetingType))].sort(
+    (a, b) => rank(a) - rank(b) || a.localeCompare(b),
+  );
+}
 
 function MeetingsView() {
   const { data: calendar, loading, error } = useCorporateCalendar();
@@ -80,26 +103,57 @@ function MeetingsView() {
     );
   }
 
+  const typeFilters = useMemo(
+    () => [
+      { id: "all", label: "All Meetings" },
+      ...typesPresent(calendar?.meetings ?? []).map((t) => ({ id: t, label: t })),
+    ],
+    [calendar],
+  );
+
   const meetings = useMemo(() => {
-    let rows = calendar?.meetings ?? [];
+    /*
+     * Each row carries an identity assigned from the SOURCE order,
+     * used as its React key — the same treatment the payouts view
+     * below needs, for the same reason.
+     *
+     * symbol + date + meetingType is NOT unique: PSX can publish the
+     * same meeting notice twice, and does — seen live with SPAC2 (LSE
+     * SPAC-II, 19 Sep 2026 AGM, listed twice, byte-identical). Two
+     * rows sharing a key made React keep just one fiber under it, so
+     * the other row's <tr> was never unmounted when the list changed
+     * and stayed stranded in the table: selecting EOGM rendered every
+     * real EOGM row plus that leftover AGM row, filing a meeting
+     * under a type that was not its own — a shareholder could prepare
+     * for the wrong meeting. Neither row can be dropped; a duplicate
+     * in the source is the source's to resolve, not ours to silently
+     * discard from a meeting calendar.
+     *
+     * The index is taken before filtering or sorting, so a row keeps
+     * the same key as the view changes and React keeps reusing its
+     * DOM rather than remounting the table on every toggle.
+     */
+    let rows = (calendar?.meetings ?? []).map((meeting, i) => ({
+      meeting,
+      id: `${meeting.symbol}-${meeting.date}-${meeting.meetingType}-${i}`,
+    }));
     if (typeFilter !== "all") {
-      rows = rows.filter((m) => m.meetingType === typeFilter);
+      rows = rows.filter(({ meeting }) => meeting.meetingType === typeFilter);
     }
     const term = search.trim().toUpperCase();
     if (term) {
       rows = rows.filter(
-        (m) =>
-          m.symbol.includes(term) ||
-          m.companyName.toUpperCase().includes(term),
+        ({ meeting }) =>
+          meeting.symbol.includes(term) ||
+          meeting.companyName.toUpperCase().includes(term),
       );
     }
     const factor = sort.dir === "asc" ? 1 : -1;
-    rows = [...rows].sort((a, b) =>
+    return [...rows].sort((a, b) =>
       sort.column === "date"
-        ? factor * a.date.localeCompare(b.date)
-        : factor * a.companyName.localeCompare(b.companyName),
+        ? factor * a.meeting.date.localeCompare(b.meeting.date)
+        : factor * a.meeting.companyName.localeCompare(b.meeting.companyName),
     );
-    return rows;
   }, [calendar, typeFilter, search, sort]);
 
   return (
@@ -107,7 +161,7 @@ function MeetingsView() {
       {/* Controls */}
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
-          {TYPE_FILTERS.map((f) => (
+          {typeFilters.map((f) => (
             <button
               key={f.id}
               type="button"
@@ -190,9 +244,9 @@ function MeetingsView() {
                 </tr>
               </thead>
               <tbody>
-                {meetings.map((meeting: CorporateMeeting) => (
+                {meetings.map(({ meeting, id }: { meeting: CorporateMeeting; id: string }) => (
                   <tr
-                    key={`${meeting.symbol}-${meeting.date}-${meeting.meetingType}`}
+                    key={id}
                     className="border-b border-white/5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.04]"
                   >
                     <td className="whitespace-nowrap px-5 py-3 tabular-nums text-white">
@@ -496,7 +550,7 @@ function PayoutsView() {
 export function CorporateCalendarPage() {
   usePageMeta(
     "Corporate Calendar — PSX AGM/EOGM Meetings & Payouts | AZEE Trade",
-    "Upcoming AGM and EOGM meetings of PSX-listed companies, plus recent dividend, bonus, and rights announcements — as reported to the Pakistan Stock Exchange.",
+    "Upcoming shareholder meetings of PSX-listed companies — AGM, EOGM and more — plus recent dividend, bonus, and rights announcements, as reported to the Pakistan Stock Exchange.",
   );
   /*
    * Tab lives in the URL (?tab=payouts) so a view can be linked and
