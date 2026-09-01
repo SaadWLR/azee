@@ -2,8 +2,12 @@
 export interface CorporateMeeting {
   symbol: string;
   companyName: string;
-  /** As reported by PSX; AGM and EOGM are the observed values. */
-  meetingType: "AGM" | "EOGM" | string;
+  /**
+   * As reported by PSX. AGM and EOGM are the bulk of it; ARM (a
+   * modaraba's Annual Review Meeting) also occurs, so consumers must
+   * treat this as an open set and never assume the pair.
+   */
+  meetingType: "AGM" | "EOGM" | "ARM" | string;
   /** Meeting date, ISO YYYY-MM-DD. */
   date: string;
   /** Meeting time, HH:MM (24h), when provided. */
