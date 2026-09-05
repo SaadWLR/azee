@@ -36,6 +36,14 @@ export interface SentimentSignal {
   status: "live" | "calibrating";
   /** Shown when status is "calibrating" — what unlocks this signal. */
   calibratingNote?: string;
+  /**
+   * Shown under the description on a LIVE signal that is still short
+   * of its full ranking window — a recorded signal (Breadth, Safe
+   * Haven Demand) early in its expanding-window ramp-up. Absent once a
+   * signal reaches the full window, and never set on the three
+   * archive-backed signals, which only ever go live at full strength.
+   */
+  sampleNote?: string;
   description: string;
 }
 

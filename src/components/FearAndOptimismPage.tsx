@@ -133,6 +133,17 @@ function SignalCard({ signal }: { signal: SentimentSignal }) {
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {signal.description}
           </p>
+          {/*
+            * A live signal still building its window says so, quieter
+            * than the description it sits under. Same rule as the
+            * calibrating branch below: the copy comes from
+            * sentimentService, never rewritten here.
+            */}
+          {signal.sampleNote ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+              {signal.sampleNote}
+            </p>
+          ) : null}
         </>
       ) : (
         /*

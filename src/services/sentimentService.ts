@@ -95,17 +95,35 @@ const VOLUME_SHORT = 20;
 const VOLUME_LONG = 90;
 
 /**
- * How much of a signal's own past it is ranked against: ~500 sessions,
- * about two years of PSX trading.
+ * The full window a MATURE signal ranks against: ~500 sessions, about
+ * two years of PSX trading.
  *
- * Required in full rather than treated as a maximum. A percentile
- * against forty prior readings is arithmetic, not evidence — it would
- * produce a confident-looking number off a sample too small to mean
- * anything, which is precisely the kind of false precision the rest of
- * this file exists to avoid. Better to stay calibrating until the
- * window is genuinely there.
+ * Required in full for the three archive-backed signals below
+ * (Momentum, Volatility, Volume Momentum) — PSX's EOD archive already
+ * has it, so there is no reason to rank any of them against less. For
+ * the two recorded signals (Breadth, Safe Haven Demand) this is a CAP,
+ * not a floor — see MIN_RANK_WINDOW.
  */
 const RANK_WINDOW = 500;
+
+/**
+ * The least history a RECORDED signal (Breadth, Safe Haven Demand)
+ * will rank against at all. Below this, a percentile is arithmetic
+ * over too small a sample to mean anything — the same reasoning
+ * RANK_WINDOW's own comment makes for the archive-backed signals.
+ *
+ * Above it, a recorded signal goes LIVE on an EXPANDING window: it
+ * ranks against whatever the recorder has banked so far, up to
+ * RANK_WINDOW. The archive-backed signals below (Momentum, Volatility,
+ * Volume Momentum) don't use this — PSX's own EOD archive already runs
+ * past 1,200 sessions, so `rankAt`'s hard RANK_WINDOW requirement was
+ * never the bottleneck for them and is untouched. This constant exists
+ * only for the two signals this site is building up from zero, where a
+ * flat 500-session gate meant two full years of "Calibrating" for a
+ * metric a smaller-but-real sample can already say something honest
+ * about.
+ */
+const MIN_RANK_WINDOW = 60;
 
 const mean = (xs: number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;
 
@@ -126,6 +144,51 @@ const orient = (rank: number, inverted?: boolean) =>
 interface DatedRaw {
   date: string;
   raw: number;
+}
+
+interface ExpandingRank {
+  rank: number;
+  /** How many prior sessions this rank was actually computed against. */
+  windowSize: number;
+}
+
+/**
+ * Percentile rank of `today` against `priorValues`' trailing window —
+ * expanding until `priorValues` reaches `maxWindow`, then capped there.
+ * Undefined while `priorValues` is short of `minWindow`.
+ *
+ * The ONE implementation of "enough history", shared by the live
+ * recorded signals and by rankedByDate's reconstruction of them, for
+ * the same reason `orient` is shared: a chart whose points became live
+ * on a different rule from today's score would be two measurements on
+ * one axis.
+ */
+function rankAgainstExpanding(
+  today: number,
+  priorValues: number[],
+  minWindow: number,
+  maxWindow: number,
+): ExpandingRank | undefined {
+  if (priorValues.length < minWindow) return undefined;
+  const windowSize = Math.min(maxWindow, priorValues.length);
+  const rank = percentileRank(today, priorValues.slice(-windowSize));
+  if (!Number.isFinite(rank)) return undefined;
+  return { rank, windowSize };
+}
+
+/**
+ * Caption for a live recorded signal still short of the full window —
+ * undefined once it reaches RANK_WINDOW, which is when this stops
+ * being worth saying.
+ *
+ * A score off 65 sessions is real arithmetic on real data, but it is
+ * not the same claim as one off 500, and showing both with identical
+ * confidence would be the quiet kind of dishonesty this index is built
+ * to avoid.
+ */
+function sampleNoteFor(windowSize: number): string | undefined {
+  if (windowSize >= RANK_WINDOW) return undefined;
+  return `Ranked against ${windowSize} of a ${RANK_WINDOW}-session target — accuracy improves as more trading days accumulate.`;
 }
 
 /**
@@ -434,14 +497,19 @@ export function computeBreadthSignal(
   const history = breadthRawSeries(trinHistory);
   const today = breadth ? computeTrin(breadth) : null;
 
-  if (today !== null && history.length >= RANK_WINDOW) {
-    const window = history.slice(-RANK_WINDOW).map((p) => p.raw);
-    const rank = percentileRank(today, window);
-    if (Number.isFinite(rank)) {
+  if (today !== null) {
+    const ranked = rankAgainstExpanding(
+      today,
+      history.map((p) => p.raw),
+      MIN_RANK_WINDOW,
+      RANK_WINDOW,
+    );
+    if (ranked) {
       return {
         ...base,
         status: "live",
-        score: Math.round(orient(rank, BREADTH.inverted)),
+        score: Math.round(orient(ranked.rank, BREADTH.inverted)),
+        sampleNote: sampleNoteFor(ranked.windowSize),
       };
     }
   }
@@ -449,7 +517,7 @@ export function computeBreadthSignal(
   return {
     ...base,
     status: "calibrating",
-    calibratingNote: `Collecting live history — will join the composite once it has enough sessions to be ranked fairly (same treatment as Foreign Flows). ${history.length} of ${RANK_WINDOW} recorded so far`,
+    calibratingNote: `Collecting live history — needs at least ${MIN_RANK_WINDOW} recorded sessions to rank fairly. ${history.length} of ${MIN_RANK_WINDOW} recorded so far`,
   };
 }
 
@@ -544,34 +612,33 @@ export function computeSafeHavenSignal(
   const raws = safeHavenRawSeries(goldHistory, kseHistory).map((r) => r.raw);
 
   /*
-   * Same window as every other signal, and required in full for the
-   * same reason: a percentile against forty prior readings is
-   * arithmetic, not evidence.
+   * Unlike Breadth, "today" is not a separate live reading — it is the
+   * last entry of this same series, so it is held out of its own
+   * ranking window rather than compared against itself.
    */
-  if (raws.length <= RANK_WINDOW) {
-    return {
-      ...base,
-      status: "calibrating",
-      calibratingNote: `Backfilling gold and USD/PKR history — ${raws.length} of ${RANK_WINDOW} sessions ranked so far`,
-    };
-  }
-
-  const today = raws[raws.length - 1];
-  const window = raws.slice(-(RANK_WINDOW + 1), -1);
-  const rank = percentileRank(today, window);
-  if (!Number.isFinite(rank)) {
-    return {
-      ...base,
-      status: "calibrating",
-      calibratingNote:
-        "The latest session could not be ranked against its own history",
-    };
+  if (raws.length > 0) {
+    const today = raws[raws.length - 1];
+    const priorValues = raws.slice(0, -1);
+    const ranked = rankAgainstExpanding(
+      today,
+      priorValues,
+      MIN_RANK_WINDOW,
+      RANK_WINDOW,
+    );
+    if (ranked) {
+      return {
+        ...base,
+        status: "live",
+        score: Math.round(orient(ranked.rank, SAFE_HAVEN.inverted)),
+        sampleNote: sampleNoteFor(ranked.windowSize),
+      };
+    }
   }
 
   return {
     ...base,
-    status: "live",
-    score: Math.round(orient(rank, SAFE_HAVEN.inverted)),
+    status: "calibrating",
+    calibratingNote: `Backfilling gold and USD/PKR history — needs at least ${MIN_RANK_WINDOW} sessions ranked; ${Math.max(raws.length - 1, 0)} so far`,
   };
 }
 
@@ -621,15 +688,20 @@ const RECORDED: RecordedSpec[] = [BREADTH, SAFE_HAVEN];
  * Every past session this recorded signal can score, by date.
  *
  * Ranked WITHIN the signal's own series, not against the KSE-100
- * calendar: each reading is compared with the RANK_WINDOW readings the
- * recorder actually captured before it, which is the same window the
- * live function uses. Ranking against archive positions instead would
- * mean a single missing recording — one cron failure, one holiday the
- * upstream skipped — left a 500-wide hole that never closed.
+ * calendar: each reading is compared with the readings the recorder
+ * actually captured before it, which is the same window the live
+ * function uses. Ranking against archive positions instead would mean
+ * a single missing recording — one cron failure, one holiday the
+ * upstream skipped — left a hole that never closed.
  *
- * Empty until the recorder has banked more than RANK_WINDOW readings,
- * which is why this is invisible in production today and stays that
- * way until real data exists.
+ * EXPANDING, exactly as the live path is, and through the same helper:
+ * a day is scored once its signal has MIN_RANK_WINDOW readings behind
+ * it, against however many there are up to RANK_WINDOW. Reconstructing
+ * history on the old flat-500 rule while today's score used the new
+ * one would put a step in the line at the date the two rules diverge.
+ *
+ * Empty until the recorder has banked MIN_RANK_WINDOW readings, which
+ * is why this stays invisible until real data exists.
  */
 function rankedByDate(
   spec: RecordedSpec,
@@ -639,10 +711,16 @@ function rankedByDate(
   const values = raws.map((r) => r.raw);
   const byDate = new Map<string, number>();
 
-  for (let i = RANK_WINDOW; i < raws.length; i++) {
-    const rank = rankAt(values, i);
-    if (rank === undefined || !Number.isFinite(rank)) continue;
-    byDate.set(raws[i].date, orient(rank, spec.inverted));
+  for (let i = MIN_RANK_WINDOW; i < raws.length; i++) {
+    const priorValues = values.slice(Math.max(0, i - RANK_WINDOW), i);
+    const ranked = rankAgainstExpanding(
+      values[i],
+      priorValues,
+      MIN_RANK_WINDOW,
+      RANK_WINDOW,
+    );
+    if (!ranked) continue;
+    byDate.set(raws[i].date, orient(ranked.rank, spec.inverted));
   }
 
   return byDate;
