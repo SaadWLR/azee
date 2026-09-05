@@ -106,8 +106,16 @@ test("the displayed timestamp is the source's own, not our fetch time", async ({
 
   const first = await stamp();
   expect(first, "a source timestamp is displayed").toBeTruthy();
-  // It must be a real formatted date, not "just now" style wording.
-  expect(first).toMatch(/\d{1,2} \w{3} \d{4}, \d{2}:\d{2} PKT/);
+  /*
+   * It must be a real formatted date, not "just now" style wording.
+   *
+   * Three OR four letters for the month. en-GB's short form is three
+   * everywhere except September, which it renders "Sept" — so a \w{3}
+   * month passed eleven months of the year and failed every day of the
+   * twelfth. The intent here is "a formatted date rather than relative
+   * wording", and that is unchanged; only the month width was wrong.
+   */
+  expect(first).toMatch(/\d{1,2} \w{3,4} \d{4}, \d{2}:\d{2} PKT/);
 
   await page.waitForTimeout(5000);
   const second = await stamp();
