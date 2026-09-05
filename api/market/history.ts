@@ -99,8 +99,19 @@ const ALLOWED_SYMBOLS = new Set([
  */
 const STOCK_SYMBOL_RE = /^[A-Z0-9]{2,8}$/;
 
-/** Sanity floor: PSX's archive runs to thousands of sessions. */
+/** Sanity floor for an INDEX: PSX's archive runs to thousands of sessions. */
 const MIN_VALID_POINTS = 200;
+
+/**
+ * A much lower floor for individual stocks. A newly-listed company can
+ * have a genuinely short real history — ANLNV has 98 sessions today,
+ * confirmed against PSX directly, and that is PSX's honest answer, not
+ * a broken response. This still catches the failure MIN_VALID_POINTS
+ * exists for — a response so empty or malformed that parseEod extracted
+ * almost nothing from it — just without mistaking "this company is
+ * young" for "PSX changed its response shape."
+ */
+const MIN_VALID_STOCK_POINTS = 5;
 
 /**
  * PSX's row shape: [epochSeconds, close, volume, <index level>].
@@ -122,7 +133,12 @@ function toIsoDate(epochSeconds: number): string {
   return new Date(epochSeconds * 1000).toISOString().slice(0, 10);
 }
 
-function parseEod(payload: unknown): EodPoint[] {
+/**
+ * `minPoints` is supplied by the caller rather than read from module
+ * scope, because "too few sessions to trust" means something different
+ * for an index than for a stock — see MIN_VALID_STOCK_POINTS.
+ */
+function parseEod(payload: unknown, minPoints: number): EodPoint[] {
   const envelope = payload as PsxEodEnvelope;
   const rows = Array.isArray(envelope?.data) ? envelope.data : null;
   if (!rows) {
@@ -163,7 +179,7 @@ function parseEod(payload: unknown): EodPoint[] {
   // of them.
   points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  if (points.length < MIN_VALID_POINTS) {
+  if (points.length < minPoints) {
     throw new Error(
       `PSX EOD parse yielded only ${points.length} valid sessions — source may have changed`,
     );
@@ -171,7 +187,10 @@ function parseEod(payload: unknown): EodPoint[] {
   return points;
 }
 
-async function fetchEod(symbol: string): Promise<EodPoint[]> {
+async function fetchEod(
+  symbol: string,
+  minPoints: number,
+): Promise<EodPoint[]> {
   const response = await fetch(`${EOD_BASE}/${symbol}`, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(15_000),
@@ -179,7 +198,7 @@ async function fetchEod(symbol: string): Promise<EodPoint[]> {
   if (!response.ok) {
     throw new Error(`PSX EOD responded ${response.status} for ${symbol}`);
   }
-  return parseEod(await response.json());
+  return parseEod(await response.json(), minPoints);
 }
 
 /**
@@ -270,9 +289,13 @@ const lastGood = new Map<string, EodPoint[]>();
  * edge cache keys on the full URL, so each symbol caches separately
  * with no extra plumbing.
  */
-async function serveSymbol(symbol: string, res: VercelResponse) {
+async function serveSymbol(
+  symbol: string,
+  res: VercelResponse,
+  minPoints: number,
+) {
   try {
-    const points = await fetchEod(symbol);
+    const points = await fetchEod(symbol, minPoints);
     lastGood.set(symbol, points);
     res.setHeader(
       "Cache-Control",
@@ -324,7 +347,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       return;
     }
-    await serveSymbol(symbol, res);
+    /*
+     * Which floor applies follows from which check the symbol passed.
+     * A named benchmark index should always be deep, so it keeps the
+     * strict floor; anything that got here on ticker SHAPE alone is a
+     * stock, and may legitimately be young.
+     */
+    const minPoints = ALLOWED_SYMBOLS.has(symbol)
+      ? MIN_VALID_POINTS
+      : MIN_VALID_STOCK_POINTS;
+    await serveSymbol(symbol, res, minPoints);
     return;
   }
 
@@ -334,7 +366,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const goldPromise = fetchGoldHistory();
 
   try {
-    const points = await fetchEod(DEFAULT_SYMBOL);
+    const points = await fetchEod(DEFAULT_SYMBOL, MIN_VALID_POINTS);
     lastGood.set(DEFAULT_SYMBOL, points);
     /*
      * A full trading day of edge cache. The upstream updates once,
