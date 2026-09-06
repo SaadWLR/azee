@@ -2,9 +2,12 @@ node_modules/
 dist/ 
 .claude/ 
 
-# Local secrets — never commit (see tests/e2e/README.md)
+# Local secrets — never commit (see tests/e2e/README.md).
+# The glob covers .env.production and anything else `vercel env pull`
+# writes, not just the two files this started with.
 .env
 .env.local
+.env*
 
 # Playwright
 test-results/
@@ -13,3 +16,6 @@ playwright-report/
 # Scratch file used to pass multi-line commit messages to git -F
 .git-msg-tmp
 .verify/
+
+# `vercel link` writes project and org ids here.
+.vercel

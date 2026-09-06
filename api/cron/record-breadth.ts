@@ -114,8 +114,32 @@ function computeTrin(b: WatchBreadth): number | null {
   return advancers / decliners / (advancingVolume / decliningVolume);
 }
 
-/** The site's own origin, so the cron can call its own endpoint. */
+/**
+ * The site's own origin, so the cron can call its own endpoint.
+ *
+ * THE PRODUCTION ALIAS, NOT THE REQUEST'S OWN HOST, and that
+ * distinction is what makes this function work at all.
+ *
+ * Vercel schedules a cron against the DEPLOYMENT-specific hostname
+ * (azee-<hash>-<team>.vercel.app), not the project's alias. This
+ * project has Vercel Authentication enabled with deploymentType
+ * "all_except_custom_domains", so that hostname sits behind SSO.
+ * Vercel's own invocation of the cron is trusted and gets through,
+ * but a fetch made BY this function is a fresh unauthenticated
+ * request: it is redirected to vercel.com/login, follows the redirect
+ * (fetch does by default), and comes back 200 with an HTML sign-in
+ * page. `response.ok` is therefore true, the guard below passes, and
+ * `.json()` throws on the HTML — which the outer catch turned into a
+ * 500 every scheduled run for a week, writing nothing.
+ *
+ * VERCEL_PROJECT_PRODUCTION_URL is the project's production domain,
+ * which is exempt from that protection. Falling back to the request
+ * host keeps the previous behaviour anywhere the variable is absent,
+ * so this is strictly an improvement rather than a swap.
+ */
 function selfOrigin(req: VercelRequest): string {
+  const production = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (production) return `https://${production}`;
   const host = req.headers["x-forwarded-host"] ?? req.headers.host;
   const proto = req.headers["x-forwarded-proto"] ?? "https";
   return `${proto}://${host}`;
