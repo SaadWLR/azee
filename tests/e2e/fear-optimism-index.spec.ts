@@ -213,12 +213,28 @@ test("the page renders every section", async ({ page }) => {
   /*
    * The sources line must name only what actually feeds the index. An
    * aspirational list would describe a page we have not built.
+   *
+   * The forbidden set shrinks as sources are genuinely wired, and this
+   * is where that gets checked rather than assumed. Gold and the
+   * currency feed came off it when Safe Haven Demand went live off
+   * them; naming a real upstream is not the failure this guards
+   * against. What stays banned is what nothing reads: no futures feed
+   * and no NCCPL foreign-flow access exist in this codebase, so
+   * Derivatives Activity and Foreign Flows have nothing to credit, and
+   * crediting one anyway would be the aspirational list this exists to
+   * prevent.
    */
   const sources = await main
     .locator("p")
     .filter({ hasText: "Sources: Pakistan Stock Exchange" })
     .innerText();
-  expect(sources).not.toMatch(/gold|currency|futures|NCCPL|foreign/i);
+  expect(sources).not.toMatch(/futures|NCCPL|foreign/i);
+
+  // And the sources it DOES name are the ones actually feeding a
+  // signal today — PSX's own data, plus the currency feed behind Safe
+  // Haven Demand and the per-stock archive behind Price Strength.
+  expect(sources).toMatch(/per-stock end-of-day price archive/i);
+  expect(sources).toMatch(/currency exchange feed for gold/i);
 
   expect(pageErrors, "no uncaught exceptions").toEqual([]);
   expect(
