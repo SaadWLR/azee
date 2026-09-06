@@ -114,8 +114,14 @@ test("the homepage teaser shows the reading and leads to the full page", async (
    * The denominator survives the shrink. A bare score in a hero
    * implies a complete index, so this is the one thing the teaser
    * cannot drop while getting smaller.
+   *
+   * The NUMERATOR is not pinned — it was, at 3, and went stale the day
+   * Safe Haven Demand went live. What matters here is that the teaser
+   * still qualifies its score at all; whether three or four signals
+   * are behind it is the page's business, and the test below checks
+   * the two agree.
    */
-  await expect(teaser).toContainText(/3 of 8 signals live/);
+  await expect(teaser).toContainText(/\d+ of 8 signals live/);
   await expect(teaser).not.toContainText(/greed/i);
 
   // The teaser is a teaser: the detail moved to the page.
@@ -124,9 +130,25 @@ test("the homepage teaser shows the reading and leads to the full page", async (
     "the signal list belongs on the page now, not the hero",
   ).toBe(0);
 
+  // What the teaser claims, to check the page agrees once we land.
+  const teaserClaim = /(\d+) of 8 signals live/.exec(await teaser.innerText())![1];
+
   await teaser.getByRole("link", { name: /see the full index/i }).click();
   await page.waitForURL(`**${PAGE}`);
   await expect(page.locator("h1")).toHaveText("Fear and Optimism Index");
+
+  /*
+   * The two surfaces read the same index, so they must report the same
+   * number of live signals. They are rendered by different components
+   * from different call sites, and a reader who sees "3 of 8" in the
+   * hero and "4 of 8" one click later has been told the site does not
+   * know its own methodology.
+   */
+  await expect(
+    page.locator("main"),
+    "the page agrees with the teaser about how much is live",
+  ).toContainText(`${teaserClaim} of 8 signals live`);
+
   expect(pageErrors, "no uncaught exceptions").toEqual([]);
 });
 
@@ -267,6 +289,13 @@ test("the page never claims more signals are live than are", async ({
    * signal that both fetches have landed — without this the count
    * below races a page that is still filling in.
    *
+   * AT LEAST three, not exactly three. This waited on an exact count
+   * once, which quietly defeated the point of the rest of the test:
+   * the moment Safe Haven Demand graduated it became four and the
+   * settle never happened, in the one test written to tolerate exactly
+   * that. A floor settles just as reliably and survives a signal
+   * going live.
+   *
    * An auto-waiting assertion, not locator.count(). count() resolves
    * immediately against whatever is in the DOM at that instant, and
    * this page is lazy-loaded and then fills in from two async
@@ -276,10 +305,12 @@ test("the page never claims more signals are live than are", async ({
    * Case-insensitive because the badges are uppercased in CSS.
    */
   const liveBadges = main.locator("text=/^Live$/i");
-  await expect(
-    liveBadges,
-    "the archive-backed signals are live",
-  ).toHaveCount(ALWAYS_LIVE.length, { timeout: 15_000 });
+  await expect
+    .poll(() => liveBadges.count(), {
+      message: "at least the archive-backed signals are live",
+      timeout: 15_000,
+    })
+    .toBeGreaterThanOrEqual(ALWAYS_LIVE.length);
 
   /*
    * Now read the truth off the page rather than asserting a literal.
