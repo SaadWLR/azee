@@ -551,14 +551,21 @@ export function FearAndOptimismPage() {
               </ul>
 
               {/*
-               * Sources names only what actually feeds the index today.
-               * Listing gold, currency, futures or foreign-flow
-               * providers here would describe a page we have not built.
+               * Sources names every real upstream the index draws on,
+               * whether the signal it feeds is live or still
+               * calibrating. Futures and foreign-flow providers stay
+               * absent because nothing is wired to them — listing one
+               * would describe a page we have not built.
+               *
+               * The currency feed belongs here now: it has fed Safe
+               * Haven Demand since that signal went live, and the
+               * per-stock archive joins it for Price Strength.
                */}
               <p className="mt-5 border-t border-white/10 pt-4 text-[11px] leading-relaxed text-white/45">
                 Sources: Pakistan Stock Exchange official market data (advancers,
-                decliners and traded volume) and the PSX KSE-100 end-of-day
-                timeseries. No other data source feeds this index today.
+                decliners and traded volume), the PSX KSE-100 end-of-day
+                timeseries, PSX&rsquo;s own per-stock end-of-day price archive,
+                and a public currency exchange feed for gold and USD/PKR.
               </p>
             </div>
           </div>

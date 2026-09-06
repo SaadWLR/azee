@@ -4,6 +4,7 @@ import type {
   EodPoint,
   GoldPoint,
   KseHistoryResponse,
+  PriceStrengthPoint,
 } from "../types/history";
 import type {
   FearOptimismResponse,
@@ -642,6 +643,84 @@ export function computeSafeHavenSignal(
   };
 }
 
+/* ── Price Strength ─────────────────────────────────────────────── */
+
+/**
+ * NOT "share near a 52-week high vs near a low", which is what this
+ * signal used to claim and what kept it permanently blocked. PSX
+ * publishes no rolling year of daily prices for its ~490 listed
+ * stocks, and building one would mean maintaining a full year of
+ * history per symbol, refreshed continuously.
+ *
+ * So the description says what is actually measured: whether a stock
+ * is above or below where it stood a year ago. That is a simpler
+ * question than "near an extreme", it answers the same underlying one
+ * — is the market broadly up or broadly down over the year — and it
+ * needs one reference price per stock rather than a price series.
+ */
+const PRICE_STRENGTH_DESCRIPTION =
+  "Share of stocks trading above vs below where they were a year ago";
+
+/** The recorded price-strength shares, in date order. */
+function priceStrengthRawSeries(
+  shareHistory?: PriceStrengthPoint[],
+): DatedRaw[] {
+  return (shareHistory ?? [])
+    .filter((p) => Number.isFinite(p.share) && p.share >= -1 && p.share <= 1)
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((p) => ({ date: p.date, raw: p.share }));
+}
+
+/**
+ * More stocks trading above where they were a year ago than below is
+ * market strength broadening out — optimism, so NOT inverted. This is
+ * the standard breadth convention (NYSE new-highs-vs-lows, the share
+ * of stocks above a moving average — the same idea CNN's own Fear &
+ * Greed Index uses), not a direction invented for this project.
+ *
+ * Today is the last entry of the recorded series itself, held out of
+ * its own ranking window — the same shape Safe Haven Demand uses,
+ * because there is no separate live reading to compare against stored
+ * history here either: the only value that exists for any date is the
+ * one this recorder wrote for it.
+ */
+export function computePriceStrengthSignal(
+  shareHistory?: PriceStrengthPoint[],
+): SentimentSignal {
+  const base = {
+    key: PRICE_STRENGTH.key,
+    label: PRICE_STRENGTH.label,
+    description: PRICE_STRENGTH.description,
+  };
+
+  const raws = priceStrengthRawSeries(shareHistory).map((r) => r.raw);
+
+  if (raws.length > 0) {
+    const today = raws[raws.length - 1];
+    const priorValues = raws.slice(0, -1);
+    const ranked = rankAgainstExpanding(
+      today,
+      priorValues,
+      MIN_RANK_WINDOW,
+      RANK_WINDOW,
+    );
+    if (ranked) {
+      return {
+        ...base,
+        status: "live",
+        score: Math.round(orient(ranked.rank, PRICE_STRENGTH.inverted)),
+        sampleNote: sampleNoteFor(ranked.windowSize),
+      };
+    }
+  }
+
+  return {
+    ...base,
+    status: "calibrating",
+    calibratingNote: `Collecting live history — needs at least ${MIN_RANK_WINDOW} recorded sessions to rank fairly. ${Math.max(raws.length - 1, 0)} of ${MIN_RANK_WINDOW} recorded so far`,
+  };
+}
+
 /* ── The recorder-backed signals, as one description ────────────── */
 
 /**
@@ -682,7 +761,16 @@ const SAFE_HAVEN: RecordedSpec = {
   raws: (h) => safeHavenRawSeries(h.goldHistory, h.points),
 };
 
-const RECORDED: RecordedSpec[] = [BREADTH, SAFE_HAVEN];
+const PRICE_STRENGTH: RecordedSpec = {
+  key: "priceStrength",
+  label: "Price Strength",
+  description: PRICE_STRENGTH_DESCRIPTION,
+  // More stocks up over the year than down is optimism — see below.
+  inverted: false,
+  raws: (h) => priceStrengthRawSeries(h.priceStrengthHistory),
+};
+
+const RECORDED: RecordedSpec[] = [BREADTH, SAFE_HAVEN, PRICE_STRENGTH];
 
 /**
  * Every past session this recorded signal can score, by date.
@@ -729,14 +817,6 @@ function rankedByDate(
 /* ── The signals that are still blocked ─────────────────────────── */
 
 const BLOCKED: SentimentSignal[] = [
-  {
-    key: "priceStrength",
-    label: "Price Strength",
-    description: "Share of stocks near 52-week highs vs near lows",
-    status: "calibrating",
-    calibratingNote:
-      "Needs per-symbol 52-week ranges; PSX publishes no such archive",
-  },
   {
     key: "derivatives",
     label: "Derivatives Activity",
@@ -792,6 +872,7 @@ export function buildFearAndOptimismIndex(
       : HISTORY_UNAVAILABLE(VOLUME_MOMENTUM),
     computeBreadthSignal(watch.breadth, history?.breadthHistory),
     computeSafeHavenSignal(history?.goldHistory, points),
+    computePriceStrengthSignal(history?.priceStrengthHistory),
     ...BLOCKED,
   ];
 

@@ -5,6 +5,7 @@ import type {
   EodPoint,
   GoldPoint,
   KseHistoryResponse,
+  PriceStrengthPoint,
   SymbolHistoryResponse,
 } from "../../src/types/history";
 
@@ -266,6 +267,17 @@ const fetchGoldHistory = () =>
       p.usdPkr > 50,
   );
 
+/*
+ * Same store, same reader. The bounds are the metric's own: a share of
+ * (above − below) / compared cannot leave [-1, 1], so anything outside
+ * it could not have been written by this codebase.
+ */
+const fetchPriceStrengthHistory = () =>
+  readKvHistory<PriceStrengthPoint>(
+    "price-strength:breadth:history",
+    (p) => Number.isFinite(p.share) && p.share >= -1 && p.share <= 1,
+  );
+
 /**
  * Survives warm invocations; the graceful answer when PSX is down.
  *
@@ -364,6 +376,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // sources and one being unavailable must not cost the other.
   const breadthPromise = fetchBreadthHistory();
   const goldPromise = fetchGoldHistory();
+  const priceStrengthPromise = fetchPriceStrengthHistory();
 
   try {
     const points = await fetchEod(DEFAULT_SYMBOL, MIN_VALID_POINTS);
@@ -382,6 +395,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       points,
       breadthHistory: await breadthPromise,
       goldHistory: await goldPromise,
+      priceStrengthHistory: await priceStrengthPromise,
       asOf: new Date().toISOString(),
       source: "psx",
     };
@@ -395,6 +409,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         points: cached,
         breadthHistory: await breadthPromise,
         goldHistory: await goldPromise,
+        priceStrengthHistory: await priceStrengthPromise,
         asOf: new Date().toISOString(),
         source: "cache",
         stale: true,

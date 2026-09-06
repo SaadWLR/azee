@@ -44,6 +44,24 @@ export interface BreadthPoint {
   trin: number;
 }
 
+/** One recorded session of the price-strength breadth measure. */
+export interface PriceStrengthPoint {
+  /** ISO date (YYYY-MM-DD) the reading was taken. */
+  date: string;
+  /**
+   * (stocks trading above their ~1-year-ago price − stocks trading
+   * below) / stocks compared, that session. NOT "share near a 52-week
+   * high/low" — PSX publishes no archive deep enough to track a
+   * rolling 52-week extreme for ~490 symbols affordably, so this
+   * measures something PSX-cheap instead: whether the market is
+   * broadly up or down over the past year, using one reference price
+   * per stock rather than a full price history. See
+   * api/cron/record-breadth.ts for how the reference is kept roughly
+   * current.
+   */
+  share: number;
+}
+
 /**
  * One recorded session of gold and USD/PKR, for Safe Haven Demand.
  *
@@ -93,6 +111,19 @@ export interface KseHistoryResponse {
    * provisioned yet.
    */
   goldHistory?: GoldPoint[];
+  /**
+   * Price-strength readings recorded by the daily cron, oldest first.
+   *
+   * NOT from a PSX archive — PSX publishes no rolling 52-week
+   * high/low history for its ~490 listed stocks, which is why this
+   * measures something PSX-cheap instead: the share of stocks trading
+   * above vs below their price from roughly a year ago. Served from
+   * this endpoint for the same reason the other recorded histories
+   * are: a second history route would spend a Vercel function this
+   * project cannot spare. Empty until the recorder has run, and
+   * absent entirely if the KV store is not provisioned yet.
+   */
+  priceStrengthHistory?: PriceStrengthPoint[];
   asOf: string;
   source: "psx" | "cache";
   stale?: boolean;

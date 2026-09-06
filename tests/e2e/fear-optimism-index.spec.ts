@@ -50,19 +50,27 @@ const ALWAYS_LIVE = ["Momentum", "Volatility", "Volume Momentum"];
  * without the history behind it, so these are checked for internal
  * consistency rather than pinned to one status.
  */
-const RECORDER_BACKED = ["Breadth", "Safe Haven Demand"];
+const RECORDER_BACKED = [
+  "Breadth",
+  "Safe Haven Demand",
+  // Price Strength joined this list rather than going live outright:
+  // it was redefined to something PSX actually serves (whether a stock
+  // is above where it stood a year ago) and is now recorded daily like
+  // the other two, so it waits on its own history the same way.
+  "Price Strength",
+];
 
 /**
  * No source at all — not blocked on volume of history, blocked on
  * data that does not exist for us to read. PSX publishes no
- * short-interest or foreign-flow feed we can reach, and the
- * derivatives figures are not in any endpoint this site calls.
+ * foreign-flow feed we can reach, and the derivatives figures are not
+ * in any endpoint this site calls.
  *
  * This is the hard line. A number appearing on any of these means
  * something is being invented, which on a licensed brokerage's site
  * is the worst failure available. It must fail the build.
  */
-const NEVER_LIVE = ["Price Strength", "Derivatives Activity", "Foreign Flows"];
+const NEVER_LIVE = ["Derivatives Activity", "Foreign Flows"];
 
 const api = () =>
   process.env.E2E_BYPASS_SECRET
