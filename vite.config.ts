@@ -138,5 +138,48 @@ export default defineConfig({
   ],
   // Source maps exist only to be uploaded; without upload credentials
   // there is nothing to produce them for.
-  build: { sourcemap: sentryUploadEnabled },
+  build: {
+    sourcemap: sentryUploadEnabled,
+    rollupOptions: {
+      output: {
+        /*
+         * Split the big, rarely-changing libraries out of the entry
+         * chunk so a deploy that touches app code does not invalidate
+         * them. Returning visitors are the case this is for: the site
+         * is something people check more than once a day, and before
+         * this every deploy handed them a fresh copy of React and the
+         * Sentry SDK alongside whatever actually changed.
+         *
+         * NOT split here: Navbar and Footer. The obvious-looking case
+         * for giving them their own chunk does not survive checking —
+         * every route imports them, so Rollup already hoists them into
+         * the entry chunk exactly once. Their own class strings
+         * (nav-mark-on-dark, nav-mark-on-light) appear in one built
+         * file, not eighteen.
+         *
+         * Sentry gets its own chunk rather than riding with the other
+         * vendors because it is the largest single thing here — around
+         * 75 kB gzipped, roughly 40% of the entry chunk — and it
+         * changes on its own schedule.
+         */
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@sentry")) return "vendor-sentry";
+          if (
+            id.includes("/react-router") ||
+            id.includes("/@remix-run/")
+          ) {
+            return "vendor-router";
+          }
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
+  },
 });
