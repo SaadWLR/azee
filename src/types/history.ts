@@ -44,6 +44,20 @@ export interface BreadthPoint {
   trin: number;
 }
 
+/** One recorded session of PSX's derivatives-to-ready-market value ratio. */
+export interface DerivativesPoint {
+  /** ISO date (YYYY-MM-DD) the reading was taken. */
+  date: string;
+  /**
+   * (Deliverable Futures + Cash Settled Futures + Stock Index Futures
+   * value) / Regular market value, that session, from PSX's own
+   * homepage "Today's Summary" panel. NOT from PSX's EOD archive —
+   * that publishes no such breakdown, which is why this is recorded
+   * daily rather than fetched on demand.
+   */
+  ratio: number;
+}
+
 /** One recorded session of the price-strength breadth measure. */
 export interface PriceStrengthPoint {
   /** ISO date (YYYY-MM-DD) the reading was taken. */
@@ -111,6 +125,19 @@ export interface KseHistoryResponse {
    * provisioned yet.
    */
   goldHistory?: GoldPoint[];
+  /**
+   * Derivatives-activity ratios recorded by the daily cron, oldest
+   * first.
+   *
+   * NOT from PSX's EOD archive — PSX's homepage publishes today's
+   * futures-vs-ready-market breakdown and nothing historical, which is
+   * why this is accumulated a day at a time exactly as breadthHistory
+   * is. Served from this endpoint for the same reason breadthHistory
+   * and goldHistory are: a second history route would spend a Vercel
+   * function this project cannot spare. Empty until the recorder has
+   * run, and absent entirely if the KV store is not provisioned yet.
+   */
+  derivativesHistory?: DerivativesPoint[];
   /**
    * Price-strength readings recorded by the daily cron, oldest first.
    *

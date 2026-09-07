@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { StockQuote } from "../../src/types";
 import type {
   BreadthPoint,
+  DerivativesPoint,
   GoldPoint,
   PriceStrengthPoint,
 } from "../../src/types/history";
@@ -10,7 +11,7 @@ import type {
 /**
  * Daily recorder — the only writer in this codebase.
  *
- * It records TWO histories, both for signals that need a past nobody
+ * It records FOUR histories, all for signals that need a past nobody
  * else is keeping for us.
  *
  * BREADTH. PSX serves today's advancers, decliners and volumes and
@@ -28,6 +29,18 @@ import type {
  * rather than waited for. The backfill is bounded by a time budget and
  * skips whatever it already holds, so it resumes across scheduled runs
  * instead of having to finish in one — see recordGold below.
+ *
+ * DERIVATIVES ACTIVITY. PSX's homepage publishes a "Today's Summary"
+ * panel with each market segment's traded value — the only place the
+ * futures-vs-ready-market split appears at all, and only for today.
+ * Breadth's situation exactly: nothing to backfill, one row per
+ * trading day.
+ *
+ * PRICE STRENGTH. Two parts: a daily ratio computed from quotes
+ * already in hand, and a rolling refresh of each stock's year-ago
+ * reference price. The reference half is the one thing here that never
+ * finishes — "a year ago" moves every day — so it rotates rather than
+ * backfills.
  *
  * ADAPTER IS INLINED. Vercel bundles each function in `api/`
  * separately, so runtime imports between them do not resolve — this
@@ -55,6 +68,18 @@ import type {
  */
 const HISTORY_KEY = "breadth:trin:history";
 const GOLD_KEY = "gold:history";
+const DERIVATIVES_KEY = "derivatives:futures:history";
+
+/** PSX's own homepage — the only place this ratio is published at all. */
+const PSX_HOME_URL = "https://dps.psx.com.pk/";
+
+/**
+ * Outer sanity bound on the derivatives ratio. Not a claim that
+ * futures value can never exceed the ready market's — a claim that a
+ * parse producing a number past this is far more likely a page change
+ * or a column shift than a real trading session.
+ */
+const MAX_PLAUSIBLE_DERIVATIVES_RATIO = 20;
 
 /**
  * PSX's end-of-day archive. The KSE-100 series is the trading calendar
@@ -97,10 +122,14 @@ const PRICE_STRENGTH_HISTORY_KEY = "price-strength:breadth:history";
  * record that never changes once written; "a year ago" is a MOVING
  * target, a different date tomorrow than today, so this rotates
  * through the symbol list forever, refreshing whichever references
- * are stalest. At ~490 symbols and 8 concurrent fetches per batch
- * within a 12s budget, a full rotation takes roughly a month, which
- * keeps "about a year ago" honest without this becoming the dominant
- * cost of the function.
+ * are stalest.
+ *
+ * MEASURED, not estimated: 48-92 symbols per run depending on how PSX
+ * is answering that minute, which took all 495 from nothing to full
+ * coverage in seven runs. A full rotation is therefore about six
+ * weekday runs — comfortably inside the 30-day tolerance that makes
+ * "about a year ago" true, and with room to shrink the budget if PSX
+ * load ever matters more than freshness.
  *
  * This is deliberately the lowest-priority fetch here: it runs last,
  * after Breadth, today's price-strength ratio and Gold's backfill have
@@ -259,6 +288,94 @@ async function fetchGoldOn(date: string): Promise<GoldPoint | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Today's derivatives-to-ready-market value ratio, from PSX's own
+ * homepage "Today's Summary" panel — the only place PSX publishes this
+ * breakdown, and only for today; no archive exists, which is why this
+ * recorder exists at all.
+ *
+ * FUTURES = Deliverable Futures (DFC) + Cash Settled Futures (CSF) +
+ * Stock Index Futures (SIF) — PSX's three genuinely derivative
+ * segments. Bills & Bonds, Odd Lot, Square Up, Negotiable Deal and
+ * Margin Trading System are excluded: real markets, but not futures.
+ *
+ * READY MARKET = Regular (REG) — the plain cash market every other
+ * signal here is already built from.
+ *
+ * VALUE, not volume or trade count: PSX's summary publishes each
+ * segment's traded VALUE in rupees, comparable across segments trading
+ * at very different price levels in a way raw share volume is not.
+ *
+ * Markup, verified live 2026-09-06 (all nine segment keys present,
+ * REG 32,417,382,768.26 and DFC 11,052,818,780.00 that session):
+ *   <div class="glide__slide" data-key="DFC">
+ *     <a class="markets__item" href="/trading-panel#DFC" ...>
+ *       <div class="markets__item__title c2">DELIVERABLE FUTURES</div>
+ *       <div class="markets__item__stat">
+ *         <div class="markets__item__stat__label">Value</div><div>11,052,818,780.00</div>
+ *       </div>
+ *       ...
+ *
+ * CSF and SIF frequently read 0.00 — those segments genuinely do not
+ * trade every session. A zero from them is a real reading, not a parse
+ * failure, and is summed as such; only a MISSING block throws.
+ *
+ * Returns null when there is nothing to rank (an empty ready market —
+ * has not happened, but dividing by zero must not either). Throws when
+ * the panel itself does not parse, which is a page-shape change rather
+ * than a quiet zero, exactly the distinction MIN_VALID_ROWS draws in
+ * api/market/psx-watch.ts.
+ */
+async function fetchDerivativesRatio(): Promise<number | null> {
+  const response = await fetch(PSX_HOME_URL, {
+    headers: { Accept: "text/html" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`PSX homepage responded ${response.status}`);
+  }
+  const html = await response.text();
+
+  const valueFor = (key: string): number | null => {
+    const slide = new RegExp(
+      `<div class="glide__slide" data-key="${key}">[\\s\\S]*?<\\/a><\\/div>`,
+    ).exec(html)?.[0];
+    if (!slide) return null;
+    const entry = [
+      ...slide.matchAll(/markets__item__stat__label">([^<]+)<\/div><div>([^<]*)</g),
+    ].find(([, label]) => label === "Value");
+    if (!entry) return null;
+    const num = Number(entry[2].replace(/,/g, ""));
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const reg = valueFor("REG");
+  const dfc = valueFor("DFC");
+  const csf = valueFor("CSF");
+  const sif = valueFor("SIF");
+
+  if (reg === null || dfc === null || csf === null || sif === null) {
+    throw new Error(
+      "PSX homepage's Today's Summary panel did not parse — page structure may have changed",
+    );
+  }
+  // No ready-market trading to compare against isn't an error, it's
+  // nothing to rank today.
+  if (reg <= 0) return null;
+
+  const ratio = (dfc + csf + sif) / reg;
+  if (
+    !Number.isFinite(ratio) ||
+    ratio < 0 ||
+    ratio > MAX_PLAUSIBLE_DERIVATIVES_RATIO
+  ) {
+    throw new Error(
+      `Derivatives ratio ${ratio} is outside a plausible range — parse may be corrupted`,
+    );
+  }
+  return ratio;
 }
 
 /**
@@ -579,6 +696,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     /*
+     * Then derivatives — cheap, single fetch, recorded before gold so
+     * gold's time-budgeted backfill can never crowd it out. Isolated in
+     * its own try for the same reason gold is: a failure here is
+     * reported and surfaced in the response, but it returns 200 —
+     * breadth is already written, and answering 500 would make a
+     * successful run look failed.
+     */
+    let derivatives: { recorded: boolean; date?: string; ratio?: number; sessions?: number; reason?: string };
+    try {
+      const ratio = await fetchDerivativesRatio();
+      if (ratio === null) {
+        derivatives = {
+          recorded: false,
+          reason: "no ready-market value to rank against",
+        };
+      } else {
+        const existingRaw = (await kv(`/get/${DERIVATIVES_KEY}`)).result;
+        const existing: DerivativesPoint[] = existingRaw
+          ? (JSON.parse(existingRaw) as DerivativesPoint[])
+          : [];
+
+        const next = existing.filter((p) => p.date !== date);
+        next.push({ date, ratio: Math.round(ratio * 10_000) / 10_000 });
+        next.sort((a, b) => (a.date < b.date ? -1 : 1));
+        const trimmed = next.slice(-MAX_POINTS);
+
+        await kv(`/set/${DERIVATIVES_KEY}`, {
+          method: "POST",
+          body: JSON.stringify(trimmed),
+          headers: { "Content-Type": "application/json" },
+        });
+
+        derivatives = {
+          recorded: true,
+          date,
+          ratio: Math.round(ratio * 10_000) / 10_000,
+          sessions: trimmed.length,
+        };
+      }
+    } catch (cause) {
+      Sentry.captureException(cause);
+      derivatives = {
+        recorded: false,
+        reason: "derivatives fetch or write failed",
+      };
+    }
+
+    /*
      * Price strength's RATIO for today — cheap, no fetch of its own
      * (reuses watch.quotes, already in hand), and dated exactly like
      * breadth: a day's ratio cannot be reconstructed after the fact,
@@ -663,7 +828,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       priceStrengthRefresh = { error: "reference refresh failed" };
     }
 
-    res.status(200).json({ breadth, priceStrength, gold, priceStrengthRefresh });
+    res.status(200).json({ breadth, derivatives, priceStrength, gold, priceStrengthRefresh });
   } catch (cause) {
     Sentry.captureException(cause);
     res.status(500).json({ error: "Could not record today's breadth" });

@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   BreadthPoint,
+  DerivativesPoint,
   EodPoint,
   GoldPoint,
   KseHistoryResponse,
@@ -13,10 +14,11 @@ import type {
  * GET /api/market/history
  * GET /api/market/history?symbol=<CODE>
  *
- * Without a symbol: the KSE-100's end-of-day archive, plus the two
- * histories the daily recorder keeps — market breadth, and
- * gold/USD-PKR for Safe Haven Demand. This is the Fear and Optimism
- * Index's own data path and its shape is fixed.
+ * Without a symbol: the KSE-100's end-of-day archive, plus every
+ * history the daily recorder keeps — market breadth, gold/USD-PKR for
+ * Safe Haven Demand, the futures-vs-ready-market ratio for Derivatives
+ * Activity, and the year-over-year breadth measure for Price Strength.
+ * This is the Fear and Optimism Index's own data path.
  *
  * With a symbol: that instrument's price archive alone — either one of
  * the ten benchmark indices, for the charts on /indices, or any PSX
@@ -268,6 +270,19 @@ const fetchGoldHistory = () =>
   );
 
 /*
+ * Same store, same reader. A ratio of traded values cannot be
+ * negative; there is deliberately no upper bound here, because the
+ * recorder already rejects an implausible one at write time and a
+ * reader that silently dropped a real outlier would hide a genuine
+ * market event.
+ */
+const fetchDerivativesHistory = () =>
+  readKvHistory<DerivativesPoint>(
+    "derivatives:futures:history",
+    (p) => Number.isFinite(p.ratio) && p.ratio >= 0,
+  );
+
+/*
  * Same store, same reader. The bounds are the metric's own: a share of
  * (above − below) / compared cannot leave [-1, 1], so anything outside
  * it could not have been written by this codebase.
@@ -376,6 +391,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // sources and one being unavailable must not cost the other.
   const breadthPromise = fetchBreadthHistory();
   const goldPromise = fetchGoldHistory();
+  const derivativesPromise = fetchDerivativesHistory();
   const priceStrengthPromise = fetchPriceStrengthHistory();
 
   try {
@@ -395,6 +411,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       points,
       breadthHistory: await breadthPromise,
       goldHistory: await goldPromise,
+      derivativesHistory: await derivativesPromise,
       priceStrengthHistory: await priceStrengthPromise,
       asOf: new Date().toISOString(),
       source: "psx",
@@ -409,6 +426,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         points: cached,
         breadthHistory: await breadthPromise,
         goldHistory: await goldPromise,
+        derivativesHistory: await derivativesPromise,
         priceStrengthHistory: await priceStrengthPromise,
         asOf: new Date().toISOString(),
         source: "cache",

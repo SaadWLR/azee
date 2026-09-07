@@ -1,6 +1,7 @@
 import type { MarketBreadth, MarketWatchResponse } from "../types";
 import type {
   BreadthPoint,
+  DerivativesPoint,
   EodPoint,
   GoldPoint,
   KseHistoryResponse,
@@ -102,15 +103,17 @@ const VOLUME_LONG = 90;
  * Required in full for the three archive-backed signals below
  * (Momentum, Volatility, Volume Momentum) — PSX's EOD archive already
  * has it, so there is no reason to rank any of them against less. For
- * the two recorded signals (Breadth, Safe Haven Demand) this is a CAP,
- * not a floor — see MIN_RANK_WINDOW.
+ * the four recorded signals (Breadth, Safe Haven Demand, Derivatives
+ * Activity, Price Strength) this is a CAP, not a floor — see
+ * MIN_RANK_WINDOW.
  */
 const RANK_WINDOW = 500;
 
 /**
- * The least history a RECORDED signal (Breadth, Safe Haven Demand)
- * will rank against at all. Below this, a percentile is arithmetic
- * over too small a sample to mean anything — the same reasoning
+ * The least history a RECORDED signal (Breadth, Safe Haven Demand,
+ * Derivatives Activity, Price Strength) will rank against at all.
+ * Below this, a percentile is arithmetic over too small a sample to
+ * mean anything — the same reasoning
  * RANK_WINDOW's own comment makes for the archive-backed signals.
  *
  * Above it, a recorded signal goes LIVE on an EXPANDING window: it
@@ -119,7 +122,7 @@ const RANK_WINDOW = 500;
  * Volume Momentum) don't use this — PSX's own EOD archive already runs
  * past 1,200 sessions, so `rankAt`'s hard RANK_WINDOW requirement was
  * never the bottleneck for them and is untouched. This constant exists
- * only for the two signals this site is building up from zero, where a
+ * only for the signals this site is building up from zero, where a
  * flat 500-session gate meant two full years of "Calibrating" for a
  * metric a smaller-but-real sample can already say something honest
  * about.
@@ -643,6 +646,85 @@ export function computeSafeHavenSignal(
   };
 }
 
+/* ── Derivatives Activity ───────────────────────────────────────── */
+
+const DERIVATIVES_DESCRIPTION = "Futures activity relative to the ready market";
+
+/**
+ * The recorded derivatives ratios, in date order.
+ *
+ * Guards mirror the ones api/market/history.ts already applies on the
+ * way out of the store — the last thing standing between a corrupted
+ * row and a percentile.
+ */
+function derivativesRawSeries(ratioHistory?: DerivativesPoint[]): DatedRaw[] {
+  return (ratioHistory ?? [])
+    .filter((p) => Number.isFinite(p.ratio) && p.ratio >= 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((p) => ({ date: p.date, raw: p.ratio }));
+}
+
+/**
+ * Elevated futures activity relative to the ready market reads as
+ * increased risk appetite here — NOT inverted, so a higher ratio ranks
+ * toward optimism.
+ *
+ * THIS IS A JUDGMENT CALL, not a settled convention the way TRIN's or
+ * gold-vs-equities' direction is. PSX's futures segments are where
+ * leveraged, directional bets get placed; a rising share of trading
+ * happening there was read as more risk-seeking behaviour rather than
+ * more hedging. A defensible reading, not an empirically established
+ * one — worth revisiting if it turns out to disagree with how this
+ * market actually behaves once enough history exists to check.
+ *
+ * Today is the last entry of its own recorded series, held out of its
+ * own ranking window — the same shape Breadth and Price Strength use,
+ * because the only value that exists for any date is the one this
+ * recorder wrote for it.
+ */
+export function computeDerivativesSignal(
+  ratioHistory?: DerivativesPoint[],
+): SentimentSignal {
+  const base = {
+    key: DERIVATIVES.key,
+    label: DERIVATIVES.label,
+    description: DERIVATIVES.description,
+  };
+
+  const raws = derivativesRawSeries(ratioHistory).map((r) => r.raw);
+
+  if (raws.length > 0) {
+    const today = raws[raws.length - 1];
+    const priorValues = raws.slice(0, -1);
+    const ranked = rankAgainstExpanding(
+      today,
+      priorValues,
+      MIN_RANK_WINDOW,
+      RANK_WINDOW,
+    );
+    if (ranked) {
+      return {
+        ...base,
+        status: "live",
+        score: Math.round(orient(ranked.rank, DERIVATIVES.inverted)),
+        sampleNote: sampleNoteFor(ranked.windowSize),
+      };
+    }
+  }
+
+  /*
+   * "Collecting", deliberately not "Backfilling" as Safe Haven says:
+   * PSX's homepage publishes today's summary and no archive, so there
+   * is nothing here that COULD be backfilled. Borrowing that word
+   * would promise a catch-up that is not coming.
+   */
+  return {
+    ...base,
+    status: "calibrating",
+    calibratingNote: `Collecting live history — needs at least ${MIN_RANK_WINDOW} recorded sessions to rank fairly. ${Math.max(raws.length - 1, 0)} of ${MIN_RANK_WINDOW} recorded so far`,
+  };
+}
+
 /* ── Price Strength ─────────────────────────────────────────────── */
 
 /**
@@ -761,6 +843,16 @@ const SAFE_HAVEN: RecordedSpec = {
   raws: (h) => safeHavenRawSeries(h.goldHistory, h.points),
 };
 
+const DERIVATIVES: RecordedSpec = {
+  key: "derivatives",
+  label: "Derivatives Activity",
+  description: DERIVATIVES_DESCRIPTION,
+  // Higher futures share reads as risk appetite — a judgment call,
+  // argued in full above computeDerivativesSignal.
+  inverted: false,
+  raws: (h) => derivativesRawSeries(h.derivativesHistory),
+};
+
 const PRICE_STRENGTH: RecordedSpec = {
   key: "priceStrength",
   label: "Price Strength",
@@ -770,7 +862,12 @@ const PRICE_STRENGTH: RecordedSpec = {
   raws: (h) => priceStrengthRawSeries(h.priceStrengthHistory),
 };
 
-const RECORDED: RecordedSpec[] = [BREADTH, SAFE_HAVEN, PRICE_STRENGTH];
+const RECORDED: RecordedSpec[] = [
+  BREADTH,
+  SAFE_HAVEN,
+  DERIVATIVES,
+  PRICE_STRENGTH,
+];
 
 /**
  * Every past session this recorded signal can score, by date.
@@ -817,13 +914,6 @@ function rankedByDate(
 /* ── The signals that are still blocked ─────────────────────────── */
 
 const BLOCKED: SentimentSignal[] = [
-  {
-    key: "derivatives",
-    label: "Derivatives Activity",
-    description: "Futures activity relative to the ready market",
-    status: "calibrating",
-    calibratingNote: "Futures/open-interest data not yet sourced",
-  },
   {
     key: "foreignFlows",
     label: "Foreign Flows",
@@ -872,6 +962,7 @@ export function buildFearAndOptimismIndex(
       : HISTORY_UNAVAILABLE(VOLUME_MOMENTUM),
     computeBreadthSignal(watch.breadth, history?.breadthHistory),
     computeSafeHavenSignal(history?.goldHistory, points),
+    computeDerivativesSignal(history?.derivativesHistory),
     computePriceStrengthSignal(history?.priceStrengthHistory),
     ...BLOCKED,
   ];

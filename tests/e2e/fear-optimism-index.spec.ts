@@ -58,19 +58,26 @@ const RECORDER_BACKED = [
   // is above where it stood a year ago) and is now recorded daily like
   // the other two, so it waits on its own history the same way.
   "Price Strength",
+  // Derivatives Activity likewise. PSX's homepage publishes a
+  // futures-vs-ready-market breakdown for today and keeps no archive
+  // of it, so it accumulates a row per weekday exactly as Breadth
+  // does — a real source, just no past to rank against yet.
+  "Derivatives Activity",
 ];
 
 /**
  * No source at all — not blocked on volume of history, blocked on
  * data that does not exist for us to read. PSX publishes no
- * foreign-flow feed we can reach, and the derivatives figures are not
- * in any endpoint this site calls.
+ * foreign-flow feed we can reach, and NCCPL access has never been
+ * arranged, so nothing in this codebase can compute it.
  *
- * This is the hard line. A number appearing on any of these means
+ * Down to one entry now, and that is the direction of travel: this
+ * list shrinks as sources are genuinely found, never as a shortcut to
+ * make a card light up. A number appearing on what remains means
  * something is being invented, which on a licensed brokerage's site
  * is the worst failure available. It must fail the build.
  */
-const NEVER_LIVE = ["Derivatives Activity", "Foreign Flows"];
+const NEVER_LIVE = ["Foreign Flows"];
 
 const api = () =>
   process.env.E2E_BYPASS_SECRET
@@ -217,24 +224,35 @@ test("the page renders every section", async ({ page }) => {
    * The forbidden set shrinks as sources are genuinely wired, and this
    * is where that gets checked rather than assumed. Gold and the
    * currency feed came off it when Safe Haven Demand went live off
-   * them; naming a real upstream is not the failure this guards
-   * against. What stays banned is what nothing reads: no futures feed
-   * and no NCCPL foreign-flow access exist in this codebase, so
-   * Derivatives Activity and Foreign Flows have nothing to credit, and
-   * crediting one anyway would be the aspirational list this exists to
-   * prevent.
+   * them; futures came off it when Derivatives Activity started
+   * reading PSX's own daily market summary. Naming a real upstream is
+   * not the failure this guards against.
+   *
+   * NCCPL is what remains, and it is the whole point: Foreign Flows is
+   * wired to nothing, so crediting a foreign-flow provider would be
+   * exactly the aspirational claim this exists to prevent.
    */
   const sources = await main
     .locator("p")
     .filter({ hasText: "Sources: Pakistan Stock Exchange" })
     .innerText();
-  expect(sources).not.toMatch(/futures|NCCPL|foreign/i);
+  expect(
+    sources,
+    "stays silent about Foreign Flows' still-unbuilt source",
+  ).not.toMatch(/NCCPL|foreign/i);
 
   // And the sources it DOES name are the ones actually feeding a
-  // signal today — PSX's own data, plus the currency feed behind Safe
-  // Haven Demand and the per-stock archive behind Price Strength.
-  expect(sources).toMatch(/per-stock end-of-day price archive/i);
-  expect(sources).toMatch(/currency exchange feed for gold/i);
+  // signal today. Each is pinned individually so the paragraph cannot
+  // satisfy the guard above by simply going quiet.
+  expect(sources, "names the per-stock archive Price Strength uses").toMatch(
+    /per-stock end-of-day price archive/i,
+  );
+  expect(sources, "names the currency feed Safe Haven Demand uses").toMatch(
+    /currency exchange feed for gold/i,
+  );
+  expect(sources, "names the futures data Derivatives Activity uses").toMatch(
+    /futures/i,
+  );
 
   expect(pageErrors, "no uncaught exceptions").toEqual([]);
   expect(
