@@ -53,9 +53,17 @@
       alike. A second display serif was loaded here for large headings
       and has been reverted (see c097754), so the request is back to
       one family with only the weights actually used.
+
+      FOUR WEIGHTS, and the list is the audited one rather than a
+      comfortable range. 400 is unclassed body copy; 500, 600 and 700
+      are font-medium, font-semibold and font-bold, plus .eyebrow's raw
+      700 in index.css. 300 and 800 were requested and never rendered —
+      no font-light, no font-extrabold, no inline fontWeight anywhere in
+      src/ — so every visitor was paying for two faces the site cannot
+      display. Re-audit before adding one back.
     -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <title>AZEE Trade — Invest in the Pakistan Stock Exchange</title>
