@@ -110,8 +110,25 @@ test("forms page links to real, downloadable PDFs", async ({ page, request }) =>
   for (const h of hrefs) {
     expect(h).toMatch(/^https:\/\/azeetrade\.com\//);
   }
-  // Spot-check that the first one is genuinely a PDF, not a dead link.
-  const head = await request.get(hrefs[0]);
+  /*
+   * Spot-check that the first one is genuinely a PDF, not a dead link.
+   *
+   * WITH A BROWSER USER-AGENT, because these files live on
+   * azeetrade.com — a separate Hostinger-hosted site, not this repo —
+   * and its edge answers 403 to Playwright's default
+   * `Playwright/x.x.x` agent. Confirmed by A/B: the same URL returns
+   * 403 to a plain client and 200 with application/pdf to a
+   * browser-like one, so the link is fine for real visitors and it was
+   * only this request being read as a bot. The assertions below are
+   * unchanged — this makes the check reach the file, it does not
+   * loosen what the check demands of it.
+   */
+  const head = await request.get(hrefs[0], {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    },
+  });
   expect(head.status()).toBe(200);
   expect(head.headers()["content-type"]).toMatch(/pdf/);
 });
