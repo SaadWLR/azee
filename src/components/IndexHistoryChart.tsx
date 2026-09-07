@@ -176,10 +176,18 @@ export function IndexHistoryChart({ points }: { points: EodPoint[] }) {
        * Said rather than hidden — the same rule the sentiment chart
        * follows. A 1Y tab drawing ten months is only misleading if
        * nothing accounts for the difference.
+       *
+       * SUBJECT-NEUTRAL WORDING, deliberately. This component is shared:
+       * /indices draws benchmark indices with it and
+       * /market-watch/:symbol draws individual stocks. It used to say
+       * "This index's archive", which was simply wrong on a stock's own
+       * page — and stocks are where the note actually fires, since every
+       * benchmark index has years more history than the longest range
+       * tab asks for.
        */}
       {view?.truncated ? (
         <p className="mt-2.5 text-[11px] text-white/45">
-          This index's archive starts {fmtDate(points[0].date)} — the range
+          This chart's archive starts {fmtDate(points[0].date)} — the range
           shows every session available, not a full {range}.
         </p>
       ) : null}
