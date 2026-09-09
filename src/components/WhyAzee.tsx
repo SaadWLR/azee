@@ -82,7 +82,7 @@ const CREDENTIALS: Credential[] = [
 
 function SealCard({ item }: { item: Credential }) {
   return (
-    <div className="rounded-[22px] border border-[rgb(var(--azee-blue)/0.22)] bg-[rgb(var(--azee-panel))] px-7 py-6 shadow-[0_28px_60px_-12px_rgba(3,6,20,0.9)]">
+    <div className="card-glow rounded-[32px] border border-[rgb(var(--azee-blue)/0.22)] bg-[rgb(var(--azee-panel))] px-7 py-6 shadow-[0_28px_60px_-12px_rgba(3,6,20,0.9)]">
       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgb(var(--azee-orange))]">
         {item.label}
       </p>
@@ -144,7 +144,7 @@ export function WhyAzee() {
 
             {/* Level 1 — the hero statement */}
             <Reveal delay={100}>
-              <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl lg:text-5xl">
+              <h2 className="mt-10 text-5xl font-bold leading-[0.95] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-6xl lg:text-7xl">
                 {years} years.
                 <br />
                 Fully accountable.

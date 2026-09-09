@@ -188,14 +188,14 @@ function StatCard({ stat, delay }: { stat: Stat; delay: number }) {
     <Reveal delay={delay} className="h-full">
       <div
         ref={ref}
-        className="liquid-glass glass-sheen card-glow h-full rounded-3xl p-8 text-center hover:bg-white/[0.12]"
+        className="liquid-glass glass-sheen card-glow h-full rounded-[32px] p-8 text-center hover:bg-white/[0.12]"
       >
         {/* The number itself carries the one warm accent — these are the
             firm's real, static achievement figures (not live gain/loss
             data), so orange here is a deliberate brand touch, not a
             financial-color signal. Label, sub-text, card, and layout are
             unchanged; every other section stays blue. */}
-        <p className="text-4xl font-bold tracking-tight text-[rgb(var(--azee-orange))] tabular-nums sm:text-5xl">
+        <p className="text-5xl font-bold tracking-tight text-[rgb(var(--azee-orange))] tabular-nums sm:text-6xl lg:text-7xl">
           {value.toLocaleString("en-US")}
           <span className="text-[rgb(var(--azee-orange)/0.7)]">{stat.suffix}</span>
         </p>
@@ -229,9 +229,12 @@ export function Stats() {
        * moved the page off. Ending on the brand navy keeps the
        * alternation intact all the way down.
        */
-      className="relative overflow-hidden bg-[rgb(var(--azee-navy))] py-24 lg:py-32"
+      className="liquid-top-alt liquid-bottom relative bg-[rgb(var(--azee-navy))] py-24 lg:py-32"
     >
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
         {PARTICLES.map((p, i) => (
           <span
             key={i}
@@ -247,11 +250,6 @@ export function Stats() {
           />
         ))}
       </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/25 to-transparent"
-      />
-
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {STATS.map((stat, i) => (

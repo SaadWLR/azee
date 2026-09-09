@@ -155,11 +155,6 @@ const SOCIALS = [
 export function Footer() {
   return (
     <footer className="footer-navy relative">
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/35 to-transparent"
-      />
-
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-12 lg:py-20">
         {/* Brand spans 2, then four link columns — 6 total since the
             Legal & Compliance column was added. */}
@@ -260,7 +255,7 @@ export function Footer() {
         </div>
 
         {/* Regulatory */}
-        <div className="mt-14 border-t border-white/10 pt-8">
+        <div className="liquid-glass mt-14 rounded-[32px] px-6 py-8 sm:px-8">
           <p className="text-xs leading-relaxed text-gray-300/80">
             AZEE Securities (Pvt.) Ltd. is a TREC Holder of the Pakistan Stock
             Exchange (TREC No. 108) and the Pakistan Mercantile Exchange ·
