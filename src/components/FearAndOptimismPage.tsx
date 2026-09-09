@@ -262,7 +262,7 @@ export function FearAndOptimismPage() {
       <Navbar />
 
       {/* ── A. Header ─────────────────────────────────────────── */}
-      <section className="relative bg-[rgb(var(--azee-navy))] px-4 pb-16 pt-[calc(var(--nav-height)+2.5rem)] sm:px-6 lg:px-12">
+      <section className="relative px-4 pb-16 pt-[calc(var(--nav-height)+2.5rem)] sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">Market Sentiment</p>
           <h1 className="mt-6 text-3xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-4xl">
@@ -334,7 +334,7 @@ export function FearAndOptimismPage() {
       </section>
 
       {/* ── B. The gauge ──────────────────────────────────────── */}
-      <section className="relative bg-[rgb(var(--azee-navy))] px-4 pb-20 sm:px-6 lg:px-12">
+      <section className="relative px-4 pb-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-2xl text-center">
           {error ? (
             <p className="text-sm text-white/60">
@@ -401,14 +401,14 @@ export function FearAndOptimismPage() {
        * that attribute, so a navy section still claiming to be light
        * would put a white bar over it.
        */}
-      <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
+      <section className="relative px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <SentimentChart series={series} />
         </div>
       </section>
 
       {/* ── D. What's driving it ──────────────────────────────── */}
-      <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
+      <section className="relative px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">What&apos;s driving it</p>
           <h2 className="mt-6 text-2xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-3xl">
@@ -481,7 +481,7 @@ export function FearAndOptimismPage() {
       </section>
 
       {/* ── F. Methodology ────────────────────────────────────── */}
-      <section className="relative bg-[rgb(var(--azee-navy))] px-4 py-20 sm:px-6 lg:px-12">
+      <section className="relative px-4 py-20 sm:px-6 lg:px-12">
         <div className="mx-auto max-w-6xl">
           <p className="eyebrow">Methodology</p>
           <h2 className="mt-6 text-2xl font-bold tracking-tight text-[rgb(var(--azee-chalk))] sm:text-3xl">

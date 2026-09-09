@@ -56,7 +56,7 @@ function membershipBadge(quote: StockQuote): string | null {
 /** A page-shaped shell, so every state gets the same chrome. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[rgb(var(--azee-navy))]">
+    <div className="min-h-screen">
       <Navbar />
       <main>{children}</main>
       <Footer />
