@@ -95,13 +95,13 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
         )}
       </div>
 
-      <div className="mt-7 flex items-end justify-between gap-4">
+      <div className="mt-7 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <p className="text-5xl font-semibold tabular-nums tracking-tight text-[rgb(var(--azee-chalk))]">
           {fmtPrice(quote.price)}
           <span className="ml-2 text-sm font-medium text-white/55">PKR</span>
         </p>
         <p
-          className={`text-right tabular-nums ${
+          className={`ml-auto text-right tabular-nums ${
             up ? "text-emerald-400" : "text-rose-400"
           }`}
         >
@@ -237,7 +237,7 @@ export function ClosingCTA() {
 
         {/* ── The live lookup ────────────────────────────────────── */}
         <div
-          className="closing-fade-up rounded-[32px] border border-white/10 bg-[rgb(var(--azee-panel))] p-6 sm:p-8"
+          className="closing-fade-up min-w-0 rounded-[32px] border border-white/10 bg-[rgb(var(--azee-panel))] p-6 sm:p-8"
           style={{ animationDelay: "0.45s" }}
         >
           <label className="block">
