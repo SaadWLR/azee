@@ -192,7 +192,7 @@ function StoreBadge({
   return (
     <a
       href="#"
-      className="pill-press inline-flex items-center gap-3 rounded-full border border-[rgb(var(--azee-navy)/0.22)] px-6 py-3 hover:border-[rgb(var(--azee-navy)/0.62)] hover:shadow-[0_16px_36px_-16px_rgb(var(--azee-navy)/0.45)]"
+      className="inline-flex items-center gap-3 rounded-full border border-[rgb(var(--azee-navy)/0.22)] px-6 py-3 transition-colors duration-300 hover:border-[rgb(var(--azee-navy)/0.62)]"
     >
       <Icon className="h-6 w-6 text-[rgb(var(--azee-navy))]" />
       <span>
@@ -230,7 +230,7 @@ export function AppShowcase() {
             <p className="eyebrow">AZEE Stockify</p>
           </Reveal>
           <Reveal delay={100}>
-            <h2 className="mt-10 text-5xl font-bold leading-[0.95] tracking-tight text-[rgb(var(--azee-navy))] sm:text-6xl lg:text-7xl">
+            <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-navy))] sm:text-4xl lg:text-5xl">
               The exchange,
               <br />
               in one hand.

@@ -71,7 +71,7 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
      * that catches the rotation, and the long directional shadow lifts
      * the near corner off the panel.
      */
-    <div className="rounded-[32px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-navy))] p-6 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
+    <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] p-6 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-wide text-[rgb(var(--azee-chalk))]">
@@ -83,7 +83,7 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
             </p>
           )}
           {quote.sector && (
-            <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">
+            <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
               {quote.sector}
             </p>
           )}
@@ -95,13 +95,13 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
         )}
       </div>
 
-      <div className="mt-7 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="mt-7 flex items-end justify-between gap-4">
         <p className="text-5xl font-semibold tabular-nums tracking-tight text-[rgb(var(--azee-chalk))]">
           {fmtPrice(quote.price)}
-          <span className="ml-2 text-sm font-medium text-white/55">PKR</span>
+          <span className="ml-2 text-sm font-medium text-white/35">PKR</span>
         </p>
         <p
-          className={`ml-auto text-right tabular-nums ${
+          className={`text-right tabular-nums ${
             up ? "text-emerald-400" : "text-rose-400"
           }`}
         >
@@ -120,7 +120,7 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
 
       <dl className="mt-7 flex items-center gap-10 border-t border-white/10 pt-5">
         <div>
-          <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
             Volume
           </dt>
           <dd className="mt-1 text-sm font-semibold tabular-nums text-white/75">
@@ -128,7 +128,7 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
           </dd>
         </div>
         <div>
-          <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
             Exchange
           </dt>
           <dd className="mt-1 text-sm font-semibold text-white/75">PSX</dd>
@@ -179,13 +179,18 @@ export function ClosingCTA() {
 
   /** Shared capsule geometry for every control in this section. */
   const pill =
-    "pill-press rounded-full px-9 py-4 text-center text-[15px] font-semibold";
+    "rounded-full px-9 py-4 text-center text-[15px] font-semibold transition-transform duration-300 hover:scale-[1.03] active:scale-[0.98]";
 
   return (
     <section
       id="start-investing"
-      className="liquid-top-alt relative w-full bg-[rgb(var(--azee-navy))] py-28 lg:py-40"
+      className="relative w-full bg-[rgb(var(--azee-navy))] py-28 lg:py-40"
     >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-blue)/0.25)]"
+      />
+
       <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-12">
         {/* ── Copy + CTA ─────────────────────────────────────────── */}
         <div>
@@ -196,7 +201,7 @@ export function ClosingCTA() {
             Start investing
           </p>
 
-          <h2 className="mt-8 text-5xl font-bold leading-[0.95] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-6xl lg:text-7xl">
+          <h2 className="mt-8 text-4xl font-bold leading-[1.05] tracking-tight text-[rgb(var(--azee-chalk))] sm:text-5xl lg:text-6xl">
             <span className="closing-fade-up block" style={{ animationDelay: "0.25s" }}>
               The market&apos;s live.
             </span>
@@ -221,7 +226,7 @@ export function ClosingCTA() {
             {/* Primary: solid accent capsule — the section's only fill. */}
             <Link
               to="/get-started"
-              className={`${pill} bg-[rgb(var(--azee-orange))] text-[rgb(var(--azee-navy))] hover:shadow-[0_18px_44px_-12px_rgb(var(--azee-orange)/0.7)] sm:w-auto`}
+              className={`${pill} bg-[rgb(var(--azee-orange))] text-white hover:bg-[rgb(var(--azee-orange)/0.9)] sm:w-auto`}
             >
               Open a Trading Account
             </Link>
@@ -237,7 +242,7 @@ export function ClosingCTA() {
 
         {/* ── The live lookup ────────────────────────────────────── */}
         <div
-          className="closing-fade-up min-w-0 rounded-[32px] border border-white/10 bg-[rgb(var(--azee-panel))] p-6 sm:p-8"
+          className="closing-fade-up rounded-[32px] bg-white/[0.04] p-6 sm:p-8"
           style={{ animationDelay: "0.45s" }}
         >
           <label className="block">
@@ -253,14 +258,14 @@ export function ClosingCTA() {
               }}
               placeholder="Try OGDC, Lucky Cement, or Commercial Banks…"
               aria-label="Search a PSX symbol, company or sector"
-              className="mt-3 w-full rounded-full border border-white/15 bg-transparent px-6 py-3.5 text-sm text-white placeholder:text-white/55 focus:border-[rgb(var(--azee-orange)/0.6)] focus:outline-none"
+              className="mt-3 w-full rounded-full border border-white/15 bg-transparent px-6 py-3.5 text-sm text-white placeholder:text-white/35 focus:border-[rgb(var(--azee-orange)/0.6)] focus:outline-none"
             />
           </label>
 
           {/* Most-active chips, derived from the same live payload. */}
           {suggestions.length > 0 && !term && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">
                 Most active
               </span>
               {suggestions.map((q) => (
@@ -336,25 +341,25 @@ export function ClosingCTA() {
             <div className="transition-transform duration-500 lg:[transform:rotateY(-24deg)_rotateX(8deg)_rotateZ(2deg)] lg:hover:[transform:rotateY(-8deg)_rotateX(3deg)_rotateZ(0.5deg)]">
             {error && !quotes ? (
               // Honest failure — never a placeholder quote.
-              <div className="rounded-[32px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-navy))] px-6 py-14 text-center text-sm text-white/70 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 Live prices are temporarily unavailable. Please try again
                 shortly.
               </div>
             ) : loading && !quotes ? (
-              <div className="rounded-[32px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-navy))] px-6 py-14 text-center text-sm text-white/70 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 Loading live PSX prices…
               </div>
             ) : active ? (
               <QuoteCard quote={active} />
             ) : (
-              <div className="rounded-[32px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-navy))] px-6 py-14 text-center text-sm text-white/70 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
+              <div className="rounded-[28px] border border-[rgb(var(--azee-blue)/0.25)] bg-[rgb(var(--azee-panel))] px-6 py-14 text-center text-sm text-white/50 shadow-[0_30px_70px_-20px_rgba(2,5,18,0.95)]">
                 No PSX symbol matches “{query.trim()}”.
               </div>
             )}
             </div>
           </div>
 
-          <p className="mt-5 text-xs leading-relaxed text-white/55">
+          <p className="mt-5 text-xs leading-relaxed text-white/35">
             Live prices from the PSX ready board, the same feed behind{" "}
             <Link
               to="/market-watch"

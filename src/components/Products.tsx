@@ -390,8 +390,13 @@ export function Products() {
        * sit navy-on-white.
        */
       data-nav-theme-section="light"
-      className="liquid-top relative bg-[rgb(var(--azee-paper))] py-32 lg:py-48"
+      className="relative bg-[rgb(var(--azee-paper))] py-32 lg:py-48"
     >
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-navy)/0.12)]"
+      />
+
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-12">
         <div className="max-w-2xl">
           {/* Level 5 — metadata */}
@@ -400,7 +405,7 @@ export function Products() {
           </Reveal>
           {/* Level 1 — hero statement */}
           <Reveal delay={100}>
-            <h2 className="mt-10 text-5xl font-bold leading-[0.95] tracking-tight text-[rgb(var(--azee-navy))] sm:text-6xl lg:text-7xl">
+            <h2 className="mt-10 text-3xl font-bold leading-[1.1] tracking-tight text-[rgb(var(--azee-navy))] sm:text-4xl lg:text-5xl">
               Every market,
               <br />
               one relationship.
