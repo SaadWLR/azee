@@ -270,6 +270,17 @@ export interface AnnouncementFilters {
   /** Inclusive ISO yyyy-mm-dd bounds — the only format PSX accepts. */
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * One PSX ticker, matched exactly against the symbol column by PSX
+   * itself. Distinct from `q`, which searches the filing's text — and
+   * unlike it, the symbol total is the company's real filing count
+   * (OGDC: 729, walkable to 2005), so a symbol-filtered pager is exact.
+   *
+   * Sector and Shariah-compliance are deliberately NOT here: PSX has no
+   * field for either, so they are applied in the page against Market
+   * Watch data over one batch of filings, and are labelled as such.
+   */
+  symbol?: string;
 }
 
 /**
@@ -293,6 +304,7 @@ export async function getAnnouncements(
   if (filters.q) params.set("q", filters.q);
   if (filters.dateFrom) params.set("date_from", filters.dateFrom);
   if (filters.dateTo) params.set("date_to", filters.dateTo);
+  if (filters.symbol) params.set("symbol", filters.symbol);
 
   if (import.meta.env.DEV) {
     /*
@@ -304,7 +316,9 @@ export async function getAnnouncements(
      * live disclosures from the API route.
      */
     const q = filters.q?.trim().toLowerCase();
+    const symbol = filters.symbol?.trim().toUpperCase();
     const rows = ANNOUNCEMENTS_FIXTURE.announcements.filter((a) => {
+      if (symbol && a.symbol !== symbol) return false;
       if (q && !`${a.symbol} ${a.companyName} ${a.title}`.toLowerCase().includes(q)) {
         return false;
       }

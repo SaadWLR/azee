@@ -211,6 +211,18 @@ export interface AnnouncementQuery {
   query?: string;
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * PSX's own `symbol` field — a different field from `query`, with
+   * different semantics. Probed live (Sep 12 2026): it is an exact
+   * match on the symbol column and its total is real, not capped.
+   * symbol=OGDC reports 729 and walks to the last row (offset 724 → 5
+   * rows, 729 → 0, oldest Feb 2005), where query=OGDC reports 50 —
+   * because `query` matches the filing's text, so the ticker happens to
+   * appear as a word in 50 of them. It is also case- and
+   * whitespace-sensitive: "ogdc" and "OGDC " both return nothing, which
+   * is why the handler normalises before forwarding.
+   */
+  symbol?: string;
 }
 
 /**
@@ -248,7 +260,7 @@ async function fetchAnnouncements(
 ): Promise<AnnouncementsResponse> {
   const body = new URLSearchParams({
     type: ANNOUNCEMENT_TYPE,
-    symbol: "",
+    symbol: filters.symbol ?? "",
     query: filters.query ?? "",
     count: String(count),
     offset: String(offset),
@@ -384,6 +396,18 @@ export default async function handler(
   const query = strParam(req.query.q, MAX_QUERY_LENGTH);
   const dateFrom = strParam(req.query.date_from, 10);
   const dateTo = strParam(req.query.date_to, 10);
+  /*
+   * Uppercased because PSX's symbol match is case-sensitive: "ogdc"
+   * returns an empty table, which would read as "this company has filed
+   * nothing" rather than "wrong case". Normalising here means the API
+   * answers the question the caller meant.
+   */
+  const symbol = strParam(req.query.symbol, 20).toUpperCase();
+  if (symbol && !/^[A-Z0-9][A-Z0-9.\-]*$/.test(symbol)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(400).json({ error: "symbol must be a PSX ticker" });
+    return;
+  }
 
   /*
    * Malformed dates are rejected, never forwarded. PSX answers a
@@ -423,13 +447,14 @@ export default async function handler(
     return;
   }
 
-  const key = `${count}:${offset}:${query}:${dateFrom}:${dateTo}`;
+  const key = `${count}:${offset}:${query}:${dateFrom}:${dateTo}:${symbol}`;
 
   try {
     const data = await fetchAnnouncements(count, offset, {
       query,
       dateFrom,
       dateTo,
+      symbol,
     });
     rememberLastGood(key, data);
     /*

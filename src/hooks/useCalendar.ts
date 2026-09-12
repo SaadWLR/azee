@@ -50,10 +50,10 @@ export function useAnnouncements(
    * itself would change the fetcher's identity on each render and
    * refetch forever. The three values are what actually change.
    */
-  const { q, dateFrom, dateTo } = filters;
+  const { q, dateFrom, dateTo, symbol } = filters;
   const fetcher = useCallback(
-    () => getAnnouncements(count, offset, { q, dateFrom, dateTo }),
-    [count, offset, q, dateFrom, dateTo],
+    () => getAnnouncements(count, offset, { q, dateFrom, dateTo, symbol }),
+    [count, offset, q, dateFrom, dateTo, symbol],
   );
   return useAsyncData(fetcher);
 }

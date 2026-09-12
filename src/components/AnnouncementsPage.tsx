@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useAnnouncements } from "../hooks/useCalendar";
+import { useAllMarketQuotes } from "../hooks/useMarketData";
 import { usePageMeta } from "../hooks/usePageMeta";
 import type { CompanyAnnouncement } from "../types/announcements";
+import type { StockQuote } from "../types";
 
 /*
  * /announcements — company disclosures filed with the PSX.
@@ -18,16 +20,29 @@ import type { CompanyAnnouncement } from "../types/announcements";
  * Reuses the Market Watch / Corporate Calendar / ETFs liquid-glass
  * table language — no new visual vocabulary.
  *
- * FILTERS NARROW AT PSX, NOT HERE. Search and the date range are
- * forwarded to PSX's own query/date_from/date_to fields, so the rows
- * and the "of N" total always describe the same query. Filtering a
- * 50-row page client-side would silently mean "search the current
- * page", which against a 223k-filing corpus is not searching at all.
+ * TWO KINDS OF FILTER, and the difference is visible to the reader.
+ *
+ * Search, date range and symbol are PSX's OWN fields, so PSX does the
+ * narrowing and the rows and the "of N" total describe the same query.
+ * Symbol in particular is exact and complete: probed live, symbol=OGDC
+ * reports 729 filings and walks back to 2005.
+ *
+ * Sector and Shariah-compliance are NOT PSX fields — there is no way to
+ * ask its endpoint for "every filing in this sector". Those are applied
+ * here, against sector and KMI membership the app already holds from
+ * Market Watch, over ONE batch of filings at a time. That is a real
+ * limitation, so the page says so whenever they are on rather than
+ * implying a complete sector history.
  */
 
 const PAGE_SIZE = 50;
 
-const COLUMNS = ["Date", "Time", "Symbol", "Company", "Announcement"];
+/*
+ * The batch size used when filtering client-side. 100 is PSX's own cap
+ * per request (larger counts are silently clamped), so it is the widest
+ * window a single request can look through.
+ */
+const CLIENT_BATCH = 100;
 
 /*
  * Long enough that ordinary typing commits once rather than per
@@ -37,9 +52,16 @@ const COLUMNS = ["Date", "Time", "Symbol", "Company", "Announcement"];
  */
 const SEARCH_DEBOUNCE_MS = 400;
 
+const MAX_SYMBOL_SUGGESTIONS = 8;
+
+const COLUMNS = ["Date", "Time", "Symbol", "Company", "Announcement"];
+
 /** The exact input treatment Market Watch uses — not a new one. */
 const INPUT_CLASS =
   "liquid-glass w-full rounded-full px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40";
+
+/** Same treatment, greyed when a symbol has taken these out of play. */
+const DISABLED_CLASS = "disabled:cursor-not-allowed disabled:opacity-40";
 
 export function AnnouncementsPage() {
   usePageMeta(
@@ -56,11 +78,22 @@ export function AnnouncementsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageParam = Number(searchParams.get("page"));
   const page = Number.isFinite(pageParam) && pageParam >= 1 ? Math.trunc(pageParam) : 1;
-  const offset = (page - 1) * PAGE_SIZE;
 
   const q = (searchParams.get("q") ?? "").trim();
   const fromParam = searchParams.get("from") ?? "";
   const toParam = searchParams.get("to") ?? "";
+  const symbolParam = (searchParams.get("symbol") ?? "").trim().toUpperCase();
+
+  /*
+   * A symbol overrides sector and Shariah-compliance rather than
+   * combining with them: one company has one sector and one index
+   * membership, so narrowing a single company by its own sector filters
+   * nothing. The controls are disabled to say so, and the params are
+   * dropped from the URL when a symbol is chosen.
+   */
+  const sector = symbolParam ? "" : (searchParams.get("sector") ?? "");
+  const shariah = symbolParam ? false : searchParams.get("shariah") === "1";
+  const clientFiltering = Boolean(sector) || shariah;
 
   /*
    * PSX ignores a one-sided range outright and answers with the whole
@@ -70,28 +103,78 @@ export function AnnouncementsPage() {
    */
   const rangeComplete = Boolean(fromParam) && Boolean(toParam);
   const rangeIncomplete = Boolean(fromParam) !== Boolean(toParam);
-  const filtersActive = Boolean(q) || Boolean(fromParam) || Boolean(toParam);
+  const filtersActive =
+    Boolean(q) ||
+    Boolean(fromParam) ||
+    Boolean(toParam) ||
+    Boolean(symbolParam) ||
+    clientFiltering;
 
-  const { data, loading, error } = useAnnouncements(PAGE_SIZE, offset, {
+  // A client-side filter reads a wider batch, since it keeps only part of it.
+  const fetchCount = clientFiltering ? CLIENT_BATCH : PAGE_SIZE;
+  const offset = (page - 1) * fetchCount;
+
+  const { data, loading, error } = useAnnouncements(fetchCount, offset, {
     q: q || undefined,
     dateFrom: rangeComplete ? fromParam : undefined,
     dateTo: rangeComplete ? toParam : undefined,
+    symbol: symbolParam || undefined,
   });
-  const announcements = data?.announcements;
-  const rows = announcements ?? [];
+
+  /*
+   * The same hook, and the same /api/market/watch URL, Market Watch and
+   * the ticker already use. apiGet coalesces concurrent same-URL GETs
+   * and briefly caches the result, so this adds no request of its own —
+   * it is where the sector and KMI facts come from, never a second
+   * source of truth.
+   */
+  const { data: quotes } = useAllMarketQuotes();
+
+  const bySymbol = useMemo(() => {
+    const map = new Map<string, StockQuote>();
+    for (const quote of quotes ?? []) map.set(quote.symbol, quote);
+    return map;
+  }, [quotes]);
+
+  /*
+   * Sector options come from the sectors actually present in the live
+   * feed, never a hardcoded list — if PSX renames or adds one, this
+   * follows without an edit.
+   */
+  const sectors = useMemo(() => {
+    const names = new Set<string>();
+    for (const quote of quotes ?? []) if (quote.sector) names.add(quote.sector);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [quotes]);
+
+  const batch = data?.announcements;
+  const batchSize = batch?.length ?? 0;
+
+  const rows = useMemo(() => {
+    const all = batch ?? [];
+    if (!clientFiltering) return all;
+    return all.filter((a) => {
+      const quote = bySymbol.get(a.symbol);
+      /*
+       * A filing whose symbol is not in the Market Watch feed cannot be
+       * placed in a sector or an index — dropped rather than guessed.
+       * Delisted companies keep filing, so this is a real case.
+       */
+      if (!quote) return false;
+      if (sector && quote.sector !== sector) return false;
+      if (shariah && !(quote.isKmi30 || quote.isKmiAllShare)) return false;
+      return true;
+    });
+  }, [batch, clientFiltering, bySymbol, sector, shariah]);
+
   const total = data?.totalAvailable ?? null;
   const stale = data?.stale;
 
-  /*
-   * The box holds keystrokes; the URL holds the committed query. They
-   * are separate so typing stays responsive while only the debounced
-   * value causes a fetch.
-   */
+  /* ── Search box: keystrokes local, committed value in the URL ──── */
+
   const [searchInput, setSearchInput] = useState(q);
   const committedQ = useRef(q);
 
-  // Follow the URL when it changes from somewhere else — back/forward,
-  // or Clear filters — without overwriting what is being typed.
   useEffect(() => {
     if (committedQ.current !== q) {
       committedQ.current = q;
@@ -117,11 +200,54 @@ export function AnnouncementsPage() {
     return () => clearTimeout(id);
   }, [searchInput, q, setSearchParams]);
 
-  function setDateParam(which: "from" | "to", value: string) {
+  /* ── Symbol autocomplete over the Market Watch directory ───────── */
+
+  const [symbolInput, setSymbolInput] = useState(symbolParam);
+  const committedSymbol = useRef(symbolParam);
+  const [symbolOpen, setSymbolOpen] = useState(false);
+
+  useEffect(() => {
+    if (committedSymbol.current !== symbolParam) {
+      committedSymbol.current = symbolParam;
+      setSymbolInput(symbolParam);
+    }
+  }, [symbolParam]);
+
+  const suggestions = useMemo(() => {
+    const term = symbolInput.trim().toUpperCase();
+    if (!term || term === symbolParam) return [];
+    return (quotes ?? [])
+      .filter(
+        (quote) =>
+          quote.symbol.includes(term) ||
+          (quote.name ?? "").toUpperCase().includes(term),
+      )
+      .slice(0, MAX_SYMBOL_SUGGESTIONS);
+  }, [symbolInput, symbolParam, quotes]);
+
+  function applySymbol(next: string) {
+    committedSymbol.current = next;
+    setSymbolInput(next);
+    setSymbolOpen(false);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
-      if (value) params.set(which, value);
-      else params.delete(which);
+      if (next) {
+        params.set("symbol", next);
+        params.delete("sector");
+        params.delete("shariah");
+      } else {
+        params.delete("symbol");
+      }
+      params.delete("page");
+      return params;
+    });
+  }
+
+  function setParam(key: string, value: string) {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (value) params.set(key, value);
+      else params.delete(key);
       params.delete("page");
       return params;
     });
@@ -129,19 +255,32 @@ export function AnnouncementsPage() {
 
   function clearFilters() {
     committedQ.current = "";
+    committedSymbol.current = "";
     setSearchInput("");
+    setSymbolInput("");
+    setSymbolOpen(false);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
-      for (const key of ["q", "from", "to", "page"]) params.delete(key);
+      for (const key of ["q", "from", "to", "symbol", "sector", "shariah", "page"]) {
+        params.delete(key);
+      }
       return params;
     });
   }
 
+  /* ── Pager ─────────────────────────────────────────────────────── */
+
   const from = offset + 1;
-  const to = offset + rows.length;
+  const to = offset + batchSize;
   const hasPrev = page > 1;
-  // Only offer Next while PSX's own total says there is more.
-  const hasNext = total !== null ? to < total : rows.length === PAGE_SIZE;
+  /*
+   * Next walks PSX's own pagination in both modes. Under a client-side
+   * filter it advances by the batch, not by the number of matches — a
+   * batch may legitimately hold none, and chaining requests to backfill
+   * a full page would turn one click into an unbounded number of
+   * requests against PSX.
+   */
+  const hasNext = total !== null ? to < total : batchSize === fetchCount;
 
   function goTo(next: number) {
     setSearchParams((current) => {
@@ -158,7 +297,12 @@ export function AnnouncementsPage() {
    * its own state so it can never borrow the "temporarily unavailable"
    * copy, which would report a working search as a broken feed.
    */
-  const noResults = Boolean(announcements) && rows.length === 0;
+  const noResults = Boolean(batch) && rows.length === 0;
+  // Told apart so the copy can say which it is: PSX returned nothing at
+  // all, or PSX returned a batch in which nothing matched.
+  const emptyBatchFiltered = noResults && clientFiltering && batchSize > 0;
+
+  const controlsLocked = Boolean(symbolParam);
 
   return (
     <main className="min-h-screen text-white">
@@ -195,6 +339,91 @@ export function AnnouncementsPage() {
               />
             </label>
 
+            {/* Symbol autocomplete over the Market Watch directory. */}
+            <div className="relative w-full sm:w-56">
+              <label className="block">
+                <span className="sr-only">Filter by symbol</span>
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-expanded={symbolOpen && suggestions.length > 0}
+                  aria-autocomplete="list"
+                  value={symbolInput}
+                  onChange={(e) => {
+                    setSymbolInput(e.target.value);
+                    setSymbolOpen(true);
+                    if (e.target.value.trim() === "" && symbolParam) applySymbol("");
+                  }}
+                  onFocus={() => setSymbolOpen(true)}
+                  // Blur is deferred so a click on a suggestion lands first.
+                  onBlur={() => setTimeout(() => setSymbolOpen(false), 150)}
+                  placeholder="Symbol (e.g. OGDC)"
+                  className={INPUT_CLASS}
+                />
+              </label>
+              {symbolOpen && suggestions.length > 0 && (
+                <ul
+                  role="listbox"
+                  aria-label="Symbol suggestions"
+                  className="liquid-glass absolute z-20 mt-2 w-full overflow-hidden rounded-2xl py-1"
+                >
+                  {suggestions.map((quote) => (
+                    <li key={quote.symbol}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={quote.symbol === symbolParam}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applySymbol(quote.symbol)}
+                        className="flex w-full items-baseline gap-2 px-4 py-2 text-left text-sm text-white transition-colors duration-200 hover:bg-white/10"
+                      >
+                        <span className="font-semibold tracking-wide">
+                          {quote.symbol}
+                        </span>
+                        {quote.name && (
+                          <span className="truncate text-xs text-gray-400">
+                            {quote.name}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Sector
+              </span>
+              <select
+                aria-label="Sector"
+                value={sector}
+                disabled={controlsLocked}
+                onChange={(e) => setParam("sector", e.target.value)}
+                className={`${INPUT_CLASS} ${DISABLED_CLASS} w-auto [color-scheme:dark]`}
+              >
+                <option value="">All sectors</option>
+                {sectors.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <input
+                type="checkbox"
+                aria-label="Shariah-compliant (KMI)"
+                checked={shariah}
+                disabled={controlsLocked}
+                onChange={(e) => setParam("shariah", e.target.checked ? "1" : "")}
+                className="h-4 w-4 rounded border-white/20 bg-transparent accent-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              />
+              Shariah-compliant (KMI)
+            </label>
+
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -205,7 +434,7 @@ export function AnnouncementsPage() {
                   aria-label="From date"
                   value={fromParam}
                   max={toParam || undefined}
-                  onChange={(e) => setDateParam("from", e.target.value)}
+                  onChange={(e) => setParam("from", e.target.value)}
                   // color-scheme keeps the native picker and its icon
                   // legible on this dark ground.
                   className={`${INPUT_CLASS} w-auto [color-scheme:dark]`}
@@ -220,7 +449,7 @@ export function AnnouncementsPage() {
                   aria-label="To date"
                   value={toParam}
                   min={fromParam || undefined}
-                  onChange={(e) => setDateParam("to", e.target.value)}
+                  onChange={(e) => setParam("to", e.target.value)}
                   className={`${INPUT_CLASS} w-auto [color-scheme:dark]`}
                 />
               </label>
@@ -243,28 +472,67 @@ export function AnnouncementsPage() {
             </p>
           )}
 
+          {controlsLocked && (
+            <p className="mt-3 text-xs text-gray-400">
+              Showing {symbolParam} only — sector and Shariah-compliant filters
+              don&apos;t apply to a single company.
+            </p>
+          )}
+
+          {/*
+           * Required whenever a client-side filter is on. PSX cannot be
+           * asked for a sector, so this is one batch of filings deep,
+           * and saying otherwise would imply a completeness the page
+           * does not have.
+           */}
+          {clientFiltering && (
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-amber-200/90">
+              Showing matches from the most recent {CLIENT_BATCH} PSX filings —
+              not a complete history for this{" "}
+              {sector ? "sector" : "index"}. PSX has no sector or index field to
+              filter on, so these are matched here against Market Watch data one
+              batch at a time; use Next to look further back.
+            </p>
+          )}
+
+          {shariah && (
+            /* Same methodology language Market Watch carries — index
+               membership, never individual religious advice. */
+            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-gray-400/90">
+              <span className="font-semibold text-gray-300">KMI-30</span> and{" "}
+              <span className="font-semibold text-gray-300">KMI All-Share</span>{" "}
+              indicate a symbol&apos;s membership in the Pakistan Stock
+              Exchange&apos;s official Shariah-compliant indices, screened per the
+              published PSX KMI index methodology. This is a statement of index
+              membership — not individual religious advice.
+            </p>
+          )}
+
           <div className="liquid-glass glass-sheen mt-6 overflow-hidden rounded-3xl">
-            {error && !announcements ? (
+            {error && !batch ? (
               <div className="px-6 py-16 text-center text-sm text-gray-400">
                 Company announcements are temporarily unavailable. Please try
                 again shortly.
               </div>
-            ) : loading && !announcements ? (
+            ) : loading && !batch ? (
               <div className="px-6 py-16 text-center text-sm text-gray-400">
                 Loading announcements…
               </div>
             ) : noResults ? (
               <div className="px-6 py-16 text-center">
                 <p className="text-sm text-gray-300">
-                  {filtersActive
-                    ? "No announcements match these filters."
-                    : "PSX is not publishing any company announcements right now."}
+                  {emptyBatchFiltered
+                    ? `No filings in this batch of ${batchSize} match these filters.`
+                    : filtersActive
+                      ? "No announcements match these filters."
+                      : "PSX is not publishing any company announcements right now."}
                 </p>
                 {filtersActive && (
                   <>
                     <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-gray-400">
-                      PSX searches whole words in the filing, so a partial word
-                      finds nothing. Try a shorter search, or widen the dates.
+                      {emptyBatchFiltered
+                        ? "Use Next to search further back through PSX's filings, or widen the filters."
+                        : "PSX searches whole words in the filing, so a partial word finds nothing. Try a shorter search, or widen the dates."}
                     </p>
                     <button
                       type="button"
@@ -345,21 +613,35 @@ export function AnnouncementsPage() {
             )}
           </div>
 
-          {announcements && (
+          {batch && (
             <>
-              {rows.length > 0 && (
+              {batchSize > 0 && (
                 /* Pager — counts come from PSX's own "Showing X to Y of Z
                    entries" header, never a client-side estimate. Under a
-                   filter that header is the FILTERED total (verified), so
-                   "of N" still describes what is on screen. */
+                   PSX-side filter that header is the FILTERED total
+                   (verified), so "of N" still describes what is on
+                   screen. Under a client-side filter it describes the
+                   batch that was searched, and the match count is stated
+                   separately so the two are never conflated. */
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-                  <p className="text-xs text-gray-400 tabular-nums">
-                    Showing {from.toLocaleString("en-US")}–
-                    {to.toLocaleString("en-US")}
-                    {total !== null && (
-                      <> of {total.toLocaleString("en-US")} announcements</>
-                    )}
-                  </p>
+                  {clientFiltering ? (
+                    <p className="text-xs text-gray-400 tabular-nums">
+                      {rows.length.toLocaleString("en-US")}{" "}
+                      {rows.length === 1 ? "match" : "matches"} in filings{" "}
+                      {from.toLocaleString("en-US")}–{to.toLocaleString("en-US")}
+                      {total !== null && (
+                        <> of {total.toLocaleString("en-US")}</>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 tabular-nums">
+                      Showing {from.toLocaleString("en-US")}–
+                      {to.toLocaleString("en-US")}
+                      {total !== null && (
+                        <> of {total.toLocaleString("en-US")} announcements</>
+                      )}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
