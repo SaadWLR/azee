@@ -92,7 +92,12 @@ test("a nonsense query shows a clean no-results state, not an outage", async ({
 
 test("a one-sided date range is not sent, and says why", async ({ page }) => {
   await page.goto("/announcements");
+  // Wait for the first page to actually render before reading its total —
+  // reading straight after goto returns null, which then "differs" from
+  // the real number later and fails for no reason.
+  await expect(page.locator(ROWS).first()).toBeVisible();
   const unfiltered = await pagerTotal(page);
+  expect(unfiltered).not.toBeNull();
 
   await page.getByLabel("From date").fill("2026-08-01");
   await expect(page).toHaveURL(/[?&]from=2026-08-01/);
@@ -102,7 +107,15 @@ test("a one-sided date range is not sent, and says why", async ({ page }) => {
     "Add both a start and end date to filter by range.",
   );
   await expect(page.locator("main")).not.toContainText(UNAVAILABLE);
-  expect(await pagerTotal(page)).toBe(unfiltered);
+  /*
+   * Still the whole corpus, not a narrowed one. Compared as "no smaller
+   * than" rather than equal: the feed is live, so a filing arriving
+   * between the two reads legitimately nudges the total up, while any
+   * range that had actually been applied would cut it by three orders of
+   * magnitude (223,379 → 210 for this week).
+   */
+  expect(await pagerTotal(page)).toBeGreaterThanOrEqual(unfiltered!);
+  await expect(page.locator(ROWS)).toHaveCount(50);
 
   // Completing the range applies it.
   await page.getByLabel("To date").fill("2026-08-07");
