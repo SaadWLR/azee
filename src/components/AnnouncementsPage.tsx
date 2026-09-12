@@ -5,6 +5,16 @@ import { Footer } from "./Footer";
 import { useAnnouncements } from "../hooks/useCalendar";
 import { useAllMarketQuotes } from "../hooks/useMarketData";
 import { usePageMeta } from "../hooks/usePageMeta";
+import {
+  CATEGORY_TABS,
+  isCategory,
+  type Category,
+} from "../lib/announcementCategory";
+import {
+  applyCategory,
+  applyMarketFilters,
+  countByCategory,
+} from "../lib/announcementFilters";
 import type { CompanyAnnouncement } from "../types/announcements";
 import type { StockQuote } from "../types";
 
@@ -27,12 +37,11 @@ import type { StockQuote } from "../types";
  * Symbol in particular is exact and complete: probed live, symbol=OGDC
  * reports 729 filings and walks back to 2005.
  *
- * Sector and Shariah-compliance are NOT PSX fields — there is no way to
- * ask its endpoint for "every filing in this sector". Those are applied
- * here, against sector and KMI membership the app already holds from
- * Market Watch, over ONE batch of filings at a time. That is a real
- * limitation, so the page says so whenever they are on rather than
- * implying a complete sector history.
+ * Sector, Shariah-compliance and filing type are NOT PSX fields. They
+ * are applied here, over ONE batch of filings at a time: sector and
+ * Shariah against Market Watch data, filing type against each title.
+ * That is a real limitation, so the page says so whenever any of them
+ * is on rather than implying a complete history.
  */
 
 const PAGE_SIZE = 50;
@@ -40,7 +49,9 @@ const PAGE_SIZE = 50;
 /*
  * The batch size used when filtering client-side. 100 is PSX's own cap
  * per request (larger counts are silently clamped), so it is the widest
- * window a single request can look through.
+ * window a single request can look through. Sector, Shariah and filing
+ * type all use the same batch, so moving between them never changes
+ * the search depth underneath the reader.
  */
 const CLIENT_BATCH = 100;
 
@@ -62,6 +73,13 @@ const INPUT_CLASS =
 
 /** Same treatment, greyed when a symbol has taken these out of play. */
 const DISABLED_CLASS = "disabled:cursor-not-allowed disabled:opacity-40";
+
+/** Market Watch's preset pills — the same selected/unselected pair. */
+function pillClass(selected: boolean): string {
+  return `rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${
+    selected ? "bg-white text-black" : "liquid-glass text-white hover:bg-white/15"
+  }`;
+}
 
 export function AnnouncementsPage() {
   usePageMeta(
@@ -90,10 +108,17 @@ export function AnnouncementsPage() {
    * membership, so narrowing a single company by its own sector filters
    * nothing. The controls are disabled to say so, and the params are
    * dropped from the URL when a symbol is chosen.
+   *
+   * Filing type is the exception, and deliberately so: one company still
+   * files many different kinds of disclosure, so it composes with a
+   * symbol — and with everything else — and is never disabled.
    */
   const sector = symbolParam ? "" : (searchParams.get("sector") ?? "");
   const shariah = symbolParam ? false : searchParams.get("shariah") === "1";
-  const clientFiltering = Boolean(sector) || shariah;
+  const categoryParam = searchParams.get("category") ?? "";
+  const category: Category | null = isCategory(categoryParam) ? categoryParam : null;
+
+  const clientFiltering = Boolean(sector) || shariah || category !== null;
 
   /*
    * PSX ignores a one-sided range outright and answers with the whole
@@ -150,22 +175,27 @@ export function AnnouncementsPage() {
   const batch = data?.announcements;
   const batchSize = batch?.length ?? 0;
 
-  const rows = useMemo(() => {
-    const all = batch ?? [];
-    if (!clientFiltering) return all;
-    return all.filter((a) => {
-      const quote = bySymbol.get(a.symbol);
-      /*
-       * A filing whose symbol is not in the Market Watch feed cannot be
-       * placed in a sector or an index — dropped rather than guessed.
-       * Delisted companies keep filing, so this is a real case.
-       */
-      if (!quote) return false;
-      if (sector && quote.sector !== sector) return false;
-      if (shariah && !(quote.isKmi30 || quote.isKmiAllShare)) return false;
-      return true;
-    });
-  }, [batch, clientFiltering, bySymbol, sector, shariah]);
+  /*
+   * Two independent stages. Sector/Shariah consult Market Watch, and
+   * only when one of them is on. Filing type reads the title alone and
+   * runs over whatever the first stage kept — it is never gated on a
+   * Market Watch lookup, so a filing from a symbol absent from that feed
+   * (a delisted company, or a fund manager such as MCBIM-FUNDS) is still
+   * tagged and still shown under its tab.
+   */
+  const working = useMemo(
+    () => applyMarketFilters(batch ?? [], { sector, shariah }, bySymbol),
+    [batch, sector, shariah, bySymbol],
+  );
+
+  /*
+   * Tab counts describe the working set BEFORE filing type narrows it,
+   * so every tab shows how the current batch splits — not just the one
+   * selected.
+   */
+  const tabCounts = useMemo(() => countByCategory(working), [working]);
+
+  const rows = useMemo(() => applyCategory(working, category), [working, category]);
 
   const total = data?.totalAvailable ?? null;
   const stale = data?.stale;
@@ -233,6 +263,7 @@ export function AnnouncementsPage() {
       const params = new URLSearchParams(current);
       if (next) {
         params.set("symbol", next);
+        // Sector and Shariah go; filing type stays — it still applies.
         params.delete("sector");
         params.delete("shariah");
       } else {
@@ -261,7 +292,16 @@ export function AnnouncementsPage() {
     setSymbolOpen(false);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
-      for (const key of ["q", "from", "to", "symbol", "sector", "shariah", "page"]) {
+      for (const key of [
+        "q",
+        "from",
+        "to",
+        "symbol",
+        "sector",
+        "shariah",
+        "category",
+        "page",
+      ]) {
         params.delete(key);
       }
       return params;
@@ -293,14 +333,20 @@ export function AnnouncementsPage() {
   }
 
   /*
-   * Zero rows from a filter is a real answer, not an outage. It gets
-   * its own state so it can never borrow the "temporarily unavailable"
-   * copy, which would report a working search as a broken feed.
+   * Zero rows is a real answer, not an outage, and it gets its own state
+   * so it can never borrow the "temporarily unavailable" copy. Three
+   * different empties are told apart so the copy can say which one it
+   * is: PSX returned nothing at all; PSX returned a batch but sector or
+   * Shariah kept none of it; or rows survived those and simply none
+   * carries the selected filing type.
    */
   const noResults = Boolean(batch) && rows.length === 0;
-  // Told apart so the copy can say which it is: PSX returned nothing at
-  // all, or PSX returned a batch in which nothing matched.
-  const emptyBatchFiltered = noResults && clientFiltering && batchSize > 0;
+  const emptyForCategory =
+    noResults && category !== null && working.length > 0;
+  const emptyBatchFiltered =
+    noResults && !emptyForCategory && clientFiltering && batchSize > 0;
+  const categoryLabel =
+    CATEGORY_TABS.find((tab) => tab.id === category)?.label ?? "";
 
   const controlsLocked = Boolean(symbolParam);
 
@@ -466,6 +512,55 @@ export function AnnouncementsPage() {
             )}
           </div>
 
+          {/* ── Filing type ────────────────────────────────────────── */}
+          <div
+            role="tablist"
+            aria-label="Filing type"
+            className="mt-5 flex flex-wrap gap-2"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === null}
+              onClick={() => setParam("category", "")}
+              className={pillClass(category === null)}
+            >
+              All
+              {clientFiltering && batch && (
+                <span className="ml-1.5 tabular-nums opacity-60">
+                  {working.length}
+                </span>
+              )}
+            </button>
+            {CATEGORY_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={category === tab.id}
+                onClick={() => setParam("category", tab.id)}
+                className={pillClass(category === tab.id)}
+              >
+                {tab.label}
+                {/* Counts are shown only on the 100-row batch, where every
+                    tab describes the same filings. On the default 50-row
+                    page they would change the moment a tab was chosen and
+                    the batch doubled. */}
+                {clientFiltering && batch && (
+                  <span className="ml-1.5 tabular-nums opacity-60">
+                    {tabCounts[tab.id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {/* What the tag MEANS — kept separate from the batch disclaimer
+              below, which is about how much of the data is on screen. */}
+          <p className="mt-2 text-xs text-gray-400">
+            Filing type is auto-tagged by AZEE from each filing&apos;s title — it
+            is not a category published by PSX.
+          </p>
+
           {rangeIncomplete && (
             <p className="mt-3 text-xs text-amber-200/90">
               Add both a start and end date to filter by range.
@@ -480,18 +575,15 @@ export function AnnouncementsPage() {
           )}
 
           {/*
-           * Required whenever a client-side filter is on. PSX cannot be
-           * asked for a sector, so this is one batch of filings deep,
-           * and saying otherwise would imply a completeness the page
-           * does not have.
+           * How much of the data is on screen. One generic sentence for
+           * every client-side filter, so the copy does not fragment into
+           * per-filter combinations as more are added.
            */}
           {clientFiltering && (
             <p className="mt-3 max-w-3xl text-xs leading-relaxed text-amber-200/90">
               Showing matches from the most recent {CLIENT_BATCH} PSX filings —
-              not a complete history for this{" "}
-              {sector ? "sector" : "index"}. PSX has no sector or index field to
-              filter on, so these are matched here against Market Watch data one
-              batch at a time; use Next to look further back.
+              not a complete history for these filters; use Next to look
+              further back.
             </p>
           )}
 
@@ -521,16 +613,18 @@ export function AnnouncementsPage() {
             ) : noResults ? (
               <div className="px-6 py-16 text-center">
                 <p className="text-sm text-gray-300">
-                  {emptyBatchFiltered
-                    ? `No filings in this batch of ${batchSize} match these filters.`
-                    : filtersActive
-                      ? "No announcements match these filters."
-                      : "PSX is not publishing any company announcements right now."}
+                  {emptyForCategory
+                    ? `No filings in this batch of ${batchSize} are tagged ${categoryLabel}.`
+                    : emptyBatchFiltered
+                      ? `No filings in this batch of ${batchSize} match these filters.`
+                      : filtersActive
+                        ? "No announcements match these filters."
+                        : "PSX is not publishing any company announcements right now."}
                 </p>
                 {filtersActive && (
                   <>
                     <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-gray-400">
-                      {emptyBatchFiltered
+                      {emptyForCategory || emptyBatchFiltered
                         ? "Use Next to search further back through PSX's filings, or widen the filters."
                         : "PSX searches whole words in the filing, so a partial word finds nothing. Try a shorter search, or widen the dates."}
                     </p>
