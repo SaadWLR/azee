@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
+import { shouldRejectParse } from "../../api/announcements/latest";
 
 /*
  * Symbol, Sector and Shariah-compliant filters on /announcements.
@@ -224,6 +225,36 @@ test("a client-side filter reads one 100-row batch and says so", async ({
   for (const url of requested) {
     expect(url, url).toContain("count=100");
   }
+});
+
+test("a page past the end of a symbol's filings is empty, not an outage", async ({
+  page,
+}) => {
+  /*
+   * SPAC2 has 14 filings, so page 2 starts past the end. PSX answers
+   * with no rows while still stating 14, which the parse floor used to
+   * read as a broken fragment and turn into a 503 — a false outage on a
+   * hand-edited URL.
+   */
+  await page.goto("/announcements?symbol=SPAC2&page=2");
+  await expect(page.locator("main")).not.toContainText(/temporarily unavailable/i);
+  await expect(page.locator("main")).toContainText(
+    "No announcements match these filters.",
+  );
+});
+
+test("the parse floor tells a past-the-end page from a broken one", () => {
+  // Past the end of a real result set: empty for a good reason.
+  expect(shouldRejectParse(50, 0, 14, 50)).toBe(false);
+  expect(shouldRejectParse(50, 0, 729, 729)).toBe(false);
+
+  // Still a breakage: nothing parsed at an offset well inside the total.
+  expect(shouldRejectParse(50, 0, 729, 0)).toBe(true);
+  expect(shouldRejectParse(50, 1, 729, 0)).toBe(true);
+
+  // The Milestone 1 rules are untouched by the new argument.
+  expect(shouldRejectParse(50, 3, 3)).toBe(false);
+  expect(shouldRejectParse(50, 1, 3)).toBe(true);
 });
 
 test("the page reuses the cached Market Watch feed, adding no second fetch", async ({

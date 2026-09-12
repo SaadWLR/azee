@@ -245,12 +245,24 @@ export function shouldRejectParse(
   count: number,
   parsedRows: number,
   totalAvailable: number | null,
+  offset = 0,
 ): boolean {
   const expectedRows = Math.min(count, MIN_ROWS);
   if (parsedRows >= expectedRows) return false;
   const totalConfirmsSmallResult =
     totalAvailable !== null && totalAvailable === parsedRows;
-  return !totalConfirmsSmallResult;
+  if (totalConfirmsSmallResult) return false;
+  /*
+   * A page that begins past the end of a real result set is empty for a
+   * good reason. PSX answers offset=729 on a 729-filing symbol with no
+   * rows while still stating 729, which the rule above reads as "0
+   * parsed against a stated 729" — a breakage. Symbol made this easy to
+   * reach: SPAC2 has 14 filings, so page 2 of it is past the end.
+   * `offset` defaults to 0 so the three-argument form is unchanged.
+   */
+  const pastEnd =
+    parsedRows === 0 && totalAvailable !== null && offset >= totalAvailable;
+  return !pastEnd;
 }
 
 async function fetchAnnouncements(
@@ -312,7 +324,7 @@ async function fetchAnnouncements(
   const totalMatch = /of\s+(\d+)\s+entries/.exec(html);
   const totalAvailable = totalMatch ? Number(totalMatch[1]) : null;
 
-  if (shouldRejectParse(count, announcements.length, totalAvailable)) {
+  if (shouldRejectParse(count, announcements.length, totalAvailable, offset)) {
     throw new Error(
       `PSX announcements parse yielded only ${announcements.length} rows against a stated total of ${
         totalAvailable ?? "unknown"
