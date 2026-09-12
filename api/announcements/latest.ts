@@ -195,18 +195,65 @@ function parseRow(row: string): CompanyAnnouncement | null {
   };
 }
 
+/**
+ * Optional narrowing, forwarded to PSX's own fields rather than applied
+ * here — so the rows AND the total belong to the same query.
+ *
+ * Dates are ISO yyyy-mm-dd, which is the only format PSX accepts.
+ * Confirmed by probing the live endpoint (Sep 11 2026): 2026-08-01 to
+ * 2026-08-07 narrowed 223,379 entries to 210, while 08/01/2026 and
+ * 01/08/2026 came back as an error page carrying no announcementsTable
+ * at all. Both ends are required — PSX silently ignores a one-sided
+ * range and answers with the unfiltered corpus, so the handler rejects
+ * that rather than returning everything under a filtered URL.
+ */
+export interface AnnouncementQuery {
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/**
+ * Does a short page mean the parser broke, or is the result genuinely
+ * that small?
+ *
+ * The floor exists to catch PSX changing its HTML: a parser that
+ * silently yields nothing on what should be a full page must fail
+ * loudly rather than render "no announcements". But a filtered query
+ * legitimately returns very few rows — "CREDIT RATING" on a single day
+ * returns exactly 3 — and reporting that as an outage would be a lie
+ * about live data.
+ *
+ * PSX's own stated total settles it, and the match must be EXACT. A
+ * total of 3 with 3 rows parsed is a real small result; a total of 3
+ * with 1 row parsed means two rows failed to parse, which is precisely
+ * the breakage the floor is for and still throws.
+ */
+export function shouldRejectParse(
+  count: number,
+  parsedRows: number,
+  totalAvailable: number | null,
+): boolean {
+  const expectedRows = Math.min(count, MIN_ROWS);
+  if (parsedRows >= expectedRows) return false;
+  const totalConfirmsSmallResult =
+    totalAvailable !== null && totalAvailable === parsedRows;
+  return !totalConfirmsSmallResult;
+}
+
 async function fetchAnnouncements(
   count: number,
   offset: number,
+  filters: AnnouncementQuery = {},
 ): Promise<AnnouncementsResponse> {
   const body = new URLSearchParams({
     type: ANNOUNCEMENT_TYPE,
     symbol: "",
-    query: "",
+    query: filters.query ?? "",
     count: String(count),
     offset: String(offset),
-    date_from: "",
-    date_to: "",
+    date_from: filters.dateFrom ?? "",
+    date_to: filters.dateTo ?? "",
     page: "annc",
   }).toString();
 
@@ -242,22 +289,30 @@ async function fetchAnnouncements(
     const parsed = parseRow(row);
     if (parsed) announcements.push(parsed);
   }
-  const expectedRows = Math.min(count, MIN_ROWS);
-  if (announcements.length < expectedRows) {
+  /*
+   * PSX's own total for this query ("Showing 1 to 50 of 221831
+   * entries"), mirrored by the pager's data-total attribute. It tracks
+   * the FILTERED query once query/date_from/date_to are set — verified
+   * live: 223,379 unfiltered, 13,506 for "dividend", 210 for one week,
+   * 29 for both together — so the pager's "of N" stays truthful under a
+   * filter. Read before the sanity floor, which now consults it.
+   */
+  const totalMatch = /of\s+(\d+)\s+entries/.exec(html);
+  const totalAvailable = totalMatch ? Number(totalMatch[1]) : null;
+
+  if (shouldRejectParse(count, announcements.length, totalAvailable)) {
     throw new Error(
-      `PSX announcements parse yielded only ${announcements.length} of an expected ${expectedRows} rows — fragment structure may have changed`,
+      `PSX announcements parse yielded only ${announcements.length} rows against a stated total of ${
+        totalAvailable ?? "unknown"
+      } — fragment structure may have changed`,
     );
   }
-
-  // PSX's own total for this query ("Showing 1 to 50 of 221831
-  // entries"), mirrored by the pager's data-total attribute.
-  const totalMatch = /of\s+(\d+)\s+entries/.exec(html);
 
   return {
     announcements,
     count,
     offset,
-    totalAvailable: totalMatch ? Number(totalMatch[1]) : null,
+    totalAvailable,
     asOf: new Date().toISOString(),
     source: "psx",
   };
@@ -272,12 +327,51 @@ function intParam(raw: unknown, fallback: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
+/** A free-text param, trimmed and capped. */
+function strParam(raw: unknown, maxLength: number): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
+/** Long enough for a real filing title, short enough not to be a payload. */
+const MAX_QUERY_LENGTH = 200;
+
 /**
- * Last good page, keyed by "count:offset" — a single slot would serve
- * page 1's rows under page 3's URL during an outage, which would read
- * as real data for the wrong page.
+ * ISO yyyy-mm-dd AND a real calendar date. The round-trip is what
+ * rejects 2026-02-31, which shape-matching alone would wave through.
+ */
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const time = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(time)) return false;
+  return new Date(time).toISOString().slice(0, 10) === value;
+}
+
+/**
+ * Last good page, keyed by every input that changes the result — a
+ * single slot would serve page 1's rows under page 3's URL during an
+ * outage, and with filters it would serve one filter's rows under
+ * another's, which reads as real data for a query nobody ran.
  */
 const lastGood = new Map<string, AnnouncementsResponse>();
+
+/**
+ * Filters multiply the key space without bound, so the map is capped at
+ * the most recent entries. Re-inserting refreshes recency: Map iterates
+ * in insertion order, so the first key is always the oldest.
+ */
+const LAST_GOOD_MAX = 50;
+
+function rememberLastGood(key: string, data: AnnouncementsResponse): void {
+  lastGood.delete(key);
+  lastGood.set(key, data);
+  while (lastGood.size > LAST_GOOD_MAX) {
+    const oldest = lastGood.keys().next().value;
+    if (oldest === undefined) break;
+    lastGood.delete(oldest);
+  }
+}
 
 export default async function handler(
   req: VercelRequest,
@@ -287,11 +381,57 @@ export default async function handler(
   // 221k+ entries exist, but an unbounded offset is a cheap way to make
   // PSX scan the whole table; cap it well past any realistic browsing.
   const offset = intParam(req.query.offset, 0, 0, 500_000);
-  const key = `${count}:${offset}`;
+  const query = strParam(req.query.q, MAX_QUERY_LENGTH);
+  const dateFrom = strParam(req.query.date_from, 10);
+  const dateTo = strParam(req.query.date_to, 10);
+
+  /*
+   * Malformed dates are rejected, never forwarded. PSX answers a
+   * non-ISO date with an HTML error page that carries no
+   * announcementsTable, which this function would report as a changed
+   * contract — a 400 naming the real problem is the honest answer.
+   */
+  for (const [name, value] of [
+    ["date_from", dateFrom],
+    ["date_to", dateTo],
+  ] as const) {
+    if (value && !isIsoDate(value)) {
+      res.setHeader("Cache-Control", "no-store");
+      res
+        .status(400)
+        .json({ error: `${name} must be an ISO date (yyyy-mm-dd)` });
+      return;
+    }
+  }
+
+  /*
+   * Both ends or neither. PSX silently drops a one-sided range and
+   * returns the whole corpus, so forwarding one would answer a filtered
+   * request with unfiltered data and no way for the caller to tell.
+   */
+  if (Boolean(dateFrom) !== Boolean(dateTo)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(400).json({
+      error:
+        "date_from and date_to must be provided together — PSX ignores a one-sided range",
+    });
+    return;
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(400).json({ error: "date_from must not be after date_to" });
+    return;
+  }
+
+  const key = `${count}:${offset}:${query}:${dateFrom}:${dateTo}`;
 
   try {
-    const data = await fetchAnnouncements(count, offset);
-    lastGood.set(key, data);
+    const data = await fetchAnnouncements(count, offset, {
+      query,
+      dateFrom,
+      dateTo,
+    });
+    rememberLastGood(key, data);
     /*
      * 15 minutes. Company announcements arrive continuously through the
      * trading day — 50 filings spanned roughly a day and a half when

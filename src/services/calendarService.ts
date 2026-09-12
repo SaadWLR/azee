@@ -260,21 +260,68 @@ const ANNOUNCEMENTS_FIXTURE: AnnouncementsResponse = {
 };
 
 /**
+ * Optional narrowing for a page of announcements. All three map onto
+ * fields PSX's own endpoint accepts; none of them is a client-side
+ * filter over a bigger fetch.
+ */
+export interface AnnouncementFilters {
+  /** Free text, matched by PSX across the filing's own fields. */
+  q?: string;
+  /** Inclusive ISO yyyy-mm-dd bounds — the only format PSX accepts. */
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/**
  * One page of PSX company announcements. `count`/`offset` map straight
  * onto PSX's own pagination — no client-side slicing of a bigger fetch,
- * since the real corpus is 221k+ filings.
+ * since the real corpus is 221k+ filings. Filters are forwarded the
+ * same way, so a narrowed view is narrowed AT PSX and its row count and
+ * total belong to the same query.
  */
 export async function getAnnouncements(
   count = 50,
   offset = 0,
+  filters: AnnouncementFilters = {},
 ): Promise<AnnouncementsResponse> {
+  const params = new URLSearchParams({
+    count: String(count),
+    offset: String(offset),
+  });
+  // Only present filters are sent, so the default URL stays byte-for-byte
+  // what it has always been and keeps hitting the same edge cache entry.
+  if (filters.q) params.set("q", filters.q);
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
+  if (filters.dateTo) params.set("date_to", filters.dateTo);
+
   if (import.meta.env.DEV) {
-    // Vercel serverless routes don't run under `vite dev`; the fixture
-    // keeps local development working. Deployed builds always fetch
-    // live disclosures from the API route.
-    return mockResponse({ ...ANNOUNCEMENTS_FIXTURE, count, offset });
+    /*
+     * Vercel serverless routes don't run under `vite dev`; the fixture
+     * keeps local development working. It is filtered here in the same
+     * shape the real endpoint would, so the filter UI is exercisable
+     * locally instead of appearing to do nothing — and so passing
+     * filters can never crash this path. Deployed builds always fetch
+     * live disclosures from the API route.
+     */
+    const q = filters.q?.trim().toLowerCase();
+    const rows = ANNOUNCEMENTS_FIXTURE.announcements.filter((a) => {
+      if (q && !`${a.symbol} ${a.companyName} ${a.title}`.toLowerCase().includes(q)) {
+        return false;
+      }
+      const day = a.announcedAt.slice(0, 10);
+      if (filters.dateFrom && day < filters.dateFrom) return false;
+      if (filters.dateTo && day > filters.dateTo) return false;
+      return true;
+    });
+    return mockResponse({
+      ...ANNOUNCEMENTS_FIXTURE,
+      announcements: rows,
+      count,
+      offset,
+      totalAvailable: rows.length,
+    });
   }
   return apiGet<AnnouncementsResponse>(
-    `/api/announcements/latest?count=${count}&offset=${offset}`,
+    `/api/announcements/latest?${params.toString()}`,
   );
 }

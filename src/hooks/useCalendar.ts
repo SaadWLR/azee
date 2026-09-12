@@ -3,6 +3,7 @@ import {
   getAnnouncements,
   getCorporateCalendar,
   getPayouts,
+  type AnnouncementFilters,
 } from "../services/calendarService";
 import { useAsyncData } from "./useAsyncData";
 
@@ -38,10 +39,21 @@ export function usePayouts() {
  * desired behaviour here (turning the page refetches), but an
  * unmemoized closure would refetch on every render.
  */
-export function useAnnouncements(count: number, offset: number) {
+export function useAnnouncements(
+  count: number,
+  offset: number,
+  filters: AnnouncementFilters = {},
+) {
+  /*
+   * Destructured to primitives before the dependency array: callers pass
+   * a fresh object literal every render, so depending on `filters`
+   * itself would change the fetcher's identity on each render and
+   * refetch forever. The three values are what actually change.
+   */
+  const { q, dateFrom, dateTo } = filters;
   const fetcher = useCallback(
-    () => getAnnouncements(count, offset),
-    [count, offset],
+    () => getAnnouncements(count, offset, { q, dateFrom, dateTo }),
+    [count, offset, q, dateFrom, dateTo],
   );
   return useAsyncData(fetcher);
 }

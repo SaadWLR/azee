@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
@@ -16,11 +17,29 @@ import type { CompanyAnnouncement } from "../types/announcements";
  *
  * Reuses the Market Watch / Corporate Calendar / ETFs liquid-glass
  * table language — no new visual vocabulary.
+ *
+ * FILTERS NARROW AT PSX, NOT HERE. Search and the date range are
+ * forwarded to PSX's own query/date_from/date_to fields, so the rows
+ * and the "of N" total always describe the same query. Filtering a
+ * 50-row page client-side would silently mean "search the current
+ * page", which against a 223k-filing corpus is not searching at all.
  */
 
 const PAGE_SIZE = 50;
 
 const COLUMNS = ["Date", "Time", "Symbol", "Company", "Announcement"];
+
+/*
+ * Long enough that ordinary typing commits once rather than per
+ * keystroke, short enough to feel immediate. Each commit is a URL
+ * change and a PSX fetch, so this is the difference between one
+ * request and one per character.
+ */
+const SEARCH_DEBOUNCE_MS = 400;
+
+/** The exact input treatment Market Watch uses — not a new one. */
+const INPUT_CLASS =
+  "liquid-glass w-full rounded-full px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40";
 
 export function AnnouncementsPage() {
   usePageMeta(
@@ -29,33 +48,117 @@ export function AnnouncementsPage() {
   );
 
   /*
-   * Page lives in the URL so a page of disclosures can be linked and
-   * back/forward works — same addressable-state convention as the
-   * ?tab= views elsewhere. 1-based for humans, 0-based offset for PSX.
+   * Page and filters both live in the URL so a filtered view can be
+   * linked and back/forward works — same addressable-state convention
+   * as ?page= already used here. 1-based for humans, 0-based offset for
+   * PSX.
    */
   const [searchParams, setSearchParams] = useSearchParams();
   const pageParam = Number(searchParams.get("page"));
   const page = Number.isFinite(pageParam) && pageParam >= 1 ? Math.trunc(pageParam) : 1;
   const offset = (page - 1) * PAGE_SIZE;
 
-  const { data, loading, error } = useAnnouncements(PAGE_SIZE, offset);
+  const q = (searchParams.get("q") ?? "").trim();
+  const fromParam = searchParams.get("from") ?? "";
+  const toParam = searchParams.get("to") ?? "";
+
+  /*
+   * PSX ignores a one-sided range outright and answers with the whole
+   * corpus (verified against the live endpoint), so a half-filled range
+   * is never sent. The user is told why instead of watching a filter do
+   * nothing.
+   */
+  const rangeComplete = Boolean(fromParam) && Boolean(toParam);
+  const rangeIncomplete = Boolean(fromParam) !== Boolean(toParam);
+  const filtersActive = Boolean(q) || Boolean(fromParam) || Boolean(toParam);
+
+  const { data, loading, error } = useAnnouncements(PAGE_SIZE, offset, {
+    q: q || undefined,
+    dateFrom: rangeComplete ? fromParam : undefined,
+    dateTo: rangeComplete ? toParam : undefined,
+  });
   const announcements = data?.announcements;
+  const rows = announcements ?? [];
   const total = data?.totalAvailable ?? null;
   const stale = data?.stale;
 
+  /*
+   * The box holds keystrokes; the URL holds the committed query. They
+   * are separate so typing stays responsive while only the debounced
+   * value causes a fetch.
+   */
+  const [searchInput, setSearchInput] = useState(q);
+  const committedQ = useRef(q);
+
+  // Follow the URL when it changes from somewhere else — back/forward,
+  // or Clear filters — without overwriting what is being typed.
+  useEffect(() => {
+    if (committedQ.current !== q) {
+      committedQ.current = q;
+      setSearchInput(q);
+    }
+  }, [q]);
+
+  useEffect(() => {
+    if (searchInput.trim() === q) return;
+    const id = setTimeout(() => {
+      const next = searchInput.trim();
+      committedQ.current = next;
+      setSearchParams((current) => {
+        const params = new URLSearchParams(current);
+        if (next) params.set("q", next);
+        else params.delete("q");
+        // Any filter change returns to the first page: page 7 of the
+        // old result set means nothing in the new one.
+        params.delete("page");
+        return params;
+      });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchInput, q, setSearchParams]);
+
+  function setDateParam(which: "from" | "to", value: string) {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (value) params.set(which, value);
+      else params.delete(which);
+      params.delete("page");
+      return params;
+    });
+  }
+
+  function clearFilters() {
+    committedQ.current = "";
+    setSearchInput("");
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      for (const key of ["q", "from", "to", "page"]) params.delete(key);
+      return params;
+    });
+  }
+
   const from = offset + 1;
-  const to = offset + (announcements?.length ?? 0);
+  const to = offset + rows.length;
   const hasPrev = page > 1;
   // Only offer Next while PSX's own total says there is more.
-  const hasNext =
-    total !== null ? to < total : (announcements?.length ?? 0) === PAGE_SIZE;
+  const hasNext = total !== null ? to < total : rows.length === PAGE_SIZE;
 
   function goTo(next: number) {
-    if (next <= 1) searchParams.delete("page");
-    else searchParams.set("page", String(next));
-    setSearchParams(searchParams);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (next <= 1) params.delete("page");
+      else params.set("page", String(next));
+      return params;
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  /*
+   * Zero rows from a filter is a real answer, not an outage. It gets
+   * its own state so it can never borrow the "temporarily unavailable"
+   * copy, which would report a working search as a broken feed.
+   */
+  const noResults = Boolean(announcements) && rows.length === 0;
 
   return (
     <main className="min-h-screen text-white">
@@ -78,7 +181,69 @@ export function AnnouncementsPage() {
             announcements. Each entry links to the original PSX document.
           </p>
 
-          <div className="liquid-glass glass-sheen mt-8 overflow-hidden rounded-3xl">
+          {/* ── Filters ────────────────────────────────────────────── */}
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="relative block w-full sm:w-72">
+              <span className="sr-only">Search announcements</span>
+              <input
+                type="text"
+                inputMode="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search announcements…"
+                className={INPUT_CLASS}
+              />
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  From
+                </span>
+                <input
+                  type="date"
+                  aria-label="From date"
+                  value={fromParam}
+                  max={toParam || undefined}
+                  onChange={(e) => setDateParam("from", e.target.value)}
+                  // color-scheme keeps the native picker and its icon
+                  // legible on this dark ground.
+                  className={`${INPUT_CLASS} w-auto [color-scheme:dark]`}
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  To
+                </span>
+                <input
+                  type="date"
+                  aria-label="To date"
+                  value={toParam}
+                  min={fromParam || undefined}
+                  onChange={(e) => setDateParam("to", e.target.value)}
+                  className={`${INPUT_CLASS} w-auto [color-scheme:dark]`}
+                />
+              </label>
+            </div>
+
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="liquid-glass rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/15"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {rangeIncomplete && (
+            <p className="mt-3 text-xs text-amber-200/90">
+              Add both a start and end date to filter by range.
+            </p>
+          )}
+
+          <div className="liquid-glass glass-sheen mt-6 overflow-hidden rounded-3xl">
             {error && !announcements ? (
               <div className="px-6 py-16 text-center text-sm text-gray-400">
                 Company announcements are temporarily unavailable. Please try
@@ -87,6 +252,29 @@ export function AnnouncementsPage() {
             ) : loading && !announcements ? (
               <div className="px-6 py-16 text-center text-sm text-gray-400">
                 Loading announcements…
+              </div>
+            ) : noResults ? (
+              <div className="px-6 py-16 text-center">
+                <p className="text-sm text-gray-300">
+                  {filtersActive
+                    ? "No announcements match these filters."
+                    : "PSX is not publishing any company announcements right now."}
+                </p>
+                {filtersActive && (
+                  <>
+                    <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-gray-400">
+                      PSX searches whole words in the filing, so a partial word
+                      finds nothing. Try a shorter search, or widen the dates.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="liquid-glass mt-5 rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/15"
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -105,7 +293,7 @@ export function AnnouncementsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(announcements ?? []).map((a: CompanyAnnouncement) => (
+                    {rows.map((a: CompanyAnnouncement) => (
                       <tr
                         key={a.id}
                         className="border-b border-white/5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.04]"
@@ -159,38 +347,42 @@ export function AnnouncementsPage() {
 
           {announcements && (
             <>
-              {/* Pager — counts come from PSX's own "Showing X to Y of Z
-                  entries" header, never a client-side estimate. */}
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-                <p className="text-xs text-gray-400 tabular-nums">
-                  Showing {from.toLocaleString("en-US")}–
-                  {to.toLocaleString("en-US")}
-                  {total !== null && (
-                    <> of {total.toLocaleString("en-US")} announcements</>
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => goTo(page - 1)}
-                    disabled={!hasPrev}
-                    className="liquid-glass rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    ← Previous
-                  </button>
-                  <span className="px-1 text-xs text-gray-400 tabular-nums">
-                    Page {page.toLocaleString("en-US")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => goTo(page + 1)}
-                    disabled={!hasNext}
-                    className="liquid-glass rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    Next →
-                  </button>
+              {rows.length > 0 && (
+                /* Pager — counts come from PSX's own "Showing X to Y of Z
+                   entries" header, never a client-side estimate. Under a
+                   filter that header is the FILTERED total (verified), so
+                   "of N" still describes what is on screen. */
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+                  <p className="text-xs text-gray-400 tabular-nums">
+                    Showing {from.toLocaleString("en-US")}–
+                    {to.toLocaleString("en-US")}
+                    {total !== null && (
+                      <> of {total.toLocaleString("en-US")} announcements</>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => goTo(page - 1)}
+                      disabled={!hasPrev}
+                      className="liquid-glass rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="px-1 text-xs text-gray-400 tabular-nums">
+                      Page {page.toLocaleString("en-US")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => goTo(page + 1)}
+                      disabled={!hasNext}
+                      className="liquid-glass rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <p className="mt-4 max-w-3xl text-xs leading-relaxed text-gray-400/90">
                 {stale && (
