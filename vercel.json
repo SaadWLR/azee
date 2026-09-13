@@ -36,6 +36,19 @@
       "destination": "/api/calendar/corporate?view=payouts"
     },
     {
+      "source": "/api/market/indices-full",
+      "destination": "/api/market/indices-data"
+    },
+    {
+      "source": "/api/market/index-constituents",
+      "missing": [{ "type": "query", "key": "code" }],
+      "destination": "/api/market/indices-data?code="
+    },
+    {
+      "source": "/api/market/index-constituents",
+      "destination": "/api/market/indices-data"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
