@@ -27,14 +27,18 @@ import type {
  *  - WRITE — Vercel Cron, carrying `Authorization: Bearer $CRON_SECRET`
  *    (the same signature check record-breadth.ts relies on). Fetches the
  *    nine SBP pages, parses them, and stores one snapshot in KV.
- *  - READ — everyone else, i.e. every page load. Serves that snapshot
- *    straight from KV and never contacts SBP, so a visitor costs SBP
- *    nothing and an SBP outage can't slow the page down.
+ *  - READ — any request with no Authorization header at all, i.e. every
+ *    page load. Serves that snapshot straight from KV and never contacts
+ *    SBP, so a visitor costs SBP nothing and an SBP outage can't slow the
+ *    page down.
+ *  - 401 — an Authorization header that doesn't match. That is a failed
+ *    auth attempt rather than a reader, and it is refused so it shows up
+ *    (for instance a CRON_SECRET that has drifted from the one Vercel
+ *    signs with) instead of quietly being handed the snapshot.
  *
- * Unlike record-breadth.ts, a request without the cron signature is NOT
- * refused: it is simply a reader. The signature decides only whether the
- * call may write. When CRON_SECRET is absent the route can never write
- * — every request reads — so it never defaults open.
+ * Unlike record-breadth.ts, a request WITHOUT credentials is not refused:
+ * it is simply a reader. When CRON_SECRET is absent nothing can match, so
+ * the route can never write — it never defaults open.
  *
  * RUNTIME: Node. EasyData's /apex/ pages were probed live from a Vercel
  * preview (Sep 2026) and returned clean 200s with real figures from the
@@ -700,8 +704,9 @@ async function read(res: VercelResponse) {
    * served to the cron's signed request. Vercel's CDN documents that it
    * won't CACHE a request carrying Authorization, but not that it won't
    * SERVE a cached response to one — and if it did, the daily write
-   * would silently never run. Every real reader sends no Authorization,
-   * so they still share one cache entry.
+   * would silently never run. Only requests with no Authorization reach
+   * this path (the handler writes or refuses the rest), so every reader
+   * still shares one cache entry.
    */
   res.setHeader("Vary", "Authorization");
 
@@ -757,15 +762,28 @@ async function read(res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   /*
-   * Vercel signs its cron invocations with CRON_SECRET, exactly as for
-   * record-breadth.ts. The difference is only what an unsigned request
-   * gets: a read, not a 401. With no CRON_SECRET configured nothing can
-   * match, so the route can only ever read — it never defaults open.
+   * Three cases, decided by the Authorization header alone:
+   *
+   *  - absent → read. The frontend never sends one.
+   *  - `Bearer ${CRON_SECRET}` → write. Vercel signs its cron invocations
+   *    this way, exactly as for record-breadth.ts.
+   *  - present but anything else → 401. Someone attempted auth and it
+   *    failed; serving them the snapshot would hide that. This includes
+   *    an empty header, a non-Bearer scheme, and every header when
+   *    CRON_SECRET isn't configured — with nothing to match against, no
+   *    attempt can succeed, so the route never defaults open.
    */
+  const authorization = req.headers.authorization;
+  if (authorization === undefined) {
+    await read(res);
+    return;
+  }
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.authorization === `Bearer ${secret}`) {
+  if (secret && authorization === `Bearer ${secret}`) {
     await write(res);
     return;
   }
-  await read(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("WWW-Authenticate", "Bearer");
+  res.status(401).json({ error: "Unauthorized" });
 }
