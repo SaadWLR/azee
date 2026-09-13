@@ -10,7 +10,9 @@
  *     mentioning a segment ("…Expansion in Retail Segment", "Removal from
  *     Non-Compliance Segment…") landed in Meetings. Every other keyword
  *     still matches as a substring — the risk was specific to these
- *     three-letter tokens, not to the approach.
+ *     three-letter tokens, not to the approach. A plural "s" still
+ *     counts ("AGMs"), added after the first whole-word version stopped
+ *     tagging three real plural-AGM filings.
  *   · Five keywords added for real titles v1 missed: "right issue",
  *     "bonus share", "intention to acquire" (Actions); "board of directors
  *     meeting", "bod meeting" (Meetings); "unusual movement" (Material).
@@ -136,13 +138,19 @@ export const CATEGORY_RULES: ReadonlyArray<{
  * Every other keyword is a phrase long enough that substring matching is
  * safe, and keeps it.
  *
+ * An optional plural "s" may sit before the closing boundary, so "AGMs"
+ * still counts. Without it, three real AGM filings ("26TH, 27TH AND 28TH
+ * AGMS…", "AGMs of K-Electric Limited…", "…holding AGMs for 2016 and
+ * 2017") fell to Other. The leading boundary is unchanged, which is what
+ * still keeps "segments" out: the "egm" there follows a letter.
+ *
  * The title is lowercased before matching, so [^a-z0-9] is the complete
  * boundary set.
  */
 const WHOLE_WORD_KEYWORDS: ReadonlyMap<string, RegExp> = new Map(
   ["agm", "egm", "cbs"].map((keyword) => [
     keyword,
-    new RegExp(`(^|[^a-z0-9])${keyword}($|[^a-z0-9])`),
+    new RegExp(`(^|[^a-z0-9])${keyword}s?($|[^a-z0-9])`),
   ]),
 );
 
