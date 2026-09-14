@@ -41,10 +41,12 @@ for (const from of ["/market-watch", "/corporate-calendar"]) {
       (window as unknown as { __noReload?: number }).__noReload = 1;
     });
 
-    await page.locator('header nav ul a', { hasText: "Research" }).click();
+    // Trading: "Markets" and "Research" are dropdowns now, not section
+    // anchors, so Trading and About are the bar's remaining ones.
+    await page.locator('header nav ul a', { hasText: "Trading" }).click();
 
     // Navigated to home with the hash...
-    await expect(page).toHaveURL(/\/#research$/);
+    await expect(page).toHaveURL(/\/#trading$/);
     // ...client-side (marker survived)...
     const marker = await page.evaluate(
       () => (window as unknown as { __noReload?: number }).__noReload,
@@ -56,11 +58,11 @@ for (const from of ["/market-watch", "/corporate-calendar"]) {
     // alone succeeds mid-animation and then measures a scroll still
     // in flight.
     await expect
-      .poll(async () => Math.abs((await sectionAtTop(page, "research")).top), {
+      .poll(async () => Math.abs((await sectionAtTop(page, "trading")).top), {
         timeout: 10_000,
       })
       .toBeLessThan(250);
-    const pos = await sectionAtTop(page, "research");
+    const pos = await sectionAtTop(page, "trading");
     expect(pos.found).toBe(true);
     expect(pos.scrollY).toBeGreaterThan(500);
 
@@ -131,6 +133,30 @@ test("Products section survives losing its nav link", async ({ page }) => {
       timeout: 10_000,
     })
     .toBeLessThan(250);
+});
+
+test("Markets and Research sections survive losing their nav links", async ({ page }) => {
+  await page.goto("/");
+  /*
+   * Their bar slots went to the Markets and Research & News dropdowns,
+   * which open page links rather than scrolling. The homepage sections
+   * were deliberately left alone: still rendered, still reachable by
+   * scrolling and by direct hash navigation (the next test).
+   */
+  await expect(page.locator('header nav a[href="#markets"]')).toHaveCount(0);
+  await expect(page.locator('header nav a[href="#research"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Markets", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Research & News", exact: true })).toBeVisible();
+
+  for (const id of ["markets", "research"]) {
+    const section = page.locator(`#${id}`);
+    await expect(section).toBeAttached();
+    // Reachable by scroll: bring it into view the way a reader would
+    // reach it, and it is on screen with real height.
+    await section.scrollIntoViewIfNeeded();
+    await expect(section).toBeInViewport();
+    expect((await section.boundingBox())!.height).toBeGreaterThan(300);
+  }
 });
 
 test("direct navigation to /#research loads home scrolled to the section", async ({

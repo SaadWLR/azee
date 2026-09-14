@@ -360,9 +360,11 @@ body {
  * keep their own treatment on both themes.
  */
 /*
- * Direct children only. The Tools dropdown panel lives deeper inside
- * this list and keeps its own dark surface, so its links must NOT be
- * flipped to dark text or they would vanish against it.
+ * Direct children only. The dropdown panels (one per nav group) live
+ * deeper inside this list and keep their own dark surface, so their
+ * links must NOT be flipped to dark text or they would vanish against
+ * them. The group triggers themselves are direct-child buttons, so they
+ * do invert.
  */
 .nav-glass[data-nav-theme="light"] .nav-themed > li > a,
 .nav-glass[data-nav-theme="light"] .nav-themed > li > button {

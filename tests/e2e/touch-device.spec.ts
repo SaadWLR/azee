@@ -152,7 +152,7 @@ const VIEW = `${MOBILE_MENU} [data-menu-view]`;
 
 /**
  * Navigation LINKS of whichever view is showing. Deliberately links
- * only: the view's controls (Tools forward, Back) are buttons and are
+ * only: the view's controls (group rows, Back) are buttons and are
  * asserted by name where they matter, which keeps this list exactly
  * "the places this view can take you".
  */
@@ -160,178 +160,191 @@ async function menuLinks(page: import("@playwright/test").Page) {
   return (await page.locator(`${VIEW} a`).allInnerTexts()).map((t) => t.trim());
 }
 
-/** Which view is mounted — "main" or "tools". */
+/** Which view is mounted — "main" or a group's slug. */
 async function currentView(page: import("@playwright/test").Page) {
   return page.locator(VIEW).getAttribute("data-menu-view");
 }
 
-/** The Tools links, in their three groups' order (Navbar's TOOL_GROUPS). */
-const TOOLS = [
-  "Market Watch",
-  "PSX Indices",
-  "PMEX Commodities",
-  "ETFs",
-  "Mutual Funds",
-  "Company Announcements",
-  "Corporate Calendar",
-  "Economic Dashboard",
-  "Knowledge Centre",
-  "Fear and Optimism Index",
+/** The three groups in menu order, each with its links in order (Navbar's NAV_GROUPS). */
+const GROUPS = [
+  {
+    heading: "Markets",
+    view: "markets",
+    links: ["Market Watch", "PSX Indices", "PMEX Commodities", "ETFs", "Mutual Funds"],
+  },
+  {
+    heading: "Corporate & Events",
+    view: "corporate-events",
+    links: ["Company Announcements", "Corporate Calendar", "Economic Dashboard"],
+  },
+  {
+    heading: "Research & News",
+    view: "research-news",
+    links: ["Knowledge Centre", "Fear and Optimism Index"],
+  },
 ];
 
-test("all ten Tools links fit a phone screen without scrolling", async ({
-  page,
-}, testInfo) => {
+/** The top level's plain links, after the three group rows. */
+const TOP_LEVEL_LINKS = ["Trading", "Forex & Commodities", "About"];
+
+const phoneOnly = (projectName: string) =>
   test.skip(
-    testInfo.project.name !== "chromium-iphone",
+    projectName !== "chromium-iphone",
     "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
   );
-  await openMobileMenu(page);
-  await page
-    .locator(MOBILE_MENU)
-    .getByRole("button", { name: "Tools", exact: true })
-    .tap();
-  await expect(page.locator(`${MOBILE_MENU} [data-menu-view="tools"]`)).toBeVisible();
 
-  /*
-   * The iPhone 14 profile is 390×664. Growing to ten links under three
-   * headings needed 588px against 530px free, so the Tools view's rows
-   * were tightened to fit (Sep 2026). This keeps that true: the scroll
-   * container must not need to scroll, and the last link must end on
-   * screen — not merely be reachable by scrolling.
-   */
-  const fit = await page.locator(MOBILE_MENU).evaluate((panel) => {
+/** Does the mounted view fit without scrolling, last row on screen? */
+async function viewFit(page: import("@playwright/test").Page) {
+  return page.locator(MOBILE_MENU).evaluate((panel) => {
     const scroller = panel.firstElementChild as HTMLElement;
-    const links = [...panel.querySelectorAll('[data-menu-view="tools"] a')];
+    const rows = [...panel.querySelectorAll("[data-menu-view] a, [data-menu-view] button")];
     return {
       needed: scroller.scrollHeight,
       available: scroller.clientHeight,
-      lastBottom: links.at(-1)!.getBoundingClientRect().bottom,
+      lastBottom: rows.at(-1)!.getBoundingClientRect().bottom,
       viewport: window.innerHeight,
-      count: links.length,
     };
   });
-  expect(fit.count).toBe(10);
-  expect(fit.needed, "Tools view must not scroll").toBeLessThanOrEqual(fit.available);
-  expect(fit.lastBottom).toBeLessThanOrEqual(fit.viewport);
-});
+}
 
-test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
+test("every menu view fits a phone screen without scrolling", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "chromium-iphone",
-    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
-  );
+  phoneOnly(testInfo.project.name);
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  /*
+   * The iPhone 14 profile is 390×664. With the groups as their own
+   * drill-downs the tallest view is Markets (five links plus Back and a
+   * heading), measured at 301px needed; the top level at 270px. This
+   * keeps that true for every view: the scroll container must not need
+   * to scroll, and the last row must end on screen — not merely be
+   * reachable by scrolling.
+   */
+  const main = await viewFit(page);
+  expect(main.needed, "top level must not scroll").toBeLessThanOrEqual(main.available);
+  expect(main.lastBottom).toBeLessThanOrEqual(main.viewport);
+
+  for (const group of GROUPS) {
+    await menu.getByRole("button", { name: group.heading, exact: true }).tap();
+    await expect(page.locator(`${MOBILE_MENU} [data-menu-view="${group.view}"]`)).toBeVisible();
+    const fit = await viewFit(page);
+    expect(fit.needed, `${group.heading} view must not scroll`).toBeLessThanOrEqual(fit.available);
+    expect(fit.lastBottom).toBeLessThanOrEqual(fit.viewport);
+    await menu.getByRole("button", { name: "Back", exact: true }).tap();
+    expect(await currentView(page)).toBe("main");
+  }
+});
+
+test("mobile menu top level shows three group rows plus three plain links", async ({
+  page,
+}, testInfo) => {
+  phoneOnly(testInfo.project.name);
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
   expect(await currentView(page)).toBe("main");
-  // The five nav links…
-  expect(await menuLinks(page)).toEqual([
-    "Markets",
-    "Research",
-    "Trading",
-    "Forex & Commodities",
-    "About",
+
+  // Same six entries, same order, as the desktop bar: three group rows
+  // (controls, not links) then three links.
+  const rows = await page.locator(`${VIEW} > li > :is(a, button)`).evaluateAll((els) =>
+    els.map((el) => `${el.tagName === "BUTTON" ? "group" : "link"}:${el.textContent!.trim()}`),
+  );
+  expect(rows).toEqual([
+    ...GROUPS.map((g) => `group:${g.heading}`),
+    ...TOP_LEVEL_LINKS.map((l) => `link:${l}`),
   ]);
-  // …plus exactly one Tools row, which is a control, not a link.
-  await expect(
-    menu.getByRole("button", { name: "Tools", exact: true }),
-  ).toBeVisible();
+  expect(await menuLinks(page)).toEqual(TOP_LEVEL_LINKS);
 
   /*
-   * The regression itself: Tools' seven links used to render inline
-   * here, pushing the panel past the screen. Not one of them may be
-   * present at the top level now.
+   * The original regression: group links used to render inline here,
+   * pushing the panel past the screen. Not one of them may be present
+   * at the top level. Nor may the old Tools row, or the Markets and
+   * Research section anchors whose places the groups took.
    */
-  for (const tool of TOOLS) {
-    await expect(menu.getByRole("link", { name: tool, exact: true })).toHaveCount(0);
+  for (const link of GROUPS.flatMap((g) => g.links)) {
+    await expect(menu.getByRole("link", { name: link, exact: true })).toHaveCount(0);
   }
+  await expect(menu.getByRole("button", { name: "Tools", exact: true })).toHaveCount(0);
+  await expect(menu.locator('a[href$="#markets"], a[href$="#research"]')).toHaveCount(0);
 
   // Client Login was removed from the menu entirely (Sep 2026).
   await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
   await expect(menu.locator('a[href="/get-started"]')).toHaveCount(0);
 });
 
-test("tapping Tools drills into a Tools-only view, and Back returns", async ({
+test("tapping a group drills into that group's view only, and Back returns", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "chromium-iphone",
-    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
-  );
+  phoneOnly(testInfo.project.name);
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
-  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
-  expect(await currentView(page)).toBe("tools");
+  for (const group of GROUPS) {
+    await menu.getByRole("button", { name: group.heading, exact: true }).tap();
+    expect(await currentView(page)).toBe(group.view);
 
-  // Exactly the ten tools, in their three groups, and nothing else.
-  expect(await menuLinks(page)).toEqual(TOOLS);
-  // Group headings carried over from the desktop dropdown.
-  await expect(menu).toContainText("Markets");
-  await expect(menu).toContainText("Corporate & Events");
-  await expect(menu).toContainText("Research & News");
-  // The top-level nav links are NOT also showing.
-  await expect(
-    menu.getByRole("link", { name: "Forex & Commodities", exact: true }),
-  ).toHaveCount(0);
-  // No Client Login in this view either — nothing is pinned below it.
-  await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
+    // Exactly this group's links, in order, and nothing else — no other
+    // group's links and none of the top-level links.
+    expect(await menuLinks(page)).toEqual(group.links);
+    // The view names its group, since the row that opened it is gone.
+    await expect(page.locator(VIEW)).toContainText(group.heading);
+    // No Client Login in this view either — nothing is pinned below it.
+    await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
 
-  // Back returns to the top level.
-  await menu.getByRole("button", { name: "Back", exact: true }).tap();
-  expect(await currentView(page)).toBe("main");
-  expect(await menuLinks(page)).toEqual([
-    "Markets",
-    "Research",
-    "Trading",
-    "Forex & Commodities",
-    "About",
-  ]);
+    // Back returns to the top level.
+    await menu.getByRole("button", { name: "Back", exact: true }).tap();
+    expect(await currentView(page)).toBe("main");
+    expect(await menuLinks(page)).toEqual(TOP_LEVEL_LINKS);
+  }
+});
+
+test("a group link navigates and closes the menu", async ({ page }, testInfo) => {
+  phoneOnly(testInfo.project.name);
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  await menu.getByRole("button", { name: "Corporate & Events", exact: true }).tap();
+  await menu.getByRole("link", { name: "Economic Dashboard", exact: true }).tap();
+  await expect(page).toHaveURL(/\/economic-dashboard$/);
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 });
 
 test("closing the menu resets the drill-down to the top level", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "chromium-iphone",
-    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
-  );
+  phoneOnly(testInfo.project.name);
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
-  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+  await menu.getByRole("button", { name: "Research & News", exact: true }).tap();
   await expect(menu.getByRole("button", { name: "Back", exact: true })).toBeVisible();
 
-  // Close, then reopen — must land on the top level, not stay in Tools.
+  // Close, then reopen — must land on the top level, not stay in the group.
   await page.getByRole("button", { name: "Close menu" }).tap();
   await page.getByRole("button", { name: "Open menu" }).tap();
 
-  await expect(menu.getByRole("button", { name: "Tools", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Research & News", exact: true })).toBeVisible();
   await expect(menu.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
 });
 
 test("the open mobile menu never extends past the viewport", async ({
   page,
 }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== "chromium-iphone",
-    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
-  );
+  phoneOnly(testInfo.project.name);
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
   /*
    * The actual reported bug, asserted directly: the panel's bottom edge
-   * must sit inside the viewport in BOTH views. A drill-down that stays
+   * must sit inside the viewport in EVERY view. A drill-down that stays
    * short today is not enough — the scroll container is what keeps this
    * true when a group grows, so it is checked, not assumed.
    */
-  for (const step of ["top level", "tools"] as const) {
-    if (step === "tools") {
-      await menu.getByRole("button", { name: "Tools", exact: true }).tap();
+  for (const step of ["top level", ...GROUPS.map((g) => g.heading)]) {
+    if (step !== "top level") {
+      await menu.getByRole("button", { name: step, exact: true }).tap();
     }
     const fits = await page.evaluate((sel) => {
       const el = document.querySelector(sel) as HTMLElement | null;
@@ -355,5 +368,8 @@ test("the open mobile menu never extends past the viewport", async ({
       fits!.bottom,
       `${step}: menu bottom (${fits!.bottom}px) must fit the ${fits!.viewport}px viewport`,
     ).toBeLessThanOrEqual(fits!.viewport);
+    if (step !== "top level") {
+      await menu.getByRole("button", { name: "Back", exact: true }).tap();
+    }
   }
 });

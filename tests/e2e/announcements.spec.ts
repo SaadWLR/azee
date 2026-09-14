@@ -121,12 +121,12 @@ test("pagination moves to genuinely different, older entries", async ({
   expect((await docLinks())[0]).toBe(firstPage[0]);
 });
 
-test("Tools dropdown and Footer both reach /announcements", async ({ page }) => {
+test("Corporate & Events dropdown and Footer both reach /announcements", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /tools/i }).click();
+  await page.getByRole("button", { name: "Corporate & Events", exact: true }).click();
   await page
-    .getByRole("menu", { name: /tools/i })
-    .getByRole("menuitem", { name: "Announcements" })
+    .getByRole("menu", { name: "Corporate & Events", exact: true })
+    .getByRole("menuitem", { name: "Company Announcements" })
     .click();
   await expect(page).toHaveURL(/\/announcements$/);
 
