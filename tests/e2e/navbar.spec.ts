@@ -27,33 +27,34 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
-  // Open on click → eight tools across two labelled groups.
+  // Open on click → ten tools across three labelled groups.
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await expect(menu.getByRole("menuitem")).toHaveCount(8);
+  await expect(menu.getByRole("menuitem")).toHaveCount(10);
 
-  // Two groups, in order, each holding its own links.
+  // Three groups, in order, each holding exactly its own links, in order.
   const groups = menu.getByRole("group");
-  await expect(groups).toHaveCount(2);
+  await expect(groups).toHaveCount(3);
   await expect(groups.nth(0)).toHaveAttribute("aria-label", "Markets");
-  await expect(groups.nth(1)).toHaveAttribute("aria-label", "Research");
-  await expect(groups.nth(0).getByRole("menuitem")).toHaveCount(4);
-  await expect(groups.nth(1).getByRole("menuitem")).toHaveCount(4);
-  for (const name of ["Market Watch", "Indices", "Commodity Futures", "ETFs"]) {
-    await expect(groups.nth(0).getByRole("menuitem", { name })).toBeVisible();
-  }
-  // Research in order: the Economic Dashboard is back in the third slot.
+  await expect(groups.nth(0).getByRole("menuitem")).toHaveText([
+    "Market Watch",
+    "PSX Indices",
+    "PMEX Commodities",
+    "ETFs",
+    "Mutual Funds",
+  ]);
+  await expect(groups.nth(1)).toHaveAttribute("aria-label", "Corporate & Events");
   await expect(groups.nth(1).getByRole("menuitem")).toHaveText([
-    "Announcements",
-    "Calendar",
+    "Company Announcements",
+    "Corporate Calendar",
     "Economic Dashboard",
+  ]);
+  // Knowledge Centre is back in Tools; the footer is its second path.
+  await expect(groups.nth(2)).toHaveAttribute("aria-label", "Research & News");
+  await expect(groups.nth(2).getByRole("menuitem")).toHaveText([
+    "Knowledge Centre",
     "Fear and Optimism Index",
   ]);
-
-  // Knowledge Centre left Tools; the footer is now its only nav path.
-  await expect(
-    menu.getByRole("menuitem", { name: "Knowledge Centre" }),
-  ).toHaveCount(0);
   // Current route's item is highlighted inside the panel.
   await expect(
     menu.getByRole("menuitem", { name: "Market Watch" }),
@@ -87,8 +88,8 @@ test("dropdown link navigates, closes the menu, and highlights Tools on the new 
   const trigger = page.getByRole("button", { name: /^tools$/i });
 
   await trigger.click();
-  // Uses a Research-group item: Knowledge Centre left Tools for the
-  // footer, and this also exercises the newer of the two groups.
+  // Uses a Research & News item, so the last of the three groups is
+  // exercised end to end, not just listed.
   await page
     .getByRole("menuitem", { name: "Fear and Optimism Index" })
     .click();
@@ -96,6 +97,56 @@ test("dropdown link navigates, closes the menu, and highlights Tools on the new 
   await expect(page).toHaveURL(/\/fear-and-optimism-index$/);
   await expect(trigger).toHaveClass(/is-active/); // Tools active on that route
   await expect(trigger).toHaveAttribute("aria-expanded", "false"); // closed after nav
+});
+
+test("the two newly linked tools load from the dropdown", async ({ page }) => {
+  const trigger = page.getByRole("button", { name: /^tools$/i });
+
+  // Mutual Funds is an honest placeholder page — "Content pending" is
+  // its correct, expected state, not a failure.
+  await page.goto("/");
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "Mutual Funds" }).click();
+  await expect(page).toHaveURL(/\/mutual-funds$/);
+  await expect(page.locator("main")).toContainText("Content pending");
+  await expect(trigger).toHaveClass(/is-active/);
+
+  await page.goto("/");
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "Knowledge Centre" }).click();
+  await expect(page).toHaveURL(/\/knowledge-centre$/);
+  await expect(page.locator("h1")).toBeVisible();
+  await expect(trigger).toHaveClass(/is-active/);
+});
+
+test("Client Login is gone from the desktop bar, leaving no empty slot", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const header = page.locator("header");
+  await expect(header.getByRole("link", { name: /client login/i })).toHaveCount(0);
+  await expect(header.locator('a[href="/get-started"]')).toHaveCount(0);
+
+  /*
+   * No residue: the bar's only rendered children are the brand and the
+   * link list (the mobile toggle is display:none at desktop widths), and
+   * the list sits flush against the bar's right padding rather than
+   * leaving a gap where the button used to be.
+   */
+  const layout = await page.locator("header nav").evaluate((nav) => {
+    const shown = [...nav.children].filter((c) => getComputedStyle(c).display !== "none");
+    const list = nav.querySelector("ul")!.getBoundingClientRect();
+    const bar = nav.getBoundingClientRect();
+    return {
+      shown: shown.length,
+      lastIsList: shown.at(-1)?.tagName === "UL",
+      rightGap: Math.round(bar.right - list.right),
+      padRight: Math.round(Number.parseFloat(getComputedStyle(nav).paddingRight)),
+    };
+  });
+  expect(layout.shown).toBe(2);
+  expect(layout.lastIsList).toBe(true);
+  expect(Math.abs(layout.rightGap - layout.padRight)).toBeLessThanOrEqual(2);
 });
 
 test("scroll-spy still activates section anchors on the homepage (unaffected by the restructure)", async ({

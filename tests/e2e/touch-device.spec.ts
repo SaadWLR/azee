@@ -165,6 +165,57 @@ async function currentView(page: import("@playwright/test").Page) {
   return page.locator(VIEW).getAttribute("data-menu-view");
 }
 
+/** The Tools links, in their three groups' order (Navbar's TOOL_GROUPS). */
+const TOOLS = [
+  "Market Watch",
+  "PSX Indices",
+  "PMEX Commodities",
+  "ETFs",
+  "Mutual Funds",
+  "Company Announcements",
+  "Corporate Calendar",
+  "Economic Dashboard",
+  "Knowledge Centre",
+  "Fear and Optimism Index",
+];
+
+test("all ten Tools links fit a phone screen without scrolling", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "chromium-iphone",
+    "Phone-sized menu behaviour; the iPad profile shows the desktop nav",
+  );
+  await openMobileMenu(page);
+  await page
+    .locator(MOBILE_MENU)
+    .getByRole("button", { name: "Tools", exact: true })
+    .tap();
+  await expect(page.locator(`${MOBILE_MENU} [data-menu-view="tools"]`)).toBeVisible();
+
+  /*
+   * The iPhone 14 profile is 390×664. Growing to ten links under three
+   * headings needed 588px against 530px free, so the Tools view's rows
+   * were tightened to fit (Sep 2026). This keeps that true: the scroll
+   * container must not need to scroll, and the last link must end on
+   * screen — not merely be reachable by scrolling.
+   */
+  const fit = await page.locator(MOBILE_MENU).evaluate((panel) => {
+    const scroller = panel.firstElementChild as HTMLElement;
+    const links = [...panel.querySelectorAll('[data-menu-view="tools"] a')];
+    return {
+      needed: scroller.scrollHeight,
+      available: scroller.clientHeight,
+      lastBottom: links.at(-1)!.getBoundingClientRect().bottom,
+      viewport: window.innerHeight,
+      count: links.length,
+    };
+  });
+  expect(fit.count).toBe(10);
+  expect(fit.needed, "Tools view must not scroll").toBeLessThanOrEqual(fit.available);
+  expect(fit.lastBottom).toBeLessThanOrEqual(fit.viewport);
+});
+
 test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
   page,
 }, testInfo) => {
@@ -194,21 +245,13 @@ test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
    * here, pushing the panel past the screen. Not one of them may be
    * present at the top level now.
    */
-  for (const tool of [
-    "Market Watch",
-    "Indices",
-    "Commodity Futures",
-    "ETFs",
-    "Announcements",
-    "Calendar",
-    "Economic Dashboard",
-    "Fear and Optimism Index",
-  ]) {
+  for (const tool of TOOLS) {
     await expect(menu.getByRole("link", { name: tool, exact: true })).toHaveCount(0);
   }
 
-  // The primary action stays reachable from the top level.
-  await expect(menu.getByRole("link", { name: "Client Login" })).toBeVisible();
+  // Client Login was removed from the menu entirely (Sep 2026).
+  await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
+  await expect(menu.locator('a[href="/get-started"]')).toHaveCount(0);
 });
 
 test("tapping Tools drills into a Tools-only view, and Back returns", async ({
@@ -224,26 +267,18 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
   await menu.getByRole("button", { name: "Tools", exact: true }).tap();
   expect(await currentView(page)).toBe("tools");
 
-  // Exactly the eight tools, in their two groups, and nothing else.
-  expect(await menuLinks(page)).toEqual([
-    "Market Watch",
-    "Indices",
-    "Commodity Futures",
-    "ETFs",
-    "Announcements",
-    "Calendar",
-    "Economic Dashboard",
-    "Fear and Optimism Index",
-  ]);
+  // Exactly the ten tools, in their three groups, and nothing else.
+  expect(await menuLinks(page)).toEqual(TOOLS);
   // Group headings carried over from the desktop dropdown.
   await expect(menu).toContainText("Markets");
-  await expect(menu).toContainText("Research");
+  await expect(menu).toContainText("Corporate & Events");
+  await expect(menu).toContainText("Research & News");
   // The top-level nav links are NOT also showing.
   await expect(
     menu.getByRole("link", { name: "Forex & Commodities", exact: true }),
   ).toHaveCount(0);
-  // Client Login is pinned outside the swapped view, so it survives.
-  await expect(menu.getByRole("link", { name: "Client Login" })).toBeVisible();
+  // No Client Login in this view either — nothing is pinned below it.
+  await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
 
   // Back returns to the top level.
   await menu.getByRole("button", { name: "Back", exact: true }).tap();

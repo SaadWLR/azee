@@ -230,7 +230,7 @@ test("the noindex tag does not leak onto real pages after a 404", async ({
   await expect.poll(async () => page.locator('meta[name="robots"]').count()).toBe(0);
 });
 
-test("Navbar Client Login and the homepage CTAs all reach real routes", async ({
+test("the header has no dead anchors and the homepage CTA reaches a real route", async ({
   page,
 }) => {
   await page.goto("/");
@@ -238,11 +238,8 @@ test("Navbar Client Login and the homepage CTAs all reach real routes", async ({
   // No dead placeholder anchors left in the header.
   expect(await page.locator('header a[href="#"]').count()).toBe(0);
 
-  // Desktop Client Login goes to the interim page.
-  const login = page.locator("header").getByRole("link", { name: "Client Login" });
-  await expect(login).toHaveAttribute("href", "/get-started");
-
-  // The hero's primary CTA too.
+  // The header's Client Login link was removed (Sep 2026); the hero's
+  // primary CTA is what still leads to the interim page.
   const hero = page.getByRole("link", { name: "Open a Trading Account" }).first();
   await expect(hero).toHaveAttribute("href", "/get-started");
   await hero.click();

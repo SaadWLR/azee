@@ -81,37 +81,42 @@ const NAV_LINKS: NavLink[] = [
 
 /**
  * Standalone tool/resource pages under the single "Tools" trigger,
- * organised into two labelled groups rather than one flat list.
+ * organised into three labelled groups rather than one flat list.
  *
- * Two groups, one trigger — deliberately not two top-level dropdowns:
- * at eight items a flat list is merely long, not confusing, and the
- * desktop bar's 1024px width budget is the scarcer resource. Grouping
- * inside the existing panel buys the clarity without spending a slot.
+ * Three groups, one trigger — deliberately not separate top-level
+ * dropdowns: at ten items a flat list would be long, and the desktop
+ * bar's 1024px width budget is the scarcer resource. Grouping inside
+ * the existing panel buys the clarity without spending a slot.
  *
- * "Markets" is live-price tooling; "Research" is reference, disclosure
- * and market context. The same grouping renders on mobile, so the two
+ * "Markets" is the instruments: live-price tooling, plus Mutual Funds.
+ * "Corporate & Events" is what companies file and hold, and the macro
+ * backdrop they report into. "Research & News" is investor education
+ * and market sentiment. The same grouping renders on mobile, so the two
  * surfaces describe the site identically — this array is the only
  * definition of either, so a change here moves both.
  *
- * The Economic Dashboard holds the third Research slot again. It was
- * there from the first grouping (Aug 2026), then gave the slot to the
- * Fear and Optimism Index while the dashboard was still a placeholder
- * with no figures — UNLINKED rather than removed, so its route kept
- * loading by direct URL. It came back once the page carried live SBP
- * EasyData figures with honest stale/unavailable states, the same bar
- * every other page here meets, and the Fear and Optimism Index moved
- * down one. It is labelled as it was before: the page's own title
- * without "Pakistan", which no sibling carries either, and short
- * enough that no width trade-off applies.
+ * LABELS MATCH THE FOOTER'S WORDING ("PSX Indices", "PMEX Commodities",
+ * "Company Announcements", "Corporate Calendar", "Mutual Funds",
+ * "Knowledge Centre"), so a page carries one name across both navs.
+ * This replaced shorter Tools-only labels ("Indices", "Commodity
+ * Futures", "Announcements", "Calendar") in Sep 2026. "PMEX
+ * Commodities" still keeps its page distinct from the top-level "Forex
+ * & Commodities": one is PMEX futures contracts, the other spot
+ * currency rates and a gold estimate.
  *
- * "Commodity Futures" is named in full to disambiguate it from the
- * top-level "Forex & Commodities" — this one is PMEX futures
- * contracts, not spot. "Calendar" stays short for width; it goes to
- * the full Corporate Calendar page.
+ * Mutual Funds is linked while its page is still an honest placeholder
+ * — it states plainly that no verified fund data is shown yet. That is
+ * a deliberate difference from the Economic Dashboard's history: it was
+ * in the first grouping (Aug 2026), then left UNLINKED (not removed)
+ * while it was still a placeholder, giving its slot to the Fear and
+ * Optimism Index, and returned once it carried live SBP EasyData
+ * figures with honest stale/unavailable states.
  *
- * Knowledge Centre is deliberately NOT here: it already has its own
- * link in the footer's Research & News column, which is now its single
- * nav path.
+ * Knowledge Centre has two nav paths: this group, and its own link in
+ * the footer's Research & News column. It was in Tools from Jul 2026,
+ * left when the groups were first drawn (Aug 2026) so the footer was
+ * its only path, and came back in Sep 2026 alongside the Fear and
+ * Optimism Index as research reading.
  */
 const TOOL_GROUPS: { heading: string; links: { label: string; to: string }[] }[] =
   [
@@ -119,17 +124,24 @@ const TOOL_GROUPS: { heading: string; links: { label: string; to: string }[] }[]
       heading: "Markets",
       links: [
         { label: "Market Watch", to: "/market-watch" },
-        { label: "Indices", to: "/indices" },
-        { label: "Commodity Futures", to: "/commodities" },
+        { label: "PSX Indices", to: "/indices" },
+        { label: "PMEX Commodities", to: "/commodities" },
         { label: "ETFs", to: "/etfs" },
+        { label: "Mutual Funds", to: "/mutual-funds" },
       ],
     },
     {
-      heading: "Research",
+      heading: "Corporate & Events",
       links: [
-        { label: "Announcements", to: "/announcements" },
-        { label: "Calendar", to: "/corporate-calendar" },
+        { label: "Company Announcements", to: "/announcements" },
+        { label: "Corporate Calendar", to: "/corporate-calendar" },
         { label: "Economic Dashboard", to: "/economic-dashboard" },
+      ],
+    },
+    {
+      heading: "Research & News",
+      links: [
+        { label: "Knowledge Centre", to: "/knowledge-centre" },
         { label: "Fear and Optimism Index", to: "/fear-and-optimism-index" },
       ],
     },
@@ -215,10 +227,12 @@ function ToolsDropdown({ pathname }: { pathname: string }) {
         </svg>
       </button>
 
+      {/* w-60: the widest label, "Company Announcements", fits on one
+          line; at w-56 it wrapped to two. */}
       <div
         role="menu"
         aria-label="Tools"
-        className={`nav-glass absolute right-0 top-[calc(100%+1.5rem)] w-56 rounded-2xl p-2 transition-all duration-300 ease-out ${
+        className={`nav-glass absolute right-0 top-[calc(100%+1.5rem)] w-60 rounded-2xl p-2 transition-all duration-300 ease-out ${
           open
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
@@ -281,7 +295,23 @@ const MOBILE_ROW =
   "block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
 
 /**
- * Mobile dropdown: navigation links plus the client login action.
+ * The Tools view's rows: the same treatment at 38px tall instead of 44.
+ *
+ * Ten links under three headings have to fit an iPhone 14's 664px
+ * viewport without scrolling. Measured when the third group was added
+ * (Sep 2026): at 44px rows the view needed 588px against 530px free; at
+ * 38px, with the group headings' top padding trimmed to match, 510px.
+ * The trade-off was chosen deliberately — still well above WCAG 2.2's
+ * 24px minimum target, while the top-level view keeps the full 44px.
+ * Written out rather than derived from MOBILE_ROW so Tailwind sees the
+ * class.
+ */
+const MOBILE_TOOL_ROW =
+  "block py-[9px] text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
+
+/**
+ * Mobile dropdown: the top-level navigation links, with Tools as a
+ * drill-down.
  *
  * Two views, not one list. Tools used to expand INLINE here — all seven
  * links plus their two group headings rendered beneath the five nav
@@ -334,10 +364,14 @@ function MobileMenu({
        * The scroll bound. dvh (not vh) so mobile browser chrome
        * collapsing does not leave the menu taller than the visible
        * viewport; --nav-height is the bar above it and the remaining
-       * rem cover this panel's own margin, padding and the pinned
-       * action below.
+       * 3.75rem cover this panel's own margin (0.5) and padding (2.5)
+       * plus a 0.75rem gap above the screen edge. It was 7rem while a
+       * Client Login button was pinned below this area (Sep 2026: that
+       * button, 3.25rem with its margin, was removed) — keeping the old
+       * figure would have reserved space for nothing and made the list
+       * scroll sooner than it has to.
        */}
-      <div className="max-h-[calc(100dvh-var(--nav-height)-7rem)] overflow-y-auto overscroll-contain">
+      <div className="max-h-[calc(100dvh-var(--nav-height)-3.75rem)] overflow-y-auto overscroll-contain">
         {view === "main" ? (
           <ul data-menu-view="main" className="nav-drill-back">
             {NAV_LINKS.map((link) => (
@@ -398,7 +432,7 @@ function MobileMenu({
             <button
               type="button"
               onClick={() => setView("main")}
-              className={`${MOBILE_ROW} flex w-full items-center gap-2 border-b border-white/10 text-gray-400`}
+              className={`${MOBILE_TOOL_ROW} flex w-full items-center gap-2 border-b border-white/10 text-gray-400`}
             >
               <svg
                 aria-hidden="true"
@@ -415,11 +449,11 @@ function MobileMenu({
               Back
             </button>
             <ul>
-              {/* The same two groups as the desktop dropdown, so both
+              {/* The same three groups as the desktop dropdown, so both
                   surfaces describe the site identically. */}
               {TOOL_GROUPS.map((group) => (
                 <Fragment key={group.heading}>
-                  <li className="px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
+                  <li className="px-1 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
                     {group.heading}
                   </li>
                   {group.links.map((tool) => (
@@ -427,7 +461,7 @@ function MobileMenu({
                       <Link
                         to={tool.to}
                         onClick={onNavigate}
-                        className={MOBILE_ROW}
+                        className={MOBILE_TOOL_ROW}
                       >
                         {tool.label}
                       </Link>
@@ -439,22 +473,6 @@ function MobileMenu({
           </div>
         )}
       </div>
-
-      {/*
-       * Pinned OUTSIDE the scroll area, so the primary action is
-       * reachable without scrolling from either view — and stays put
-       * rather than sliding away when you drill into Tools.
-       */}
-      {/* Points at /get-started, not a dead "#": the client portal is
-          not built, and the honest interim page says so next to a real
-          phone number. */}
-      <Link
-        to="/get-started"
-        onClick={onNavigate}
-        className="glass-navy mt-4 block rounded-full px-4 py-2.5 text-center text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98]"
-      >
-        Client Login
-      </Link>
     </div>
   );
 }
@@ -690,14 +708,6 @@ export function Navbar() {
                 and future tool pages have room. */}
             <ToolsDropdown pathname={pathname} />
           </ul>
-
-          {/* See the mobile counterpart: /get-started, not a dead "#". */}
-          <Link
-            to="/get-started"
-            className="nav-cta glass-navy hidden whitespace-nowrap rounded-full px-5 py-2 text-xs font-semibold text-white transition-all duration-500 hover:bg-white/10 hover:shadow-[0_0_24px_rgb(var(--azee-blue)/0.32)] active:scale-[0.98] lg:block"
-          >
-            Client Login
-          </Link>
 
           {/* Mobile menu toggle */}
           <button
