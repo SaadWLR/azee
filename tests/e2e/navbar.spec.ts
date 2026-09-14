@@ -27,10 +27,10 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
 
   const menu = page.getByRole("menu", { name: /tools/i });
 
-  // Open on click → seven tools across two labelled groups.
+  // Open on click → eight tools across two labelled groups.
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await expect(menu.getByRole("menuitem")).toHaveCount(7);
+  await expect(menu.getByRole("menuitem")).toHaveCount(8);
 
   // Two groups, in order, each holding its own links.
   const groups = menu.getByRole("group");
@@ -38,13 +38,17 @@ test("Tools dropdown: opens/closes (click, Escape, outside), active on tool rout
   await expect(groups.nth(0)).toHaveAttribute("aria-label", "Markets");
   await expect(groups.nth(1)).toHaveAttribute("aria-label", "Research");
   await expect(groups.nth(0).getByRole("menuitem")).toHaveCount(4);
-  await expect(groups.nth(1).getByRole("menuitem")).toHaveCount(3);
+  await expect(groups.nth(1).getByRole("menuitem")).toHaveCount(4);
   for (const name of ["Market Watch", "Indices", "Commodity Futures", "ETFs"]) {
     await expect(groups.nth(0).getByRole("menuitem", { name })).toBeVisible();
   }
-  for (const name of ["Announcements", "Calendar", "Fear and Optimism Index"]) {
-    await expect(groups.nth(1).getByRole("menuitem", { name })).toBeVisible();
-  }
+  // Research in order: the Economic Dashboard is back in the third slot.
+  await expect(groups.nth(1).getByRole("menuitem")).toHaveText([
+    "Announcements",
+    "Calendar",
+    "Economic Dashboard",
+    "Fear and Optimism Index",
+  ]);
 
   // Knowledge Centre left Tools; the footer is now its only nav path.
   await expect(

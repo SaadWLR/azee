@@ -84,7 +84,7 @@ const NAV_LINKS: NavLink[] = [
  * organised into two labelled groups rather than one flat list.
  *
  * Two groups, one trigger — deliberately not two top-level dropdowns:
- * at seven items a flat list is merely long, not confusing, and the
+ * at eight items a flat list is merely long, not confusing, and the
  * desktop bar's 1024px width budget is the scarcer resource. Grouping
  * inside the existing panel buys the clarity without spending a slot.
  *
@@ -93,10 +93,16 @@ const NAV_LINKS: NavLink[] = [
  * surfaces describe the site identically — this array is the only
  * definition of either, so a change here moves both.
  *
- * The Economic Dashboard held the third Research slot and is UNLINKED
- * rather than removed: its page and its route are untouched and it
- * still loads at /economic-dashboard by direct URL. Only its shortcut
- * is gone.
+ * The Economic Dashboard holds the third Research slot again. It was
+ * there from the first grouping (Aug 2026), then gave the slot to the
+ * Fear and Optimism Index while the dashboard was still a placeholder
+ * with no figures — UNLINKED rather than removed, so its route kept
+ * loading by direct URL. It came back once the page carried live SBP
+ * EasyData figures with honest stale/unavailable states, the same bar
+ * every other page here meets, and the Fear and Optimism Index moved
+ * down one. It is labelled as it was before: the page's own title
+ * without "Pakistan", which no sibling carries either, and short
+ * enough that no width trade-off applies.
  *
  * "Commodity Futures" is named in full to disambiguate it from the
  * top-level "Forex & Commodities" — this one is PMEX futures
@@ -123,6 +129,7 @@ const TOOL_GROUPS: { heading: string; links: { label: string; to: string }[] }[]
       links: [
         { label: "Announcements", to: "/announcements" },
         { label: "Calendar", to: "/corporate-calendar" },
+        { label: "Economic Dashboard", to: "/economic-dashboard" },
         { label: "Fear and Optimism Index", to: "/fear-and-optimism-index" },
       ],
     },

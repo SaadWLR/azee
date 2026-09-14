@@ -201,6 +201,7 @@ test("mobile menu top level shows the 5 nav links plus one Tools row", async ({
     "ETFs",
     "Announcements",
     "Calendar",
+    "Economic Dashboard",
     "Fear and Optimism Index",
   ]) {
     await expect(menu.getByRole("link", { name: tool, exact: true })).toHaveCount(0);
@@ -223,7 +224,7 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
   await menu.getByRole("button", { name: "Tools", exact: true }).tap();
   expect(await currentView(page)).toBe("tools");
 
-  // Exactly the seven tools, in their two groups, and nothing else.
+  // Exactly the eight tools, in their two groups, and nothing else.
   expect(await menuLinks(page)).toEqual([
     "Market Watch",
     "Indices",
@@ -231,6 +232,7 @@ test("tapping Tools drills into a Tools-only view, and Back returns", async ({
     "ETFs",
     "Announcements",
     "Calendar",
+    "Economic Dashboard",
     "Fear and Optimism Index",
   ]);
   // Group headings carried over from the desktop dropdown.
