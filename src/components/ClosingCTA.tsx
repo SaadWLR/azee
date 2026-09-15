@@ -95,13 +95,21 @@ function QuoteCard({ quote }: { quote: StockQuote }) {
         )}
       </div>
 
-      <div className="mt-7 flex items-end justify-between gap-4">
+      {/*
+       * flex-wrap: on the narrowest phones a live price and its change
+       * don't fit side by side, so the change drops below the price
+       * instead of forcing the card (and the page) wider than the screen.
+       * The change's flex-1 + min-w-min makes it wrap only when even its
+       * min-content can't fit; until then it fills the same space it
+       * always did, so every card that already fit renders unchanged.
+       */}
+      <div className="mt-7 flex flex-wrap items-end justify-between gap-4">
         <p className="text-5xl font-semibold tabular-nums tracking-tight text-[rgb(var(--azee-chalk))]">
           {fmtPrice(quote.price)}
           <span className="ml-2 text-sm font-medium text-white/35">PKR</span>
         </p>
         <p
-          className={`text-right tabular-nums ${
+          className={`min-w-min flex-1 text-right tabular-nums ${
             up ? "text-emerald-400" : "text-rose-400"
           }`}
         >
@@ -191,7 +199,13 @@ export function ClosingCTA() {
         className="absolute inset-x-0 top-0 h-px bg-[rgb(var(--azee-blue)/0.25)]"
       />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-12">
+      {/*
+       * grid-cols-1 (minmax(0, 1fr)), not the implicit auto column: an
+       * auto column grows to its content's min-content width, so a live
+       * quote with a long price or name widened the page past a 320px
+       * phone screen. A 0 minimum pins the column to the screen instead.
+       */}
+      <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-20 lg:px-12">
         {/* ── Copy + CTA ─────────────────────────────────────────── */}
         <div>
           <p
