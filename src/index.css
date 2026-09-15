@@ -356,8 +356,8 @@ body {
 
 /*
  * Contents that must invert with the surface. Marked explicitly rather
- * than selected broadly, so the Client Login button and the logo mark
- * keep their own treatment on both themes.
+ * than selected broadly, so the logo mark keeps its own treatment on
+ * both themes.
  */
 /*
  * Direct children only. The dropdown panels (one per nav group) live
@@ -430,20 +430,6 @@ body {
   opacity: 1;
 }
 
-/*
- * Client Login keeps its glass-navy treatment on dark, but on bone a
- * navy-blue pill is the one saturated object in an otherwise neutral
- * bar — and navy is the palette this redesign moved away from. On light
- * it becomes a solid ink capsule: the same shape, inverted to match the
- * surface.
- */
-.nav-glass[data-nav-theme="light"] .nav-cta {
-  background: rgb(var(--azee-navy));
-  border-color: rgb(var(--azee-navy) / 0.25);
-  color: rgb(var(--azee-paper));
-  box-shadow: none;
-}
-
 /* The hamburger's bars and its outline. */
 .nav-glass[data-nav-theme="light"] .nav-toggle {
   border-color: rgb(var(--azee-navy) / 0.18);
@@ -490,18 +476,9 @@ body {
 }
 
 /*
- * Client Login's resting .glass-navy is a translucent navy gradient —
- * on a navy bar it has nothing to stand against and dissolves. On this
- * theme it lifts to a brighter blue so it stays the one raised object
- * in the bar, which is the job it does on every other surface.
+ * The toggle's faint white outline and fill dissolve into this bar, so
+ * they lift to the blue.
  */
-.nav-glass[data-nav-theme="hero"] .nav-cta {
-  background: rgb(var(--azee-blue) / 0.24);
-  border-color: rgb(var(--azee-blue) / 0.5);
-  box-shadow: none;
-}
-
-/* Same reason: the toggle's white-on-white outline needs the blue. */
 .nav-glass[data-nav-theme="hero"] .nav-toggle {
   border-color: rgb(var(--azee-blue) / 0.35);
   background: rgb(var(--azee-blue) / 0.12);

@@ -6,9 +6,11 @@ import { CONTACT, HEAD_OFFICES } from "../data/company";
 
 /*
  * /get-started — the honest interim destination for "Open an Account"
- * and "Client Login".
+ * (the hero's and closing section's "Open a Trading Account", and the
+ * footer's link). The header's "Client Login" also led here until it
+ * was removed (Sep 2026).
  *
- * Both used to be href="#": a control that looks live, does nothing,
+ * Both started out as href="#": a control that looks live, does nothing,
  * and on a licensed brokerage sits exactly where a prospective client
  * is deciding whether to trust the firm. This page exists because the
  * online onboarding and client portal are not built yet, and saying so
