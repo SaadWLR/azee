@@ -54,40 +54,16 @@ function BrandMark() {
   );
 }
 
-/**
- * Top-level plain links — the three entries after the dropdown groups
- * (NAV_GROUPS, below). A `hash` entry is a homepage section anchor
- * (a hash target on "/"); an entry with `to` is a real route link.
- *
- * "Forex & Commodities" took the slot "Products" used to hold — the bar
- * has a hard width budget at 1024px, and it earns a top-level place as
- * a standalone page in a way an on-page section does not. The Products
- * SECTION is untouched and still renders on the homepage; it simply
- * lost its direct shortcut, and is still reached by scrolling or via
- * the "Every market, one relationship." section itself.
- *
- * "Markets" (#markets, the hero) and "Research" (#research) were hash
- * links here too, until Sep 2026, when dropdowns of the same group names
- * took their positions. They went the way Products did: both SECTIONS
- * are untouched and still render on the homepage — reached by scrolling,
- * and /#research still lands on its section — they lost only the bar's
- * direct shortcut.
- */
-type NavLink =
-  | { label: string; hash: string; to?: undefined }
-  | { label: string; to: string; hash?: undefined };
-
-const NAV_LINKS: NavLink[] = [
-  { label: "Trading", hash: "#trading" },
-  // Named for what the page holds: currency rates AND a local gold
-  // estimate. Route stays /forex.
-  { label: "Forex & Commodities", to: "/forex" },
-  { label: "About", hash: "#about" },
-];
+/** A route link: a plain top-level entry, or one inside a group's panel. */
+interface NavLink {
+  label: string;
+  to: string;
+}
 
 /**
  * The site's standalone pages, as three top-level dropdowns — Markets,
- * Corporate & Events, Research & News — ahead of the plain links.
+ * Corporate & Events, Research & News — between Home and the remaining
+ * plain links (the full order is NAV_ENTRIES, below).
  *
  * WHY TOP-LEVEL. From Aug to Sep 2026 these groups sat inside a single
  * "Tools" dropdown, deliberately NOT as separate top-level triggers: at
@@ -144,7 +120,7 @@ const NAV_LINKS: NavLink[] = [
  */
 interface NavGroup {
   heading: string;
-  links: { label: string; to: string }[];
+  links: NavLink[];
 }
 
 const NAV_GROUPS: NavGroup[] =
@@ -182,6 +158,66 @@ function groupSlug(group: NavGroup): string {
 }
 
 /**
+ * THE TOP-LEVEL BAR, left to right:
+ *
+ *   Home · Markets ▾ · Corporate & Events ▾ · Research & News ▾ ·
+ *   Forex & Commodities · About
+ *
+ * Desktop and mobile both render this one array in this order, so the
+ * two surfaces cannot drift apart.
+ *
+ * EVERY PLAIN ENTRY IS A REAL ROUTE. Until Sep 2026 some entries were
+ * homepage section anchors instead. The last two went in the same
+ * change that added Home:
+ *  - "Trading" (#trading) was removed from the bar outright.
+ *  - "About" (#about) now opens /about, the dedicated company page,
+ *    rather than scrolling to the homepage's credential section.
+ * Both SECTIONS are untouched and still render on the homepage, reached
+ * by scrolling. That follows the earlier precedent: Products lost its
+ * slot to Forex & Commodities, and "Markets" (#markets) and "Research"
+ * (#research) lost theirs to the group dropdowns, while all three
+ * sections stayed.
+ *
+ * NO SCROLL-SPY. The effect that lit a hash entry while its section was
+ * in view was removed along with the last hash entry, rather than left
+ * observing an empty list; every entry is now simply active on its own
+ * route. A section anchor added back would need a spy again — 355c480's
+ * version is the one to restore, since it also clears the highlight
+ * between spied sections.
+ *
+ * "Home" sits alongside the logo, which also leads home. On the
+ * homepage itself both scroll back to the top instead of re-navigating
+ * to the page already showing (see scrollHomeToTop).
+ *
+ * "Forex & Commodities" is named for what the page holds — currency
+ * rates AND a local gold estimate; the route stays /forex.
+ */
+type NavEntry = NavLink | NavGroup;
+
+const NAV_ENTRIES: NavEntry[] = [
+  { label: "Home", to: "/" },
+  ...NAV_GROUPS,
+  { label: "Forex & Commodities", to: "/forex" },
+  { label: "About", to: "/about" },
+];
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return "links" in entry;
+}
+
+/**
+ * Home, clicked on the homepage, scrolls back to the top — as the logo
+ * does there. Without this it would "navigate" to the page already
+ * showing and do nothing: the router's scroll reset only runs when the
+ * path or hash actually changes.
+ */
+function scrollHomeToTop(link: NavLink, pathname: string) {
+  if (link.to === "/" && pathname === "/") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+/**
  * One desktop top-level dropdown: a group's trigger and its panel of
  * links. Rendered once per NAV_GROUPS entry. It is the former "Tools"
  * dropdown generalised to take a group, not a second mechanism — the
@@ -195,18 +231,22 @@ function groupSlug(group: NavGroup): string {
  * when the current route is one of its links. The panel reuses the
  * nav-glass surface so it reads as one nav.
  *
- * WIDTH BUDGET, measured when the groups went top-level (Sep 2026) at
+ * WIDTH BUDGET, re-measured when Home replaced Trading (Sep 2026) at
  * the 1024px breakpoint where this bar first appears: the six entries
- * take 722px of the 976px bar, leaving 104px between the brand and the
- * first trigger — down from 283px with one Tools trigger and five plain
- * links. No label wraps and the bar stays one line. That 104px is the
- * headroom a future top-level entry has to fit inside, so measure again
- * rather than assuming a seventh entry fits.
+ * and their gaps take 710px of the 976px bar (it was 722px with Trading
+ * in Home's place). Since the balance fix centres them (see the <ul> in
+ * Navbar), the free space is split: 58px between the logo and Home,
+ * 59px after About, each including the list's 16px minimum clearance.
+ * That leaves about 85px before either side is down to that 16px, and
+ * it is the headroom a future top-level entry has to fit inside, so
+ * measure again rather than assuming a seventh entry fits. No label
+ * wraps and the bar stays one line.
  *
  * The panel carries no group heading of its own: the trigger directly
  * above it already names the group. It opens left-aligned under its
- * trigger — the triggers now lead the bar, so a right-aligned panel
- * (right for Tools, the last item) would hang back over the brand.
+ * trigger — the triggers sit in the left half of the bar, where a
+ * right-aligned panel (right suited Tools, the last item) would hang
+ * back over the logo.
  */
 function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string }) {
   const [open, setOpen] = useState(false);
@@ -333,8 +373,9 @@ const MOBILE_ROW =
   "block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
 
 /**
- * Mobile dropdown: the three groups as drill-downs, then the plain nav
- * links — the same six entries, in the same order, as the desktop bar.
+ * Mobile dropdown: the same six entries, in the same order, as the
+ * desktop bar (NAV_ENTRIES) — plain links as rows, the three groups as
+ * drill-downs.
  *
  * Drill-downs, not one list. The old single Tools group used to expand
  * INLINE here — all its links plus their headings rendered beneath the
@@ -344,8 +385,8 @@ const MOBILE_ROW =
  * row that swaps in its own view with a back action.
  *
  * Each group now gets that treatment (Sep 2026): the top level shows
- * six rows (three group rows + three links), and tapping a group swaps
- * in a view holding only that group's links. It is the same mechanism
+ * six rows (Home, three group rows, Forex & Commodities, About), and
+ * tapping a group swaps in a view holding only that group's links. It is the same mechanism
  * Tools had, keyed by group rather than duplicated.
  *
  * Every row uses the full 44px MOBILE_ROW again. While all ten links
@@ -361,11 +402,11 @@ const MOBILE_ROW =
  */
 function MobileMenu({
   open,
-  onHome,
+  pathname,
   onNavigate,
 }: {
   open: boolean;
-  onHome: boolean;
+  pathname: string;
   onNavigate: () => void;
 }) {
   /** "main", or the slug of the group whose drill-down is showing. */
@@ -405,57 +446,46 @@ function MobileMenu({
       <div className="max-h-[calc(100dvh-var(--nav-height)-3.75rem)] overflow-y-auto overscroll-contain">
         {!drilled ? (
           <ul data-menu-view="main" className="nav-drill-back">
-            {/* One row per group, standing in for its whole link set. */}
-            {NAV_GROUPS.map((group) => (
-              <li key={group.heading} className="border-b border-white/10">
-                <button
-                  type="button"
-                  aria-expanded={false}
-                  onClick={() => setView(groupSlug(group))}
-                  className={`${MOBILE_ROW} flex w-full items-center justify-between`}
-                >
-                  {group.heading}
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-3.5 w-3.5"
+            {NAV_ENTRIES.map((entry) =>
+              isGroup(entry) ? (
+                // One row per group, standing in for its whole link set.
+                <li key={entry.heading} className="border-b border-white/10">
+                  <button
+                    type="button"
+                    aria-expanded={false}
+                    onClick={() => setView(groupSlug(entry))}
+                    className={`${MOBILE_ROW} flex w-full items-center justify-between`}
                   >
-                    <path d="M4.5 3 7.5 6 4.5 9" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-            {NAV_LINKS.map((link) => (
-              <li key={link.label} className="border-b border-white/10">
-                {link.to ? (
-                  // Real route: always a router link, regardless of page.
-                  <Link to={link.to} onClick={onNavigate} className={MOBILE_ROW}>
-                    {link.label}
-                  </Link>
-                ) : onHome ? (
-                  // Same-page anchor: native browser scroll, untouched.
-                  <a href={link.hash} onClick={onNavigate} className={MOBILE_ROW}>
-                    {link.label}
-                  </a>
-                ) : (
-                  // Cross-route: client-side navigation; ScrollToHash in
-                  // the root layout scrolls to the section once home
-                  // renders.
+                    {entry.heading}
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3.5 w-3.5"
+                    >
+                      <path d="M4.5 3 7.5 6 4.5 9" />
+                    </svg>
+                  </button>
+                </li>
+              ) : (
+                <li key={entry.to} className="border-b border-white/10">
                   <Link
-                    to={`/${link.hash}`}
-                    onClick={onNavigate}
+                    to={entry.to}
+                    onClick={() => {
+                      scrollHomeToTop(entry, pathname);
+                      onNavigate();
+                    }}
                     className={MOBILE_ROW}
                   >
-                    {link.label}
+                    {entry.label}
                   </Link>
-                )}
-              </li>
-            ))}
+                </li>
+              ),
+            )}
           </ul>
         ) : (
           <div data-menu-view={view} className="nav-drill-forward">
@@ -508,11 +538,8 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   /** Which surface the nav is currently sitting over. */
   const [navTheme, setNavTheme] = useState<NavTheme>("dark");
-  const [active, setActive] = useState("");
   const headerRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
-  // Section anchors point at in-page hashes on the homepage, and at
-  // the homepage-plus-hash from any other route so they still work.
   const pathname = useLocation().pathname;
   const onHome = pathname === "/";
 
@@ -630,38 +657,7 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* Scroll spy: highlight the section currently in view. */
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    // Only the hash entries have a section to spy on; a route entry
-    // (Forex) has no homepage element and is skipped.
-    const targets = NAV_LINKS.filter((link) => link.hash !== undefined)
-      .map((link) => document.getElementById(link.hash!.slice(1)))
-      .filter((el): el is HTMLElement => el !== null);
-    /*
-     * Track which spied sections are in the band, and clear the
-     * highlight when none is. It used to only ever set, never clear —
-     * harmless while the hero (#markets) and #research were spied too,
-     * because some entry always took over. Once those two links left
-     * the bar (Sep 2026), scrolling back up to the hero left "About"
-     * underlined over it, and "Trading" stayed lit over Research
-     * (measured). Now an entry is lit only while its own section is.
-     */
-    const inBand = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) inBand.add(entry.target.id);
-          else inBand.delete(entry.target.id);
-        }
-        const [current] = inBand;
-        setActive(current ? `#${current}` : "");
-      },
-      { rootMargin: "-40% 0px -55% 0px" },
-    );
-    targets.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
+  /* No scroll-spy: every entry is a route now — see NAV_ENTRIES. */
 
   return (
     <header
@@ -682,7 +678,7 @@ export function Navbar() {
         <nav
           ref={navRef}
           data-nav-theme={navTheme}
-          className={`nav-glass pointer-events-auto mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full px-5 py-2.5 sm:px-7 ${
+          className={`nav-glass pointer-events-auto mx-auto flex max-w-6xl items-center justify-between gap-4 rounded-full px-5 py-2.5 sm:px-7 lg:gap-0 ${
             scrolled ? "nav-glass-scrolled" : ""
           }`}
         >
@@ -710,41 +706,57 @@ export function Navbar() {
             </Link>
           )}
 
-          <ul className="nav-themed hidden items-center gap-7 lg:flex">
-            {/* The three groups lead the bar as dropdowns, then the
-                plain links. There is no "Tools" trigger any more — see
-                NAV_GROUPS for why, and for when one would come back. */}
-            {NAV_GROUPS.map((group) => (
-              <NavDropdown key={group.heading} group={group} pathname={pathname} />
-            ))}
-            {NAV_LINKS.map((link) => {
-              // A route entry is "active" on its own route; a hash
-              // entry is active when scroll-spy has it in view.
-              const isActive = link.to
-                ? pathname === link.to
-                : active === link.hash;
+          {/*
+           * BALANCE: the links sit centred in the space between the logo
+           * and the bar's right edge, via lg:mx-auto, with lg:px-4 as
+           * the minimum clearance on both sides.
+           *
+           * This fixes a right-skew, measured (Sep 2026). The bar is a
+           * justify-between row, which shares its free space among the
+           * gaps BETWEEN children. While a Client Login pill sat at the
+           * right end there were three children and two equal gaps,
+           * 86px each at 1024 and 174px each from 1280, with the links
+           * within 9px of the bar's centre. Removing that pill left two
+           * children and one gap: all the free space (104px at 1024,
+           * 280px from 1280) landed between the logo and the links, which
+           * pinned against the right edge, their centre 98–186px right of
+           * the bar's.
+           *
+           * Auto margins restore the equal split without a stand-in third
+           * child. The row's gap-4 is dropped at lg because it applied on
+           * the logo's side only and would unbalance the two gaps by
+           * 16px; the list's own padding gives both sides that 16px
+           * instead. The mobile toggle, the one other child, is hidden
+           * at lg.
+           *
+           * Rejected, also measured: centring the links on the bar itself
+           * leaves ~12px between the logo and Home at 1024. Shrinking the
+           * bar to fit its contents balances by construction, but breaks
+           * the bar's alignment with the page's max-w-6xl frame.
+           */}
+          <ul className="nav-themed hidden items-center gap-7 lg:mx-auto lg:flex lg:px-4">
+            {/* NAV_ENTRIES in order: Home, the three group dropdowns,
+                then Forex & Commodities and About. There is no "Tools"
+                trigger any more — see NAV_GROUPS for why, and for when
+                one would come back. */}
+            {NAV_ENTRIES.map((entry) => {
+              if (isGroup(entry)) {
+                return <NavDropdown key={entry.heading} group={entry} pathname={pathname} />;
+              }
+              // Every plain entry is a route: active on its own path.
+              const isActive = pathname === entry.to;
               const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500 hover:text-white ${
                 isActive ? "is-active text-white after:w-7" : "text-gray-300 after:w-0"
               }`;
               return (
-                <li key={link.label} className="flex items-center">
-                  {link.to ? (
-                    // Real route: always a router link.
-                    <Link to={link.to} className={linkClass}>
-                      {link.label}
-                    </Link>
-                  ) : onHome ? (
-                    // Same-page anchor: native browser scroll, untouched.
-                    <a href={link.hash} className={linkClass}>
-                      {link.label}
-                    </a>
-                  ) : (
-                    // Cross-route: client-side navigation; ScrollToHash
-                    // in the root layout scrolls once home renders.
-                    <Link to={`/${link.hash}`} className={linkClass}>
-                      {link.label}
-                    </Link>
-                  )}
+                <li key={entry.to} className="flex items-center">
+                  <Link
+                    to={entry.to}
+                    onClick={() => scrollHomeToTop(entry, pathname)}
+                    className={linkClass}
+                  >
+                    {entry.label}
+                  </Link>
                 </li>
               );
             })}
@@ -775,7 +787,7 @@ export function Navbar() {
 
       <MobileMenu
         open={menuOpen}
-        onHome={onHome}
+        pathname={pathname}
         onNavigate={() => setMenuOpen(false)}
       />
     </header>

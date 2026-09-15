@@ -21,8 +21,7 @@ import { useLocation } from "react-router-dom";
  *
  * Same-page anchor clicks (plain <a href="#..."> on the homepage) are
  * handled natively by the browser first; this effect then targets the
- * same element, so the two never fight. Scroll-spy only reads scroll
- * position and is unaffected.
+ * same element, so the two never fight.
  */
 export function ScrollToHash() {
   const { pathname, hash } = useLocation();

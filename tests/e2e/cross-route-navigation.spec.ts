@@ -23,8 +23,15 @@ async function sectionAtTop(page: import("@playwright/test").Page, id: string) {
   }, id);
 }
 
-for (const from of ["/market-watch", "/corporate-calendar"]) {
-  test(`from ${from}, a Navbar section link navigates home AND scrolls to the section`, async ({
+/*
+ * The Navbar has no section links left (Sep 2026): Trading was removed
+ * and About became the /about route, after Products, Markets and
+ * Research had already lost theirs. The in-app cross-route link to a
+ * homepage section that remains is Knowledge Centre's "View Research →"
+ * (to="/#research"), so that is what keeps this path covered now.
+ */
+for (const from of ["/knowledge-centre"]) {
+  test(`from ${from}, a link to a homepage section navigates home AND scrolls to it`, async ({
     page,
   }) => {
     const consoleErrors: string[] = [];
@@ -41,12 +48,10 @@ for (const from of ["/market-watch", "/corporate-calendar"]) {
       (window as unknown as { __noReload?: number }).__noReload = 1;
     });
 
-    // Trading: "Markets" and "Research" are dropdowns now, not section
-    // anchors, so Trading and About are the bar's remaining ones.
-    await page.locator('header nav ul a', { hasText: "Trading" }).click();
+    await page.locator('main a[href="/#research"]', { hasText: "View Research" }).click();
 
     // Navigated to home with the hash...
-    await expect(page).toHaveURL(/\/#trading$/);
+    await expect(page).toHaveURL(/\/#research$/);
     // ...client-side (marker survived)...
     const marker = await page.evaluate(
       () => (window as unknown as { __noReload?: number }).__noReload,
@@ -58,11 +63,11 @@ for (const from of ["/market-watch", "/corporate-calendar"]) {
     // alone succeeds mid-animation and then measures a scroll still
     // in flight.
     await expect
-      .poll(async () => Math.abs((await sectionAtTop(page, "trading")).top), {
+      .poll(async () => Math.abs((await sectionAtTop(page, "research")).top), {
         timeout: 10_000,
       })
       .toBeLessThan(250);
-    const pos = await sectionAtTop(page, "trading");
+    const pos = await sectionAtTop(page, "research");
     expect(pos.found).toBe(true);
     expect(pos.scrollY).toBeGreaterThan(500);
 
@@ -76,17 +81,18 @@ test("same-page anchors on the homepage still work (no regression)", async ({
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
   /*
-   * Uses #trading: "Products" lost its top-level nav slot to Forex, so
-   * there is no #products anchor in the bar any more. The section
-   * itself is unaffected — that is asserted separately below.
+   * Uses the hero's "View Research" button (href="#research"): the bar
+   * has no section anchors left to click, but the homepage still links
+   * within itself, and ScrollToHash must not fight the browser's native
+   * handling of it.
    */
-  await page.locator('header nav ul a[href="#trading"]').click();
+  await page.locator('#markets a[href="#research"]', { hasText: "View Research" }).click();
   await expect
-    .poll(async () => Math.abs((await sectionAtTop(page, "trading")).top), {
+    .poll(async () => Math.abs((await sectionAtTop(page, "research")).top), {
       timeout: 10_000,
     })
     .toBeLessThan(250);
-  expect((await sectionAtTop(page, "trading")).scrollY).toBeGreaterThan(500);
+  expect((await sectionAtTop(page, "research")).scrollY).toBeGreaterThan(500);
 });
 
 test("Products section survives losing its nav link", async ({ page }) => {
@@ -135,20 +141,25 @@ test("Products section survives losing its nav link", async ({ page }) => {
     .toBeLessThan(250);
 });
 
-test("Markets and Research sections survive losing their nav links", async ({ page }) => {
+test("Markets, About, Research and Trading sections survive losing their nav links", async ({
+  page,
+}) => {
   await page.goto("/");
   /*
-   * Their bar slots went to the Markets and Research & News dropdowns,
-   * which open page links rather than scrolling. The homepage sections
-   * were deliberately left alone: still rendered, still reachable by
-   * scrolling and by direct hash navigation (the next test).
+   * Markets' and Research's bar slots went to the dropdowns of the same
+   * names; Trading was removed; About now opens the /about page. All
+   * four homepage sections were deliberately left alone: still
+   * rendered, still reachable by scrolling (and /#research by direct
+   * hash navigation, the next test).
    */
-  await expect(page.locator('header nav a[href="#markets"]')).toHaveCount(0);
-  await expect(page.locator('header nav a[href="#research"]')).toHaveCount(0);
+  await expect(page.locator('header a[href^="#"], header a[href*="/#"]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Markets", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Research & News", exact: true })).toBeVisible();
+  await expect(
+    page.locator("header nav ul").getByRole("link", { name: "About", exact: true }),
+  ).toHaveAttribute("href", "/about");
 
-  for (const id of ["markets", "research"]) {
+  for (const id of ["markets", "about", "research", "trading"]) {
     const section = page.locator(`#${id}`);
     await expect(section).toBeAttached();
     // Reachable by scroll: bring it into view the way a reader would

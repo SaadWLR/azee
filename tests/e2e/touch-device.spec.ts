@@ -185,7 +185,7 @@ const GROUPS = [
 ];
 
 /** The top level's plain links, after the three group rows. */
-const TOP_LEVEL_LINKS = ["Trading", "Forex & Commodities", "About"];
+const TOP_LEVEL_LINKS = ["Home", "Forex & Commodities", "About"];
 
 const phoneOnly = (projectName: string) =>
   test.skip(
@@ -237,7 +237,7 @@ test("every menu view fits a phone screen without scrolling", async ({
   }
 });
 
-test("mobile menu top level shows three group rows plus three plain links", async ({
+test("mobile menu top level shows Home, three group rows, Forex & Commodities and About", async ({
   page,
 }, testInfo) => {
   phoneOnly(testInfo.project.name);
@@ -246,28 +246,36 @@ test("mobile menu top level shows three group rows plus three plain links", asyn
 
   expect(await currentView(page)).toBe("main");
 
-  // Same six entries, same order, as the desktop bar: three group rows
-  // (controls, not links) then three links.
+  // Same six entries, same order, as the desktop bar: group rows are
+  // controls (buttons); every plain entry is a route link.
   const rows = await page.locator(`${VIEW} > li > :is(a, button)`).evaluateAll((els) =>
-    els.map((el) => `${el.tagName === "BUTTON" ? "group" : "link"}:${el.textContent!.trim()}`),
+    els.map((el) =>
+      el.tagName === "BUTTON"
+        ? `group:${el.textContent!.trim()}`
+        : `link:${el.textContent!.trim()}→${el.getAttribute("href")}`,
+    ),
   );
   expect(rows).toEqual([
+    "link:Home→/",
     ...GROUPS.map((g) => `group:${g.heading}`),
-    ...TOP_LEVEL_LINKS.map((l) => `link:${l}`),
+    "link:Forex & Commodities→/forex",
+    "link:About→/about",
   ]);
   expect(await menuLinks(page)).toEqual(TOP_LEVEL_LINKS);
 
   /*
    * The original regression: group links used to render inline here,
    * pushing the panel past the screen. Not one of them may be present
-   * at the top level. Nor may the old Tools row, or the Markets and
-   * Research section anchors whose places the groups took.
+   * at the top level. Nor may the old Tools row, the removed Trading
+   * link, or any homepage section anchor (#… or /#…) — the menu has
+   * none left.
    */
   for (const link of GROUPS.flatMap((g) => g.links)) {
     await expect(menu.getByRole("link", { name: link, exact: true })).toHaveCount(0);
   }
   await expect(menu.getByRole("button", { name: "Tools", exact: true })).toHaveCount(0);
-  await expect(menu.locator('a[href$="#markets"], a[href$="#research"]')).toHaveCount(0);
+  await expect(menu.getByRole("link", { name: "Trading", exact: true })).toHaveCount(0);
+  await expect(menu.locator('a[href*="#"]')).toHaveCount(0);
 
   // Client Login was removed from the menu entirely (Sep 2026).
   await expect(menu.getByRole("link", { name: /client login/i })).toHaveCount(0);
@@ -308,6 +316,26 @@ test("a group link navigates and closes the menu", async ({ page }, testInfo) =>
   await menu.getByRole("button", { name: "Corporate & Events", exact: true }).tap();
   await menu.getByRole("link", { name: "Economic Dashboard", exact: true }).tap();
   await expect(page).toHaveURL(/\/economic-dashboard$/);
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+});
+
+test("About opens the /about page and Home returns to / from the menu", async ({
+  page,
+}, testInfo) => {
+  phoneOnly(testInfo.project.name);
+  await openMobileMenu(page);
+  const menu = page.locator(MOBILE_MENU);
+
+  // About is the real page now, not a scroll to the homepage section.
+  await menu.getByRole("link", { name: "About", exact: true }).tap();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.locator("#about")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open menu" }).tap();
+  await menu.getByRole("link", { name: "Home", exact: true }).tap();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("#markets")).toBeAttached();
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 });
 

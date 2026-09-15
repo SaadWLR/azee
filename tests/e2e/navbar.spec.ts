@@ -33,7 +33,7 @@ const trigger = (page: Page, heading: string) =>
 const panel = (page: Page, heading: string) =>
   page.getByRole("menu", { name: heading, exact: true });
 
-test("the bar is three dropdowns then three plain links, with no Tools trigger", async ({
+test("the bar is Home, three dropdowns, Forex & Commodities and About — all routes", async ({
   page,
 }) => {
   await page.goto("/");
@@ -41,24 +41,26 @@ test("the bar is three dropdowns then three plain links, with no Tools trigger",
   const entries = await page.locator("header nav ul > li").evaluateAll((items) =>
     items.map((li) => {
       const el = li.firstElementChild!;
-      return `${el.tagName === "BUTTON" ? "dropdown" : "link"}:${el.textContent!.trim()}`;
+      return el.tagName === "BUTTON"
+        ? `dropdown:${el.textContent!.trim()}`
+        : `link:${el.textContent!.trim()}→${el.getAttribute("href")}`;
     }),
   );
   expect(entries).toEqual([
+    "link:Home→/",
     "dropdown:Markets",
     "dropdown:Corporate & Events",
     "dropdown:Research & News",
-    "link:Trading",
-    "link:Forex & Commodities",
-    "link:About",
+    "link:Forex & Commodities→/forex",
+    "link:About→/about",
   ]);
 
-  // Tools is gone, and so are the Markets / Research section anchors
-  // whose positions the groups took. The sections themselves stay; see
-  // cross-route-navigation.spec.ts.
+  // Trading and Tools are gone, and no entry is a homepage section anchor
+  // any more — same-page (#…) or cross-route (/#…). The sections
+  // themselves stay; see cross-route-navigation.spec.ts.
+  await expect(page.locator("header nav").getByRole("link", { name: "Trading" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^tools$/i })).toHaveCount(0);
-  await expect(page.locator('header nav a[href="#markets"]')).toHaveCount(0);
-  await expect(page.locator('header nav a[href="#research"]')).toHaveCount(0);
+  await expect(page.locator('header a[href^="#"], header a[href*="/#"]')).toHaveCount(0);
 });
 
 test("each dropdown lists exactly its own links, in order", async ({ page }) => {
@@ -187,111 +189,130 @@ test("Mutual Funds and Knowledge Centre load from their groups", async ({ page }
   await expect(trigger(page, "Research & News")).toHaveClass(/is-active/);
 });
 
-test("Client Login is gone from the desktop bar, leaving no empty slot", async ({
+test("Client Login stays gone, and the links sit balanced between the logo and the bar's edge", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/market-watch");
   const header = page.locator("header");
   await expect(header.getByRole("link", { name: /client login/i })).toHaveCount(0);
   await expect(header.locator('a[href="/get-started"]')).toHaveCount(0);
 
   /*
-   * No residue: the bar's only rendered children are the brand and the
-   * link list (the mobile toggle is display:none at desktop widths), and
-   * the list sits flush against the bar's right padding rather than
-   * leaving a gap where the button used to be.
+   * The right-skew this guards against (measured, Sep 2026): with Client
+   * Login gone the bar was a two-child justify-between row, so ALL its
+   * free space fell between the logo and Home — 104px at 1024, 280px
+   * from 1280 — while About sat 1px from the bar's inner edge. The fix
+   * centres the links in the space after the logo, so the gap before
+   * the first entry and the gap after the last must match, at every
+   * width the desktop bar is shown at, not just the widest.
    */
-  const layout = await page.locator("header nav").evaluate((nav) => {
-    const shown = [...nav.children].filter((c) => getComputedStyle(c).display !== "none");
-    const list = nav.querySelector("ul")!.getBoundingClientRect();
-    const bar = nav.getBoundingClientRect();
-    return {
-      shown: shown.length,
-      lastIsList: shown.at(-1)?.tagName === "UL",
-      rightGap: Math.round(bar.right - list.right),
-      padRight: Math.round(Number.parseFloat(getComputedStyle(nav).paddingRight)),
-    };
-  });
-  expect(layout.shown).toBe(2);
-  expect(layout.lastIsList).toBe(true);
-  expect(Math.abs(layout.rightGap - layout.padRight)).toBeLessThanOrEqual(2);
+  for (const width of [1024, 1152, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(async () => {
+        const m = await page.locator("header nav").evaluate((nav) => {
+          const shown = [...nav.children].filter((c) => getComputedStyle(c).display !== "none");
+          const brand = nav.querySelector(".nav-brand")!.getBoundingClientRect();
+          const items = [...nav.querySelectorAll("ul > li > :is(a, button)")];
+          const first = items[0].getBoundingClientRect();
+          const last = items.at(-1)!.getBoundingClientRect();
+          const innerRight =
+            nav.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(nav).paddingRight);
+          return {
+            // No residue: only the logo and the list render at desktop
+            // widths (the mobile toggle is display:none).
+            shown: shown.map((c) => c.tagName).join(","),
+            before: Math.round(first.left - brand.right),
+            after: Math.round(innerRight - last.right),
+            oneLine: items.every((el) => el.getBoundingClientRect().height <= 24),
+          };
+        });
+        return (
+          m.shown === "A,UL" &&
+          m.oneLine &&
+          m.before >= 16 &&
+          m.after >= 16 &&
+          Math.abs(m.before - m.after) <= 2
+        )
+          ? "balanced"
+          : `${width}px: ${JSON.stringify(m)}`;
+      }, { timeout: 5_000 })
+      .toBe("balanced");
+  }
 });
 
-/**
- * Scroll `selector` into position on every poll attempt and read which
- * bar entries are highlighted. Re-scrolling each attempt is what makes
- * this reliable — see the scroll-spy test below.
- */
-async function activeAfterScroll(page: Page, scroll: () => Promise<void>) {
-  await scroll();
-  return page
+/** Which bar entries currently wear the active underline. */
+const activeEntries = (page: Page) =>
+  page
     .locator("header nav ul > li > .is-active")
     .evaluateAll((els) => els.map((el) => el.textContent!.trim()));
-}
 
-test("scroll-spy activates section anchors on the homepage", async ({ page }) => {
-  await page.goto("/");
-
-  /*
-   * Re-centre on every attempt rather than scrolling once and waiting.
-   *
-   * The old form scrolled immediately after goto and then waited up to
-   * ten seconds for the anchor to light. That is a race the homepage
-   * usually lost: it is still growing while it loads — video, fonts,
-   * two live feeds — so a scroll issued at that moment lands somewhere
-   * else by the time the page stops moving, and nothing scrolls again.
-   * The spy is then correctly reporting whichever section actually
-   * ended up in its band, and the assertion blames the spy for the
-   * test's own timing.
-   *
-   * It went from passing to failing four runs in five when the display
-   * face was reverted, because Inter reflows the sections above this
-   * one and changed how far the page shifts after load — the race was
-   * always there, that just tipped which way it usually fell.
-   *
-   * Scrolling inside the poll makes it immune: each attempt puts the
-   * section back in the middle of whatever the layout is NOW. Instant,
-   * because the smooth scrolling the site sets is not what this test is
-   * about.
-   *
-   * Uses #trading: #research has had no bar anchor since the groups
-   * became top-level dropdowns.
-   */
-  await expect
-    .poll(
-      async () => {
-        await page.locator("#trading").evaluate((el) =>
-          el.scrollIntoView({ block: "center", behavior: "instant" }),
-        );
-        return page
-          .locator('header nav a[href="#trading"]')
-          .evaluate((el) => el.className);
-      },
-      { timeout: 15_000 },
-    )
-    .toMatch(/is-active/);
-});
-
-test("scroll-spy clears the highlight over sections that have no bar entry", async ({
+test("About opens the real /about page instead of scrolling the homepage", async ({
   page,
 }) => {
   await page.goto("/");
-  const centre = (id: string) => () =>
-    page.locator(`#${id}`).evaluate((el) =>
-      el.scrollIntoView({ block: "center", behavior: "instant" }),
-    );
-  const toTop = () => page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  const about = page.locator("header nav ul").getByRole("link", { name: "About", exact: true });
+  await expect(about).toHaveAttribute("href", "/about");
+
+  await about.click();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.locator("h1")).toBeVisible();
+  await expect(page.locator("#about")).toHaveCount(0); // the page, not the homepage section
+  await expect.poll(() => activeEntries(page)).toEqual(["About"]);
+});
+
+test("Home returns to / and is active there; on the homepage it scrolls back to the top", async ({
+  page,
+}) => {
+  await page.goto("/about");
+  const home = page.locator("header nav ul").getByRole("link", { name: "Home", exact: true });
+  await expect.poll(() => activeEntries(page)).toEqual(["About"]);
+
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("#markets")).toBeAttached();
+  await expect.poll(() => activeEntries(page)).toEqual(["Home"]);
 
   /*
-   * The spy used to only ever set a highlight, never clear one. That was
-   * invisible while the hero (#markets) and #research had bar anchors of
-   * their own, since one of them always took over. Without them,
-   * scrolling back up to the hero left "About" underlined over it, and
-   * "Trading" stayed lit over Research — both measured before the fix.
+   * Already home: the click must not be a silent no-op. The router only
+   * resets scroll when the path or hash changes, so without its own
+   * handler Home would do nothing down the page. The page is scrolled
+   * once; the click alone has to bring it back to the top.
    */
-  await expect.poll(() => activeAfterScroll(page, centre("about")), { timeout: 15_000 }).toEqual(["About"]);
-  await expect.poll(() => activeAfterScroll(page, toTop), { timeout: 15_000 }).toEqual([]);
+  await page.locator("#research").evaluate((el) =>
+    el.scrollIntoView({ block: "start", behavior: "instant" }),
+  );
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  await home.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 10_000 }).toBe(0);
+  await expect(page).toHaveURL(/\/$/);
+});
 
-  await expect.poll(() => activeAfterScroll(page, centre("trading")), { timeout: 15_000 }).toEqual(["Trading"]);
-  await expect.poll(() => activeAfterScroll(page, centre("research")), { timeout: 15_000 }).toEqual([]);
+test("scrolling the homepage lights no entry — there is no scroll-spy left", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  /*
+   * Trading and About were the last section anchors, lit by a scroll-spy
+   * while their sections were in view. Both left the bar (Trading
+   * removed, About now a route), and the spy went with them. Over each
+   * former target, only Home — active by route — may be lit. Each
+   * section is re-centred on every attempt because the homepage is still
+   * growing while it loads, which moves a single early scroll off target.
+   */
+  for (const id of ["about", "trading", "research"]) {
+    await expect
+      .poll(
+        async () => {
+          await page.locator(`#${id}`).evaluate((el) =>
+            el.scrollIntoView({ block: "center", behavior: "instant" }),
+          );
+          await page.waitForTimeout(300);
+          return activeEntries(page);
+        },
+        { timeout: 15_000 },
+      )
+      .toEqual(["Home"]);
+  }
 });
