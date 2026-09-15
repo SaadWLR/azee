@@ -294,6 +294,7 @@ export async function getAnnouncements(
   count = 50,
   offset = 0,
   filters: AnnouncementFilters = {},
+  after?: string,
 ): Promise<AnnouncementsResponse> {
   const params = new URLSearchParams({
     count: String(count),
@@ -305,6 +306,9 @@ export async function getAnnouncements(
   if (filters.dateFrom) params.set("date_from", filters.dateFrom);
   if (filters.dateTo) params.set("date_to", filters.dateTo);
   if (filters.symbol) params.set("symbol", filters.symbol);
+  // The id of the filing the previous page ended on — the page is the
+  // filings after it, wherever new arrivals have pushed them.
+  if (after) params.set("after", after);
 
   if (import.meta.env.DEV) {
     /*

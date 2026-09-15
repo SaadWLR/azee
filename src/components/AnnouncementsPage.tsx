@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useAnnouncements } from "../hooks/useCalendar";
@@ -81,6 +81,18 @@ function pillClass(selected: boolean): string {
   }`;
 }
 
+/**
+ * Page number → the id of the filing the page before it ended on, read
+ * from history state. Anything malformed reads as no anchors.
+ */
+function readAnchors(state: unknown): Record<string, string> {
+  const anchors = (state as { anchors?: unknown } | null)?.anchors;
+  if (!anchors || typeof anchors !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(anchors).filter(([, id]) => typeof id === "string"),
+  );
+}
+
 export function AnnouncementsPage() {
   usePageMeta(
     "PSX Company Announcements — Live Corporate Disclosures | AZEE Trade",
@@ -139,12 +151,35 @@ export function AnnouncementsPage() {
   const fetchCount = clientFiltering ? CLIENT_BATCH : PAGE_SIZE;
   const offset = (page - 1) * fetchCount;
 
-  const { data, loading, error } = useAnnouncements(fetchCount, offset, {
-    q: q || undefined,
-    dateFrom: rangeComplete ? fromParam : undefined,
-    dateTo: rangeComplete ? toParam : undefined,
-    symbol: symbolParam || undefined,
-  });
+  /*
+   * A page reached by Next is fetched as the filings after the one the
+   * previous page ended on, not by offset alone. PSX publishes all day
+   * and each offset is cached separately, so page 2 read at another
+   * moment than page 1 would repeat its last rows or skip past some (see
+   * api/announcements/latest.ts).
+   *
+   * The anchors live in history state, not the URL. Every filter change
+   * navigates without state, which drops them exactly when the pages
+   * they describe stop existing; Back and Previous restore them, so an
+   * earlier page comes back as it was read — except page 1, which is
+   * always the newest filings. A deep link to ?page=3 has none and reads
+   * the bare offset.
+   */
+  const location = useLocation();
+  const anchors = readAnchors(location.state);
+  const after = page > 1 ? anchors[page] : undefined;
+
+  const { data, loading, error } = useAnnouncements(
+    fetchCount,
+    offset,
+    {
+      q: q || undefined,
+      dateFrom: rangeComplete ? fromParam : undefined,
+      dateTo: rangeComplete ? toParam : undefined,
+      symbol: symbolParam || undefined,
+    },
+    after,
+  );
 
   /*
    * The same hook, and the same /api/market/watch URL, Market Watch and
@@ -310,8 +345,11 @@ export function AnnouncementsPage() {
 
   /* ── Pager ─────────────────────────────────────────────────────── */
 
-  const from = offset + 1;
-  const to = offset + batchSize;
+  // An anchored page reports where its rows sit now, which arrivals may
+  // have moved past (page - 1) × size.
+  const shownOffset = data?.offset ?? offset;
+  const from = shownOffset + 1;
+  const to = shownOffset + batchSize;
   const hasPrev = page > 1;
   /*
    * Next walks PSX's own pagination in both modes. Under a client-side
@@ -323,12 +361,21 @@ export function AnnouncementsPage() {
   const hasNext = total !== null ? to < total : batchSize === fetchCount;
 
   function goTo(next: number) {
-    setSearchParams((current) => {
-      const params = new URLSearchParams(current);
-      if (next <= 1) params.delete("page");
-      else params.set("page", String(next));
-      return params;
-    });
+    // Keep the anchors up to where we are going; Next adds its own.
+    const nextAnchors = Object.fromEntries(
+      Object.entries(anchors).filter(([p]) => Number(p) <= Math.min(page, next)),
+    );
+    const last = batch?.[batch.length - 1];
+    if (next === page + 1 && last) nextAnchors[next] = last.id;
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next <= 1) params.delete("page");
+        else params.set("page", String(next));
+        return params;
+      },
+      { state: { anchors: nextAnchors } },
+    );
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

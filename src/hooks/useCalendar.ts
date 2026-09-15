@@ -43,6 +43,7 @@ export function useAnnouncements(
   count: number,
   offset: number,
   filters: AnnouncementFilters = {},
+  after?: string,
 ) {
   /*
    * Destructured to primitives before the dependency array: callers pass
@@ -52,8 +53,8 @@ export function useAnnouncements(
    */
   const { q, dateFrom, dateTo, symbol } = filters;
   const fetcher = useCallback(
-    () => getAnnouncements(count, offset, { q, dateFrom, dateTo, symbol }),
-    [count, offset, q, dateFrom, dateTo, symbol],
+    () => getAnnouncements(count, offset, { q, dateFrom, dateTo, symbol }, after),
+    [count, offset, q, dateFrom, dateTo, symbol, after],
   );
   return useAsyncData(fetcher);
 }

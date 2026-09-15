@@ -51,4 +51,11 @@ export interface AnnouncementsResponse {
   asOf: string;
   source: "psx" | "cache";
   stale?: boolean;
+  /**
+   * Present only when the request carried `after`. True: these are the
+   * filings that follow that one, and `offset` is where they sit now.
+   * False: it had moved out of the search's reach, so this is the bare
+   * offset page instead.
+   */
+  anchored?: boolean;
 }

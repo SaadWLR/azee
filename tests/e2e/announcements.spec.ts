@@ -97,6 +97,35 @@ test("pagination moves to genuinely different, older entries", async ({
     page.locator(`${ROWS} td:nth-child(5) a`).evaluateAll((as) =>
       as.map((a) => a.getAttribute("href")!),
     );
+  // The pager's "Showing N–", which waits out the refetch a page turn starts.
+  const shownFrom = async () => {
+    const match = /Showing ([\d,]+)–/.exec(await page.locator("main").innerText());
+    return match ? Number(match[1].replace(/,/g, "")) : 0;
+  };
+
+  /*
+   * PSX publishes all day, so nothing here may assume the feed stood
+   * still. Both pages are placed against the feed as it is at the end:
+   * two reads under URLs the edge cache has never served, so neither can
+   * be an older snapshot, stitched on a shared filing so one published
+   * between them cannot open a gap. Adjacency does not change as filings
+   * arrive on top, which is what lets the checks below be exact.
+   */
+  const liveFeed = () =>
+    page.evaluate(async () => {
+      type Row = { id: string; documentUrl: string | null };
+      const read = async (offset: number): Promise<Row[]> => {
+        const res = await fetch(
+          `/api/announcements/latest?count=100&offset=${offset}&fresh=${Date.now()}`,
+        );
+        return (await res.json()).announcements;
+      };
+      const head = await read(0);
+      const tail = await read(90);
+      const seam = tail.findIndex((a) => a.id === head[head.length - 1].id);
+      const rows = seam === -1 ? head : [...head, ...tail.slice(seam + 1)];
+      return rows.flatMap((a) => (a.documentUrl ? [a.documentUrl] : []));
+    });
 
   await page.goto("/announcements");
   await expect(page.locator(ROWS).first()).toBeVisible();
@@ -106,19 +135,45 @@ test("pagination moves to genuinely different, older entries", async ({
   await page.getByRole("button", { name: /Next/ }).click();
   await expect(page).toHaveURL(/[?&]page=2/);
   await expect(page.locator("main")).toContainText("Page 2");
-  // Turning the page refetches, so wait for the new page's own count.
-  await expect(page.locator("main")).toContainText(/Showing 51–/);
+  // Page 2 starts at 51, or further down if filings arrived since page 1.
+  await expect.poll(shownFrom).toBeGreaterThanOrEqual(51);
 
   const secondPage = await docLinks();
   expect(secondPage.length).toBeGreaterThan(10);
-  // Not one filing is repeated across the two pages.
+  // Not one filing is repeated across the two pages, however the feed moved.
   expect(secondPage.filter((h) => firstPage.includes(h))).toEqual([]);
 
-  // Back to page 1 restores the original filings.
+  // Previous returns to page 1, which is always the newest filings.
   await page.getByRole("button", { name: /Previous/ }).click();
   await expect(page.locator("main")).toContainText("Page 1");
-  await expect(page.locator("main")).toContainText(/Showing 1–/);
-  expect((await docLinks())[0]).toBe(firstPage[0]);
+  await expect.poll(shownFrom).toBe(1);
+  const restored = await docLinks();
+
+  // Back replays page 2 exactly as it was read.
+  await page.goBack();
+  await expect(page).toHaveURL(/[?&]page=2/);
+  await expect.poll(shownFrom).toBeGreaterThanOrEqual(51);
+  expect(await docLinks()).toEqual(secondPage);
+
+  const live = await liveFeed();
+  const end = live.indexOf(firstPage[firstPage.length - 1]);
+  test.skip(end === -1, "Page 1 is no longer among the newest ~190 filings; nothing to place it against");
+
+  // Page 2 is exactly the filings that follow page 1's last: no repeat, no skip.
+  expect(secondPage).toEqual(live.slice(end + 1, end + 1 + secondPage.length));
+
+  /*
+   * Page 1 on return may have new filings on top, but only ones that
+   * have really arrived since it was first read (the live position of
+   * its old first filing), and below them the same filings in order.
+   */
+  const sinceFirstRead = live.indexOf(firstPage[0]);
+  if (sinceFirstRead < restored.length) {
+    const arrived = restored.indexOf(firstPage[0]);
+    expect(arrived).toBeGreaterThanOrEqual(0);
+    expect(arrived).toBeLessThanOrEqual(sinceFirstRead);
+    expect(restored.slice(arrived)).toEqual(firstPage.slice(0, restored.length - arrived));
+  }
 });
 
 test("Corporate & Events dropdown and Footer both reach /announcements", async ({ page }) => {
@@ -242,4 +297,48 @@ test("GET /api/announcements/latest honours count/offset and shape", async ({
     const smallBody = await small.json();
     expect(smallBody.announcements.length, `count=${count} rows`).toBe(count);
   }
+});
+
+test("GET /api/announcements/latest?after= continues from a filing, wherever it has moved", async ({
+  request,
+}) => {
+  const read = async (query: string) => {
+    const response = await request.get(`/api/announcements/latest?${query}`);
+    expect(response.status(), query).toBe(200);
+    return response.json();
+  };
+  const ids = (body: { announcements: { id: string }[] }) =>
+    body.announcements.map((a) => a.id);
+
+  /*
+   * `fresh` is a param the function ignores, so the edge cache has never
+   * served that URL and cannot answer with a snapshot from hours ago.
+   * The anchored read in between is deliberately left cacheable.
+   */
+  const head = ids(await read(`count=10&offset=0&fresh=${Date.now()}`));
+  const next = await read(`count=10&offset=10&after=${head[9]}`);
+  const live = ids(await read(`count=100&offset=0&fresh=${Date.now()}`));
+
+  expect(next.anchored).toBe(true);
+  expect(ids(next)).toHaveLength(10);
+  const at = live.indexOf(head[9]);
+  test.skip(at === -1 || at + 10 >= live.length, "PSX feed moved past one read mid-test");
+
+  // Exactly the ten filings that follow head[9] in the live feed.
+  expect(ids(next)).toEqual(live.slice(at + 1, at + 11));
+  // `offset` is where they sat when read: at or below the hint, never above the live position.
+  expect(next.offset).toBeGreaterThanOrEqual(10);
+  expect(next.offset).toBeLessThanOrEqual(at + 1);
+
+  // A filing nowhere near the hint is reported, not passed off as anchored.
+  const lost = await read("count=10&offset=10&after=1");
+  expect(lost.anchored).toBe(false);
+  expect(lost.offset).toBe(10);
+  expect(lost.announcements).toHaveLength(10);
+
+  // A bare page carries no anchored flag at all.
+  expect("anchored" in (await read("count=10&offset=10"))).toBe(false);
+
+  const malformed = await request.get("/api/announcements/latest?count=10&after=%3Cscript%3E");
+  expect(malformed.status()).toBe(400);
 });

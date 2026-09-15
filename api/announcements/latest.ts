@@ -7,6 +7,7 @@ import type {
 
 /**
  * GET /api/announcements/latest?count=50&offset=0
+ * GET /api/announcements/latest?count=50&offset=50&after=282669
  *
  * Company announcements (corporate disclosures) from the PSX Data
  * Portal, normalized and paginated. The frontend never talks to PSX
@@ -342,6 +343,93 @@ async function fetchAnnouncements(
   };
 }
 
+/*
+ * Anchored paging: `after` is the id of the last filing the caller has
+ * already shown, and the page is the `count` filings that follow it.
+ *
+ * A bare offset cannot page a live, newest-first feed. Measured Sep 15
+ * 2026: PSX takes 34–67 filings a day, up to 18 an hour, and each
+ * offset is cached at the edge on its own clock. Page 2 cached after
+ * page 1 starts with page 1's last rows again (a preview repeated two);
+ * cached before it, page 2 skips the rows that arrivals pushed off page
+ * 1. stale-while-revalidate stretches that gap from minutes to hours on
+ * a rarely read page. Dropping repeats on the client fixes only the
+ * first case.
+ *
+ * PSX has no cursor, so `offset` stays the hint for where the anchor
+ * sat. The anchor can only have moved down since, as filings arrived,
+ * unless PSX removed a filing above it, which ANCHOR_OVERLAP absorbs.
+ * The search reads PSX's widest windows (100 rows), stitching the
+ * second onto the first by the id they share so a filing landing
+ * between the two reads cannot open a seam. Two windows fill a 50-row
+ * page after an anchor that has moved 139 filings, and a 100-row batch
+ * after 89 — two to three trading days. A 50-row page usually costs one
+ * read, a 100-row batch always two.
+ */
+const ANCHOR_OVERLAP = 5;
+const MAX_ANCHOR_WINDOWS = 2;
+
+async function fetchAfter(
+  count: number,
+  offset: number,
+  after: string,
+  filters: AnnouncementQuery = {},
+): Promise<AnnouncementsResponse> {
+  const runStart = Math.max(0, offset - 1 - ANCHOR_OVERLAP);
+  const run: CompanyAnnouncement[] = [];
+  let latest: AnnouncementsResponse | null = null;
+  let at = -1;
+  let complete = false;
+
+  for (let i = 0; i < MAX_ANCHOR_WINDOWS; i++) {
+    const windowOffset = runStart + i * (MAX_COUNT - ANCHOR_OVERLAP);
+    latest = await fetchAnnouncements(MAX_COUNT, windowOffset, filters);
+    const rows = latest.announcements;
+    if (run.length === 0) {
+      run.push(...rows);
+    } else {
+      const seam = rows.findIndex((a) => a.id === run[run.length - 1].id);
+      if (seam === -1) break;
+      run.push(...rows.slice(seam + 1));
+    }
+    at = run.findIndex((a) => a.id === after);
+    const feedEnded =
+      latest.totalAvailable !== null
+        ? windowOffset + MAX_COUNT >= latest.totalAvailable
+        : rows.length < MAX_COUNT;
+    complete = at !== -1 && (feedEnded || run.length - at - 1 >= count);
+    if (complete || feedEnded) break;
+  }
+  const lastRead = latest!;
+
+  if (!complete) {
+    /*
+     * Not found, or found too near the end of what was read to fill the
+     * page: it moved further than two windows reach, or PSX removed it.
+     * A short page would read as the end of the list, so serve the page
+     * the bare offset would have given, from rows already read, and say
+     * so rather than pass it off as anchored.
+     */
+    const from = offset - runStart;
+    return {
+      ...lastRead,
+      announcements: run.slice(from, from + count),
+      count,
+      offset,
+      anchored: false,
+    };
+  }
+  return {
+    ...lastRead,
+    announcements: run.slice(at + 1, at + 1 + count),
+    count,
+    // Where these rows sit in the feed now, so the pager's "Showing
+    // 53–102" describes the rows on screen rather than the hint.
+    offset: runStart + at + 1,
+    anchored: true,
+  };
+}
+
 /* ── HTTP handler ──────────────────────────────────────────────── */
 
 /** Clamps a query param to a sane integer, falling back to `fallback`. */
@@ -459,15 +547,22 @@ export default async function handler(
     return;
   }
 
-  const key = `${count}:${offset}:${query}:${dateFrom}:${dateTo}:${symbol}`;
+  // A filing id: PSX's document number, or the timestamp-symbol key
+  // parseRow gives a row without a document.
+  const after = strParam(req.query.after, 64);
+  if (after && !/^[A-Za-z0-9][A-Za-z0-9:.\-]*$/.test(after)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(400).json({ error: "after must be an announcement id" });
+    return;
+  }
+
+  const key = `${count}:${offset}:${query}:${dateFrom}:${dateTo}:${symbol}:${after}`;
 
   try {
-    const data = await fetchAnnouncements(count, offset, {
-      query,
-      dateFrom,
-      dateTo,
-      symbol,
-    });
+    const filters = { query, dateFrom, dateTo, symbol };
+    const data = after
+      ? await fetchAfter(count, offset, after, filters)
+      : await fetchAnnouncements(count, offset, filters);
     rememberLastGood(key, data);
     /*
      * 15 minutes. Company announcements arrive continuously through the
@@ -497,4 +592,4 @@ export default async function handler(
   }
 }
 
-export { fetchAnnouncements };
+export { fetchAfter, fetchAnnouncements };
