@@ -13,7 +13,19 @@ test.beforeEach(() => {
   );
 });
 
-const BENCHMARKS = ["S&P 500", "Nasdaq-100", "Dow Jones", "Japan Equity"];
+/*
+ * The four benchmarks the tab shows, each with the BASE symbol of its
+ * PMEX contract — mirroring the BENCHMARKS table in api/market/pmex.ts.
+ * The base is the part before the "-<expiry>", and it is the only half
+ * of the symbol that can be written down here: PMEX rolls the expiry
+ * quarterly, so the full symbol is read from the feed at run time.
+ */
+const BENCHMARKS: { name: string; base: string }[] = [
+  { name: "S&P 500", base: "SP500" },
+  { name: "Nasdaq-100", base: "NSDQ100" },
+  { name: "Dow Jones", base: "DJ" },
+  { name: "Japan Equity", base: "JPYEQTY1" },
+];
 
 /**
  * PMEX closes at weekends, and when it does EVERY contract in the feed
@@ -64,9 +76,44 @@ test("Global Futures tab shows real PMEX futures with honest framing", async ({
   const table = page.locator("main table");
   await expect(table).toBeVisible();
   // Four benchmark futures, each present by name plus a real contract.
-  await expect(table).toContainText("SP500-SE26");
   await expect(page.locator("main table tbody tr")).toHaveCount(4);
-  for (const b of BENCHMARKS) await expect(table).toContainText(b);
+  for (const b of BENCHMARKS) await expect(table).toContainText(b.name);
+
+  /*
+   * Each row must name a REAL dated PMEX contract — the whole point of
+   * this assertion, since a spot index level would carry no contract
+   * symbol at all. PMEX symbols embed their expiry and roll quarterly,
+   * so the expected symbol is read from the same endpoint the tab
+   * renders from instead of being pinned here: "SP500-SE26" was
+   * hardcoded and silently expired when PMEX rolled to December 2026.
+   *
+   * Both halves earn their place. The shape check proves the feed is
+   * serving a dated contract for the expected base symbol (not a bare
+   * "SP500", not some other instrument), and the cell check proves the
+   * page renders THAT symbol — so the row cannot be satisfied by a
+   * stale, invented, or merely well-shaped code.
+   */
+  const feed = await request.get("/api/market/global-futures");
+  expect(feed.status()).toBe(200);
+  const { futures } = (await feed.json()) as {
+    futures: { contract: string; benchmark: string }[];
+  };
+  const contractFor = new Map(futures.map((f) => [f.benchmark, f.contract]));
+
+  for (const { name, base } of BENCHMARKS) {
+    const contract = contractFor.get(name);
+    expect(contract, `feed carries no contract for ${name}`).toMatch(
+      new RegExp(`^${base}-[A-Z]{2}\\d{2}$`),
+    );
+    // Column 2 is Contract; toHaveText is exact, after whitespace trim.
+    await expect(
+      page
+        .locator("main table tbody tr")
+        .filter({ hasText: name })
+        .locator("td")
+        .nth(1),
+    ).toHaveText(contract!);
+  }
 
   // Honest framing: EVERY row is labelled "PMEX futures", not a spot index.
   expect(
