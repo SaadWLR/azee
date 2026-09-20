@@ -156,6 +156,139 @@ test("the trailing-year range is the archive's own closing high and low", async 
   expect(target.price).toBeLessThan(high * 2);
 });
 
+/** The card's own numbers, recomputed here from the archive it reads. */
+async function archive(request: APIRequestContext, symbol: string) {
+  const response = await request.get(
+    `/api/market/history?symbol=${encodeURIComponent(symbol)}`,
+  );
+  expect(response.status()).toBe(200);
+  return (await response.json()).points as { date: string; close: number }[];
+}
+
+test("SMA-50, SMA-200 and RSI-14 match the archive they are computed from", async ({
+  page,
+  request,
+}) => {
+  const rows = await quotes(request);
+  const target = rows.sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))[0];
+  const points = await archive(request, target.symbol);
+  test.skip(points.length < 200, `${target.symbol} has too short an archive for SMA-200`);
+
+  const closes = points.map((p) => p.close);
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sma50 = mean(closes.slice(-50));
+  const sma200 = mean(closes.slice(-200));
+  // Wilder's smoothing, written out here rather than imported, so the
+  // page is checked against arithmetic this file owns.
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i <= 14; i++) {
+    const delta = closes[i] - closes[i - 1];
+    if (delta >= 0) avgGain += delta;
+    else avgLoss -= delta;
+  }
+  avgGain /= 14;
+  avgLoss /= 14;
+  for (let i = 15; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    avgGain = (avgGain * 13 + Math.max(delta, 0)) / 14;
+    avgLoss = (avgLoss * 13 + Math.max(-delta, 0)) / 14;
+  }
+  const rsi14 = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  await page.goto(`/market-watch/${target.symbol}`);
+  const section = page
+    .getByRole("heading", { name: "Technical indicators", exact: true })
+    .locator("..");
+  await expect(section).toBeVisible({ timeout: 20_000 });
+
+  const money = (v: number) =>
+    v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const field = (label: string) => section.getByText(label, { exact: true }).locator("..");
+  await expect(field("SMA-50")).toContainText(money(sma50));
+  await expect(field("SMA-200")).toContainText(money(sma200));
+  await expect(field("RSI-14")).toContainText(money(rsi14));
+
+  // The reading is described, never acted on.
+  const zone = rsi14 > 70 ? "overbought" : rsi14 < 30 ? "oversold" : "Between 30 and 70";
+  await expect(field("RSI-14")).toContainText(zone);
+});
+
+test("a short archive computes what it can and says why the rest is missing", async ({
+  page,
+  request,
+}) => {
+  const rows = await quotes(request);
+  // A symbol whose archive is long enough for RSI-14 but not SMA-200.
+  let short: { symbol: string; points: number } | undefined;
+  for (const q of rows.slice(0, 40)) {
+    const points = await archive(request, q.symbol);
+    if (points.length >= 51 && points.length < 200) {
+      short = { symbol: q.symbol, points: points.length };
+      break;
+    }
+  }
+  test.skip(!short, "no symbol in this sample has a 51–199 session archive");
+
+  await page.goto(`/market-watch/${short!.symbol}`);
+  const section = page
+    .getByRole("heading", { name: "Technical indicators", exact: true })
+    .locator("..");
+  await expect(section).toBeVisible({ timeout: 20_000 });
+
+  // SMA-200 is absent with its reason stated in full, and the two that
+  // can be computed still are.
+  await expect(section).toContainText(
+    `Needs 200 sessions; this archive has ${short!.points.toLocaleString("en-US")}.`,
+  );
+  await expect(section.getByText("SMA-50", { exact: true }).locator("..")).toContainText("PKR");
+  await expect(section.getByText("RSI-14", { exact: true }).locator("..")).toContainText(/\d/);
+});
+
+test("the indicators section states who computed it, and recommends nothing", async ({
+  page,
+  request,
+}) => {
+  const rows = await quotes(request);
+  const target = rows.sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))[0];
+
+  await page.goto(`/market-watch/${target.symbol}`);
+  const section = page
+    .getByRole("heading", { name: "Technical indicators", exact: true })
+    .locator("..");
+  await expect(section).toBeVisible({ timeout: 20_000 });
+
+  // Whose numbers these are, and what they are not.
+  await expect(section).toContainText(
+    "Computed by AZEE from the Pakistan Stock Exchange's published closing prices — PSX does not publish these figures",
+  );
+  await expect(section).toContainText("Wilder's smoothing");
+  await expect(section).toContainText("Information only, not investment advice");
+
+  /*
+   * The line this feature must not cross. "Overbought" and "oversold"
+   * are RSI's own zone names and are allowed; a verdict is not.
+   */
+  const copy = (await section.innerText()).toLowerCase();
+  for (const word of [
+    "buy",
+    "sell",
+    "hold",
+    "bullish",
+    "bearish",
+    "signal",
+    "recommend",
+    "target price",
+    "outperform",
+    "undervalued",
+    "overvalued",
+    "strong",
+    "momentum",
+  ]) {
+    expect(copy, `"${word}" must not appear in the indicators section`).not.toContain(word);
+  }
+});
+
 test("sector peers are the same sector, capped, biggest move first, and each links on", async ({
   page,
   request,

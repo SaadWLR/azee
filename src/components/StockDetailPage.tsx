@@ -5,6 +5,7 @@ import { Footer } from "./Footer";
 import { IndexHistoryChart } from "./IndexHistoryChart";
 import { useAllMarketQuotes, useIndexHistory } from "../hooks/useMarketData";
 import { usePageMeta } from "../hooks/usePageMeta";
+import { rsi, rsiZone, sma } from "../lib/indicators";
 import type { StockQuote } from "../types";
 import type { EodPoint } from "../types/history";
 
@@ -123,6 +124,38 @@ function closingRange(points: EodPoint[] | undefined): ClosingRange | null {
   };
 }
 
+/** Sessions each indicator needs before it means what its name says. */
+const SMA_SHORT = 50;
+const SMA_LONG = 200;
+const RSI_PERIOD = 14;
+
+interface Indicators {
+  sessions: number;
+  asOf: string;
+  sma50: number | null;
+  sma200: number | null;
+  rsi14: number | null;
+}
+
+/**
+ * The indicators for a symbol, from the archive this page already has.
+ *
+ * Each entry is either a number or null, and null is rendered as the
+ * reason it is missing rather than a dash — a symbol listed this year
+ * has no 200-session average, which is a fact about the listing, not a
+ * failure of the page.
+ */
+function indicators(points: EodPoint[] | undefined): Indicators | null {
+  if (!points || points.length < 2) return null;
+  return {
+    sessions: points.length,
+    asOf: points[points.length - 1].date,
+    sma50: sma(points, SMA_SHORT),
+    sma200: sma(points, SMA_LONG),
+    rsi14: rsi(points, RSI_PERIOD),
+  };
+}
+
 /**
  * How many sector peers the list shows. Some PSX sectors run past 30
  * names (Commercial Banks, Textile Composite), and a detail page is not
@@ -221,6 +254,7 @@ export function StockDetailPage() {
    * neither depends on anything that changes between renders.
    */
   const range = useMemo(() => closingRange(history.data?.points), [history.data]);
+  const technicals = useMemo(() => indicators(history.data?.points), [history.data]);
   const peers = useMemo(() => sectorPeers(quotes, quote), [quotes, quote]);
 
   usePageMeta(
@@ -440,6 +474,82 @@ export function StockDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Technical indicators, from the same archive the chart drew.
+              Numbers only: where each one sits, never what to do about
+              it. See src/lib/indicators.ts. */}
+          {technicals ? (
+            <section className="mt-6 rounded-2xl border border-white/12 bg-[rgb(var(--azee-panel))] px-6 py-5">
+              <h2 className="text-sm font-semibold text-[rgb(var(--azee-chalk))]">
+                Technical indicators
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-x-10 gap-y-5">
+                {[
+                  { label: `SMA-${SMA_SHORT}`, value: technicals.sma50, needs: SMA_SHORT },
+                  { label: `SMA-${SMA_LONG}`, value: technicals.sma200, needs: SMA_LONG },
+                ].map((entry) => (
+                  <div key={entry.label} className="min-w-[8rem]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                      {entry.label}
+                    </p>
+                    {entry.value !== null ? (
+                      <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                        {fmtNum(entry.value)}
+                        <span className="ml-2 text-sm font-semibold text-white/45">PKR</span>
+                      </p>
+                    ) : (
+                      /* Said plainly, with both numbers, so the gap reads
+                         as this symbol's short archive rather than a
+                         broken page. */
+                      <p className="mt-1.5 max-w-[15rem] text-[11px] leading-relaxed text-white/45">
+                        Needs {entry.needs} sessions; this archive has{" "}
+                        {technicals.sessions.toLocaleString("en-US")}.
+                      </p>
+                    )}
+                  </div>
+                ))}
+                <div className="min-w-[8rem]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                    RSI-{RSI_PERIOD}
+                  </p>
+                  {technicals.rsi14 !== null ? (
+                    <>
+                      <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                        {fmtNum(technicals.rsi14)}
+                      </p>
+                      {/*
+                       * Where the number sits on RSI's own 0–100 scale,
+                       * in RSI's own published vocabulary. It describes
+                       * the reading, and deliberately stops there: no
+                       * verdict is drawn from it here or anywhere else.
+                       */}
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-white/45">
+                        {rsiZone(technicals.rsi14) === "overbought"
+                          ? "Above 70, the zone conventionally called overbought."
+                          : rsiZone(technicals.rsi14) === "oversold"
+                            ? "Below 30, the zone conventionally called oversold."
+                            : "Between 30 and 70, outside the conventional overbought and oversold zones."}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1.5 max-w-[15rem] text-[11px] leading-relaxed text-white/45">
+                      Needs {RSI_PERIOD + 1} sessions; this archive has{" "}
+                      {technicals.sessions.toLocaleString("en-US")}.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="mt-4 max-w-3xl text-[11px] leading-relaxed text-white/45">
+                Computed by AZEE from the Pakistan Stock Exchange&apos;s published
+                closing prices — PSX does not publish these figures. SMA-
+                {SMA_SHORT} and SMA-{SMA_LONG} are the mean closing price of the
+                last {SMA_SHORT} and {SMA_LONG} sessions; RSI-{RSI_PERIOD} uses
+                Wilder&apos;s smoothing over {RSI_PERIOD} sessions. All three run
+                to the close of {fmtDate(technicals.asOf)} and do not include the
+                live price above. Information only, not investment advice.
+              </p>
+            </section>
+          ) : null}
 
           {/* Sector peers. Absent entirely — not an empty card — when the
               symbol has no sector (the directory fetch carries it, and it
