@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
@@ -5,6 +6,7 @@ import { IndexHistoryChart } from "./IndexHistoryChart";
 import { useAllMarketQuotes, useIndexHistory } from "../hooks/useMarketData";
 import { usePageMeta } from "../hooks/usePageMeta";
 import type { StockQuote } from "../types";
+import type { EodPoint } from "../types/history";
 
 /**
  * One dynamic route (/market-watch/:symbol) for every PSX symbol.
@@ -51,6 +53,105 @@ function membershipBadge(quote: StockQuote): string | null {
   if (quote.isKmi30) return "KMI-30";
   if (quote.isKmiAllShare) return "KMI All-Share";
   return null;
+}
+
+function fmtDate(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** The trailing window "52-week" means here, in calendar days. */
+const YEAR_DAYS = 365;
+/**
+ * A window whose oldest session is younger than this is reported by the
+ * span it actually has, rather than called a 52-week range it cannot
+ * cover — a symbol listed three months ago has a three-month range.
+ */
+const NEAR_YEAR_DAYS = 350;
+
+interface ClosingRange {
+  low: number;
+  high: number;
+  sessions: number;
+  from: string;
+  to: string;
+  coversYear: boolean;
+}
+
+/**
+ * The trailing-year high and low, computed here from the EOD archive the
+ * chart on this page already loaded — no second fetch, and no backend
+ * field for it.
+ *
+ * CLOSING PRICES, and labelled that way in the UI. PSX publishes no
+ * rolling 52-week extreme, and the archive carries one close per session
+ * rather than each session's high and low, so a true intraday 52-week
+ * high is not derivable from what this page holds. Calling a closing
+ * extreme "the 52-week high" would overstate it by whatever the highest
+ * intraday spike added.
+ *
+ * The window is counted in calendar days from the newest session, the
+ * same convention IndexHistoryChart's range tabs use, so the "1Y" chart
+ * and this range describe the same stretch of time.
+ */
+function closingRange(points: EodPoint[] | undefined): ClosingRange | null {
+  if (!points || points.length < 2) return null;
+  const to = points[points.length - 1].date;
+  const cutoff = new Date(`${to}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - YEAR_DAYS);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+  const window = points.filter((p) => p.date >= cutoffIso);
+  // Two points is the floor for a range to mean anything at all.
+  if (window.length < 2) return null;
+
+  const closes = window.map((p) => p.close);
+  const spanDays =
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${window[0].date}T00:00:00Z`)) /
+    86_400_000;
+  return {
+    low: Math.min(...closes),
+    high: Math.max(...closes),
+    sessions: window.length,
+    from: window[0].date,
+    to,
+    coversYear: spanDays >= NEAR_YEAR_DAYS,
+  };
+}
+
+/**
+ * How many sector peers the list shows. Some PSX sectors run past 30
+ * names (Commercial Banks, Textile Composite), and a detail page is not
+ * a second Market Watch — the cap keeps this a glance, and the line
+ * under the list says how many were left out rather than hiding it.
+ */
+const PEER_CAP = 8;
+
+/**
+ * Peers ordered by the size of today's move, largest first.
+ *
+ * Alphabetical would be arbitrary here, and share volume is not
+ * comparable across a 12-rupee share and a 1,400-rupee one — millions of
+ * shares of the first is a quieter session than thousands of the second,
+ * and this feed carries no traded VALUE to rank by. The size of the move
+ * is the one thing that is comparable between two names in the same
+ * sector, and it answers what someone reading this page is asking: what
+ * else in this sector is doing something today. Direction is kept in the
+ * row (each peer shows its own sign), so this ranks by magnitude without
+ * flattening gainers and losers together.
+ */
+function sectorPeers(
+  quotes: StockQuote[] | null | undefined,
+  quote: StockQuote | undefined,
+): StockQuote[] {
+  if (!quotes || !quote?.sector) return [];
+  return quotes
+    .filter((q) => q.sector === quote.sector && q.symbol !== quote.symbol)
+    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
 }
 
 /** A page-shaped shell, so every state gets the same chrome. */
@@ -112,6 +213,15 @@ export function StockDetailPage() {
    * worth looking at, and the two answers are independent.
    */
   const history = useIndexHistory(symbol);
+
+  /*
+   * Both derived from data already on the page — the archive the chart
+   * drew, and the same quote list the header read. Memoised because each
+   * walks a few hundred (peers) or a few thousand (archive) entries, and
+   * neither depends on anything that changes between renders.
+   */
+  const range = useMemo(() => closingRange(history.data?.points), [history.data]);
+  const peers = useMemo(() => sectorPeers(quotes, quote), [quotes, quote]);
 
   usePageMeta(
     quote?.name
@@ -246,12 +356,75 @@ export function StockDetailPage() {
                   {fmtVolume(quote.volume)}
                 </p>
               </div>
+              {/* The session in the order it happened: where it closed
+                  last time, where it opened, how far it travelled. Each
+                  appears only when PSX published it — see StockQuote: a
+                  0 in these columns means "no range", not a price, and a
+                  symbol can trade without one. */}
+              {quote.previousClose !== undefined ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                    Previous close
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                    {fmtNum(quote.previousClose)}
+                  </p>
+                </div>
+              ) : null}
+              {quote.open !== undefined ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                    Open
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                    {fmtNum(quote.open)}
+                  </p>
+                </div>
+              ) : null}
+              {quote.dayLow !== undefined && quote.dayHigh !== undefined ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                    Day range
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                    {fmtNum(quote.dayLow)}
+                    <span className="mx-1.5 text-sm font-semibold text-white/40">–</span>
+                    {fmtNum(quote.dayHigh)}
+                  </p>
+                </div>
+              ) : null}
             </div>
             <p className="mt-4 text-[11px] leading-relaxed text-white/45">
               Live prices from the PSX ready board, the same feed behind Market
               Watch. Quotes are indicative and not an offer to trade.
             </p>
           </div>
+
+          {/* Trailing-year range, from the archive below. Absent while
+              that archive is loading or if it holds too few sessions to
+              describe a range — never a figure from one data point. */}
+          {range ? (
+            <div className="mt-6 rounded-2xl border border-white/12 bg-[rgb(var(--azee-panel))] px-6 py-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                {range.coversYear
+                  ? "52-week range"
+                  : `Range since ${fmtDate(range.from)}`}
+              </p>
+              <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[rgb(var(--azee-chalk))]">
+                {fmtNum(range.low)}
+                <span className="mx-1.5 text-sm font-semibold text-white/40">–</span>
+                {fmtNum(range.high)}
+                <span className="ml-2 text-sm font-semibold text-white/45">PKR</span>
+              </p>
+              <p className="mt-3 text-[11px] leading-relaxed text-white/45">
+                Highest and lowest CLOSING price across {range.sessions} sessions,{" "}
+                {fmtDate(range.from)} to {fmtDate(range.to)}. PSX publishes no
+                rolling 52-week extreme and the archive carries closes rather
+                than each session's high and low, so an intraday high above this
+                is possible.
+              </p>
+            </div>
+          ) : null}
 
           {/* Price history — its own states, independent of the quote. */}
           <div className="mt-6 overflow-hidden rounded-2xl border border-white/12 bg-[rgb(var(--azee-panel))]">
@@ -267,6 +440,72 @@ export function StockDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Sector peers. Absent entirely — not an empty card — when the
+              symbol has no sector (the directory fetch carries it, and it
+              is optional) or is alone in its own. */}
+          {peers.length ? (
+            <section className="mt-6 rounded-2xl border border-white/12 bg-[rgb(var(--azee-panel))] px-6 py-5">
+              <h2 className="text-sm font-semibold text-[rgb(var(--azee-chalk))]">
+                Others in {quote.sector}
+              </h2>
+              <p className="mt-1 text-[11px] leading-relaxed text-white/45">
+                {peers.length > PEER_CAP
+                  ? `The ${PEER_CAP} biggest moves today of the ${peers.length} other symbols in this sector.`
+                  : `All ${peers.length} other ${peers.length === 1 ? "symbol" : "symbols"} in this sector, biggest move today first.`}
+              </p>
+              <ul className="mt-4 divide-y divide-white/8">
+                {peers.slice(0, PEER_CAP).map((peer) => {
+                  const peerUp = peer.changePercent >= 0;
+                  return (
+                    <li key={peer.symbol}>
+                      <Link
+                        to={`/market-watch/${peer.symbol}`}
+                        className="flex items-center gap-4 py-2.5 transition-colors duration-300 hover:bg-white/5"
+                      >
+                        <span className="w-24 shrink-0 text-sm font-semibold text-[rgb(var(--azee-chalk))]">
+                          {peer.symbol}
+                        </span>
+                        {/* The name is a bonus here too: absent when the
+                            directory has no entry, never guessed. */}
+                        <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
+                          {peer.name ?? ""}
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-[rgb(var(--azee-chalk))]">
+                          {fmtNum(peer.price)}
+                        </span>
+                        <span
+                          className={`w-20 shrink-0 text-right text-sm font-semibold tabular-nums ${
+                            peerUp ? "text-emerald-400" : "text-rose-400"
+                          }`}
+                        >
+                          {peerUp ? "▲ +" : "▼ "}
+                          {fmtNum(Math.abs(peer.changePercent))}%
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {peers.length > PEER_CAP ? (
+                <Link
+                  to="/market-watch"
+                  className="mt-4 inline-block text-xs font-semibold text-blue-300/90 transition-colors duration-300 hover:text-blue-200"
+                >
+                  Search {quote.sector} in Market Watch →
+                </Link>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/* Announcements already filter by symbol; this is that filter
+              pre-applied, not a new view. */}
+          <Link
+            to={`/announcements?symbol=${encodeURIComponent(quote.symbol)}`}
+            className="liquid-glass mt-6 inline-block rounded-full px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-white/15"
+          >
+            Company announcements for {quote.symbol} →
+          </Link>
         </div>
       </section>
     </Shell>

@@ -34,6 +34,28 @@ export interface StockQuote {
   changePoints?: number;
   /** Shares traded this session (live market-watch data only). */
   volume?: number;
+  /*
+   * SESSION RANGE — the day's open, high and low, plus the previous
+   * close, from the live market-watch feed (api/market/psx-watch.ts,
+   * view=watch). Only the company detail page reads them; Market Watch's
+   * table and the ETF view ignore them, which is why they are optional
+   * rather than a new required shape every consumer would have to grow.
+   *
+   * Absent means PSX PUBLISHED NO VALUE, not zero: it prints 0 in these
+   * columns for symbols with no session range (including ones showing a
+   * non-zero volume), and the parser drops a 0 rather than pass off "no
+   * range" as a price of 0.00. A symbol can therefore have a price and
+   * a volume but no day range at all. Any other quote source (the ETF
+   * view, the dev fixtures) simply never sets them.
+   */
+  open?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  /**
+   * The session's opening reference — PSX's LDCP column, equal to
+   * price − changePoints (verified against every row of the live table).
+   */
+  previousClose?: number;
   /**
    * Constituent of PSX's KMI-30 Islamic index. A statement of official
    * index membership (per the published KMI methodology), not a

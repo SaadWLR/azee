@@ -180,6 +180,9 @@ async function fetchSymbolDirectory(): Promise<SymbolDirectory> {
 /** Column positions within each row's numeric data-order sequence. */
 const WATCH_COL = {
   ldcp: 0,
+  open: 1,
+  high: 2,
+  low: 3,
   current: 4,
   change: 5,
   changePercent: 6,
@@ -245,12 +248,38 @@ function parseRow(row: string): StockQuote | null {
     )?.[1] ?? "";
   const codes = new Set(membership.split(","));
 
+  /*
+   * Session open/high/low were parsed from every row all along — they
+   * sit in the same numbers array as the fields above — and simply went
+   * unread until the company detail page had a use for them. No extra
+   * fetch or parse pass: three more reads of data already in hand.
+   *
+   * A ZERO IS "NOT PUBLISHED", NOT A PRICE. PSX prints 0 for these
+   * columns on symbols it has no session range for, including some that
+   * carry a non-zero volume (measured 2026-09-20: PRWM and GCWLPRS, both
+   * open/high/low 0 with volume 8 and 6). Passing a 0 through would put
+   * "0.00 – 0.00" on a page as if it were a real day range, so the field
+   * is left absent instead and the UI shows nothing for it.
+   */
+  const published = (value: number): number | undefined =>
+    Number.isFinite(value) && value > 0 ? round2(value) : undefined;
+
   return {
     symbol,
     price: round2(price),
     changePercent: round2(changePercent),
     changePoints: round2(changePoints),
     volume: Math.round(numbers[WATCH_COL.volume]),
+    open: published(numbers[WATCH_COL.open]),
+    dayHigh: published(numbers[WATCH_COL.high]),
+    dayLow: published(numbers[WATCH_COL.low]),
+    /*
+     * The previous close the check above already derived. It is not a
+     * second opinion on PSX's own LDCP column: measured across all 495
+     * rows on 2026-09-20, price − change equalled LDCP everywhere except
+     * the misaligned "786" row, which this parser drops anyway.
+     */
+    previousClose: round2(previousClose),
     isKmi30: codes.has("KMI30"),
     isKmiAllShare: codes.has("KMIALLSHR"),
   };
