@@ -817,6 +817,24 @@ export function AnnouncementsPage() {
                     may be missing.{" "}
                   </>
                 )}
+                {/*
+                 * The anchor fell out of reach, so this page is the bare
+                 * offset one (see AnnouncementsResponse.anchored). That
+                 * is the repeat-or-skip behaviour the anchoring exists to
+                 * prevent, and it is the reader's business: without this
+                 * line the page would quietly serve it as if nothing had
+                 * changed. Same placement and treatment as the stale
+                 * notice above, for the same reason.
+                 */}
+                {data?.anchored === false && (
+                  <>
+                    <span className="font-semibold text-gray-300">
+                      Showing by position, not by continuation —
+                    </span>{" "}
+                    too many filings arrived since the previous page loaded, so
+                    a few entries here may repeat or be missing.{" "}
+                  </>
+                )}
                 Announcements are shown exactly as filed with the Pakistan Stock
                 Exchange — titles are the companies&apos; own wording, and each
                 links to the original PSX document. AZEE does not summarize or
