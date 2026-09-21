@@ -88,12 +88,19 @@ interface ClosingRange {
  * chart on this page already loaded — no second fetch, and no backend
  * field for it.
  *
- * CLOSING PRICES, and labelled that way in the UI. PSX publishes no
- * rolling 52-week extreme, and the archive carries one close per session
- * rather than each session's high and low, so a true intraday 52-week
- * high is not derivable from what this page holds. Calling a closing
- * extreme "the 52-week high" would overstate it by whatever the highest
- * intraday spike added.
+ * CLOSING PRICES, and labelled that way in the UI. The archive carries
+ * one close per session rather than each session's high and low, so a
+ * true intraday 52-week high is not derivable from what this page holds.
+ * Calling a closing extreme "the 52-week high" would overstate it by
+ * whatever the highest intraday spike added.
+ *
+ * The card says what AZEE computed and from what, and deliberately makes
+ * no claim about what other sources publish. It once said "PSX publishes
+ * no rolling 52-week extreme", which was false: PSX's company pages do
+ * publish one (checked 2026-09-21). That page is not used here — its
+ * data is gated on an open licensing question — and no comparison is
+ * implied either way, though for one thin stock (PRWM) its stated low
+ * sat above 191 of the year's 220 closes in this same archive.
  *
  * The window is counted in calendar days from the newest session, the
  * same convention IndexHistoryChart's range tabs use, so the "1Y" chart
@@ -451,11 +458,11 @@ export function StockDetailPage() {
                 <span className="ml-2 text-sm font-semibold text-white/45">PKR</span>
               </p>
               <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-                Highest and lowest CLOSING price across {range.sessions} sessions,{" "}
-                {fmtDate(range.from)} to {fmtDate(range.to)}. PSX publishes no
-                rolling 52-week extreme and the archive carries closes rather
-                than each session's high and low, so an intraday high above this
-                is possible.
+                Computed by AZEE from the highest and lowest CLOSING price across{" "}
+                {range.sessions} sessions of the Pakistan Stock Exchange&apos;s
+                end-of-day archive, {fmtDate(range.from)} to {fmtDate(range.to)}.
+                Closes only, so a session may have traded above or below this
+                range intraday.
               </p>
             </div>
           ) : null}
