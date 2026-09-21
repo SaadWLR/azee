@@ -280,6 +280,41 @@ body {
   animation-play-state: paused;
 }
 
+/*
+ * Reduced motion: the tape stands still and scrolls sideways by hand
+ * instead, so every quote stays reachable. The second copy exists only
+ * to make the loop seamless, so it drops out and each quote shows once.
+ * These rules are unlayered, so they beat the overflow-hidden utility
+ * on the same element.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-mask {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ticker-mask::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * As a scroller it becomes a tab stop, but the mask swallows the
+   * default focus ring, so this one is drawn inside the edge.
+   */
+  .ticker-mask:focus-visible {
+    outline: 2px solid rgb(var(--azee-blue) / 0.55);
+    outline-offset: -2px;
+  }
+
+  .ticker-track {
+    animation: none;
+  }
+
+  .ticker-track > [aria-hidden="true"] {
+    display: none;
+  }
+}
+
 .ticker-mask {
   mask-image: linear-gradient(
     to right,
@@ -535,6 +570,12 @@ body {
   animation: card-float 9s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .card-float {
+    animation: none;
+  }
+}
+
 /* Extremely subtle blue rim light over the hero globe. */
 .globe-rim {
   background:
@@ -618,6 +659,17 @@ body {
   animation-name: particle-drift;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+
+/*
+ * Reduced motion: no particle field. Removed rather than frozen — the
+ * keyframes are what carry each particle into view, so a stopped one
+ * would sit parked below its section's bottom edge.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .particle {
+    display: none;
+  }
 }
 
 /*

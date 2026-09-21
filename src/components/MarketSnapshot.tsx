@@ -173,7 +173,7 @@ export function MarketSnapshot() {
           <span className="flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
               {open && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" />
               )}
               <span
                 className={`relative inline-flex h-2 w-2 rounded-full ${
