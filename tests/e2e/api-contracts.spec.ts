@@ -73,6 +73,34 @@ test("the KSE-100 feed honours the M4 contract", async ({ request }) => {
   }
 });
 
+/*
+ * An index PSX could not be read for is left out of `indices`, never
+ * fabricated, and has to be named in `missing` so the gap is reported
+ * rather than silently showing fewer rows. Whether a given index is
+ * missing today is up to PSX. What this pins is that every benchmark
+ * index is accounted for exactly once.
+ */
+test("the indices feed accounts for every benchmark index", async ({
+  request,
+}) => {
+  const response = await request.get("/api/market/indices");
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+
+  expect(Array.isArray(body.missing), "the feed lists what it could not read").toBe(
+    true,
+  );
+  const codes = [...body.indices, ...body.missing].map(
+    (index: { code: string }) => index.code,
+  );
+  expect(codes.sort()).toEqual(
+    ["KSE100", "KSE30", "ALLSHR", "KMI30", "KMIALLSHR"].sort(),
+  );
+  for (const index of body.missing) {
+    expect(typeof index.name).toBe("string");
+  }
+});
+
 /** The retired endpoint must stay retired — it costs a function slot. */
 test("/api/market/snapshot is gone, not silently restored", async ({
   request,

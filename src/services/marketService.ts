@@ -232,6 +232,7 @@ export async function getMarketIndices(): Promise<MarketIndicesResponse> {
     const asOf = new Date().toISOString();
     return mockResponse({
       indices: MARKET_INDICES.map((index) => ({ ...index, asOf })),
+      missing: [],
       status: "OPEN",
       asOf,
       source: "psx",

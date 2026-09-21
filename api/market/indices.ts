@@ -22,9 +22,11 @@ import type {
  * time and safe.
  *
  * Data integrity: every value is a real PSX tick or close. An index
- * that fails to fetch is OMITTED from the response — never fabricated,
- * never zero-filled. If every index fails (PSX unreachable) the handler
- * falls through to lastGood/503, matching snapshot.ts and watch.ts.
+ * that fails to fetch is OMITTED from `indices` — never fabricated,
+ * never zero-filled — and named in `missing`, so the gap is reported
+ * rather than left looking like a shorter list. If every index fails
+ * (PSX unreachable) the handler falls through to lastGood/503, matching
+ * snapshot.ts and watch.ts.
  */
 
 /*
@@ -158,8 +160,9 @@ async function fetchIndex(code: string, name: string): Promise<IndexResult> {
 
 /**
  * Fetches every index in parallel and returns the successful ones in
- * display order. A single index failing is tolerated (omitted); only a
- * total failure (no index resolved — PSX unreachable) throws.
+ * display order. A single index failing is tolerated (omitted from
+ * `indices`, listed in `missing`); only a total failure (no index
+ * resolved — PSX unreachable) throws.
  */
 async function fetchIndices(): Promise<MarketIndicesResponse> {
   const settled = await Promise.allSettled(
@@ -167,12 +170,15 @@ async function fetchIndices(): Promise<MarketIndicesResponse> {
   );
 
   const results: IndexResult[] = [];
+  const missing: MarketIndicesResponse["missing"] = [];
   settled.forEach((result, i) => {
     if (result.status === "fulfilled") {
       results.push(result.value);
     } else {
-      // Never fabricate a value for a failed index — log and omit it.
+      // Never fabricate a value for a failed index — log it, omit it,
+      // and say which one is missing.
       console.error(`Index "${INDICES[i].code}" failed:`, result.reason);
+      missing.push({ code: INDICES[i].code, name: INDICES[i].name });
     }
   });
 
@@ -190,6 +196,7 @@ async function fetchIndices(): Promise<MarketIndicesResponse> {
 
   return {
     indices: results.map((r) => r.quote),
+    missing,
     status,
     asOf: new Date(freshestTs * 1000).toISOString(),
     source: "psx",
@@ -201,8 +208,21 @@ async function fetchIndices(): Promise<MarketIndicesResponse> {
 /** Survives warm invocations; the graceful answer when PSX is down. */
 let lastGood: MarketIndicesResponse | null = null;
 
-function cacheControl(status: MarketStatus): string {
-  return status === "OPEN"
+/**
+ * For anything short of a complete, fresh read: the lastGood fallback,
+ * and a set with an index missing. Either is one failed upstream read
+ * away from the real answer, so it must not hold the edge for long.
+ */
+const DEGRADED_CACHE_CONTROL = "s-maxage=30, stale-while-revalidate=600";
+
+function cacheControl(indices: MarketIndicesResponse): string {
+  // A partial set gets the short lifetime even after the close. Cached
+  // like a complete one, a single failed read once pinned four of five
+  // indices at the edge for the full 30-minute closed-market window
+  // (a Vercel preview, 2026-09-21), while a cache-busted request
+  // already returned all five.
+  if (indices.missing.length > 0) return DEGRADED_CACHE_CONTROL;
+  return indices.status === "OPEN"
     ? "s-maxage=60, stale-while-revalidate=300"
     : "s-maxage=1800, stale-while-revalidate=86400";
 }
@@ -214,14 +234,15 @@ export default async function handler(
   try {
     const indices = await fetchIndices();
     lastGood = indices;
-    res.setHeader("Cache-Control", cacheControl(indices.status));
+    res.setHeader("Cache-Control", cacheControl(indices));
     res.status(200).json(indices);
   } catch (error) {
     console.error("Market indices fetch failed:", error);
     if (lastGood) {
       // Serve the last verified values, clearly labelled — never
-      // fabricate market data.
-      res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=600");
+      // fabricate market data. Its `missing` travels with it: those
+      // indices were absent from the values being served.
+      res.setHeader("Cache-Control", DEGRADED_CACHE_CONTROL);
       res.status(200).json({ ...lastGood, stale: true, source: "cache" });
       return;
     }

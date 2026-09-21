@@ -95,6 +95,13 @@ function formatClosedAsOf(asOfMs: number): string {
   return `As of ${time} PKT · market closed`;
 }
 
+/** "A", "A and B", "A, B and C" — for naming indices in a sentence. */
+function joinNames(names: string[]): string {
+  return names.length <= 1
+    ? names.join("")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 function DirectionArrow({ direction }: { direction: Direction }) {
   return direction === "up" ? (
     <span className="text-emerald-400">▲</span>
@@ -138,10 +145,14 @@ export function MarketSnapshot() {
   const { data: watchStats } = useMarketWatchStats();
   const { data: news } = useLatestNews();
   // KSE-100 is already the panel's hero value, so the strip shows only
-  // the OTHER benchmark indices. Whatever the feed omits simply isn't
-  // rendered — never a fabricated placeholder.
+  // the OTHER benchmark indices. One the feed could not read gets no
+  // row — never a fabricated placeholder — and the strip says it is
+  // missing rather than quietly showing fewer rows.
   const otherIndices =
     indices?.indices.filter((index) => index.code !== "KSE100") ?? [];
+  const missingNames = (indices?.missing ?? [])
+    .filter((index) => index.code !== "KSE100")
+    .map((index) => index.name);
   const sessionStats = SESSION_STAT_LABELS.map((label) =>
     watchStats?.find((stat) => stat.label === label),
   ).filter((stat): stat is MarketStat => stat !== undefined);
@@ -230,17 +241,27 @@ export function MarketSnapshot() {
 
         {/* Other PSX benchmark indices — live from /api/market/indices.
             Reuses the session-stat sub-section pattern (label + rows);
-            renders only the indices the feed actually returned. */}
-        {otherIndices.length > 0 && (
+            rows only for the indices the feed actually returned, and a
+            note naming any it reported missing. */}
+        {(otherIndices.length > 0 || missingNames.length > 0) && (
           <div className="mt-6 border-t border-blue-200/15 pt-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
               Other Indices
             </p>
-            <div className="mt-3">
-              {otherIndices.map((index, i) => (
-                <IndexRow key={index.code} index={index} delay={1600 + i * 90} />
-              ))}
-            </div>
+            {otherIndices.length > 0 && (
+              <div className="mt-3">
+                {otherIndices.map((index, i) => (
+                  <IndexRow key={index.code} index={index} delay={1600 + i * 90} />
+                ))}
+              </div>
+            )}
+            {missingNames.length > 0 && (
+              <p className="mt-2 text-[11px] font-medium text-gray-400/90">
+                {joinNames(missingNames)}{" "}
+                {missingNames.length === 1 ? "is" : "are"} temporarily
+                unavailable.
+              </p>
+            )}
           </div>
         )}
 

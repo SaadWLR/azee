@@ -40,34 +40,80 @@ test.describe("PSX Market Snapshot panel", () => {
   test("renders the other PSX benchmark indices with live values", async ({
     page,
   }) => {
+    /*
+     * Read the exact payload the panel rendered: the snapshot and the
+     * strip share one deduplicated /api/market/indices request, so its
+     * response is the panel's data. A separate request could land on a
+     * different edge-cache entry than the page's.
+     */
+    const feeds: {
+      indices: { name: string }[];
+      missing?: { name: string }[];
+    }[] = [];
+    page.on("response", async (response) => {
+      if (new URL(response.url()).pathname !== "/api/market/indices") return;
+      if (response.ok()) feeds.push(await response.json());
+    });
+
     await page.goto("/");
     const panel = page.locator(PANEL);
     await expect(panel).toContainText("KSE-100 Index");
+    await expect.poll(() => feeds.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    // The latest one, should a 75s poll have landed in the meantime.
+    const { indices, missing = [] } = feeds[feeds.length - 1];
+    const returned = new Set(indices.map((index) => index.name));
+    const reportedMissing = new Set(missing.map((index) => index.name));
 
     // The multi-index strip (KSE-100 is the panel's hero, so it is not
-    // repeated here). Every other benchmark index the feed returns shows
-    // by name; the production feed reliably returns all five.
+    // repeated here).
     await expect(panel).toContainText("Other Indices");
-    for (const name of ["KSE-30", "KSE All Share", "KMI-30", "KMI All Share"]) {
-      await expect(panel).toContainText(name);
-    }
-
-    // Scope to the strip via its label's parent, then read the first
-    // row's value (the leading number, before the change arrow). Real
-    // data → assert a sane range, not an exact value.
     const strip = panel
       .getByText("Other Indices", { exact: true })
       .locator("xpath=..");
-    await expect
-      .poll(
-        async () => {
-          const txt = await strip.locator("p.tabular-nums").first().innerText();
-          const m = txt.replace(/,/g, "").match(/^[\d.]+/);
-          return m ? Number.parseFloat(m[0]) : 0;
-        },
-        { timeout: 20_000 },
-      )
-      .toBeGreaterThan(1000);
+
+    /*
+     * Every other benchmark index is either a row or named as
+     * temporarily unavailable. PSX does fail single index reads: on
+     * 2026-09-21 a preview's edge cache served four of five for half an
+     * hour after one failed read. A gap the API reports in `missing` is
+     * tolerated. One it drops silently, or a row the panel drops from a
+     * feed that carried it, still fails.
+     */
+    for (const name of ["KSE-30", "KSE All Share", "KMI-30", "KMI All Share"]) {
+      if (returned.has(name)) {
+        // Exact match: a row's label is the bare name, whereas the
+        // unavailable note only mentions it inside a sentence.
+        await expect(strip.getByText(name, { exact: true })).toBeVisible();
+      } else {
+        expect(
+          reportedMissing.has(name),
+          `"${name}" is neither in the feed nor reported missing by it`,
+        ).toBe(true);
+        await expect(strip.getByText(name, { exact: true })).toHaveCount(0);
+        await expect(strip).toContainText(
+          new RegExp(`${name}[^.]* temporarily unavailable\\.`),
+        );
+        test.info().annotations.push({
+          type: "missing index",
+          description: `the feed reported ${name} missing; the panel said so`,
+        });
+      }
+    }
+
+    // Read the first row's value (the leading number, before the change
+    // arrow). Real data → assert a sane range, not an exact value.
+    if (indices.some((index) => index.name !== "KSE-100")) {
+      await expect
+        .poll(
+          async () => {
+            const txt = await strip.locator("p.tabular-nums").first().innerText();
+            const m = txt.replace(/,/g, "").match(/^[\d.]+/);
+            return m ? Number.parseFloat(m[0]) : 0;
+          },
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(1000);
+    }
 
     // KSE-100 is the hero value and is never duplicated into the strip.
     expect(await strip.innerText()).not.toContain("KSE-100");

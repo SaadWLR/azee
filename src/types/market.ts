@@ -141,6 +141,13 @@ export interface MarketIndexQuote extends MarketIndex {
  */
 export interface MarketIndicesResponse {
   indices: MarketIndexQuote[];
+  /**
+   * The benchmark indices PSX could not be read for, in display order;
+   * empty when the set is complete. Every benchmark index is in exactly
+   * one of `indices` and `missing`, so a gap is always stated, never
+   * left for the reader to notice (or not) as a shorter list.
+   */
+  missing: Pick<MarketIndexQuote, "code" | "name">[];
   status: MarketStatus;
   /** ISO time of the freshest underlying PSX tick in the set. */
   asOf: string;
