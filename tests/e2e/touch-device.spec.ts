@@ -139,8 +139,38 @@ test("touch entrance animations drop the blur and still complete", async ({
 /** The mobile panel — the toggle's aria-controls target. */
 const MOBILE_MENU = "#mobile-menu";
 
-async function openMobileMenu(page: import("@playwright/test").Page) {
-  await page.goto("/");
+/*
+ * WHERE THE MENU IS OPENED, and why it is not the homepage.
+ *
+ * Measured 2026-09-21 on chromium-iphone against production. A tap does
+ * not happen until Playwright sees its target hold still across two
+ * consecutive frames. The homepage runs 17 infinite decorative
+ * animations (15 hero particles, the ticker tape, the floating card, the
+ * live-dot ping), and headless software rendering draws that page at
+ * about 3 fps — a median frame of ~500ms. So every tap sat 3.7–5.5s in
+ * that wait, while the menu's own work after each tap took 75–150ms.
+ *
+ * The three drill-down loops tap eight times each, so they spent 39–50s
+ * on the homepage against a 60s budget, and CPU contention on the runner
+ * stretched them further: one run at 60.0s failed and retried at 59.6s.
+ * The same loop on a page with no running animations measured 10–17s,
+ * and 11–16s with three browsers competing for the CPU.
+ *
+ * The menu is the same shared Navbar component on every route and
+ * nothing it asserts depends on the page behind it, so every test here
+ * opens it on /contact: static, no running animations (verified), and
+ * not one of the menu's own destinations the tests navigate to.
+ *
+ * That includes the top-level listing, which was first kept on the
+ * homepage as the page most visitors open the menu from. It taps only
+ * once, but it then checks for the absence of every group link, and on
+ * a ~3 fps page it became the slowest menu test (21–34s solo) and the
+ * one that failed under load. Nothing it asserts is homepage-specific.
+ */
+const MENU_PAGE = "/contact";
+
+async function openMobileMenu(page: import("@playwright/test").Page, path = MENU_PAGE) {
+  await page.goto(path);
   const toggle = page.getByRole("button", { name: "Open menu" });
   await toggle.waitFor({ state: "visible" });
   await toggle.tap();
