@@ -729,10 +729,14 @@ export function computeDerivativesSignal(
 
 /**
  * NOT "share near a 52-week high vs near a low", which is what this
- * signal used to claim and what kept it permanently blocked. PSX
- * publishes no rolling year of daily prices for its ~490 listed
- * stocks, and building one would mean maintaining a full year of
- * history per symbol, refreshed continuously.
+ * signal used to claim and what kept it permanently blocked. The
+ * prices for it exist: PSX's end-of-day archive holds about five years
+ * of daily closes per listed stock, and the stock-detail chart already
+ * reads it through api/market/history.ts. The cost was upkeep, not
+ * data: a 52-week extreme has to be kept current for every stock as
+ * closes enter and leave the window, while a year-ago reference price
+ * only has to land within 30 days of the mark, so the cron refreshes
+ * it on rotation from that same archive (api/cron/record-breadth.ts).
  *
  * So the description says what is actually measured: whether a stock
  * is above or below where it stood a year ago. That is a simpler

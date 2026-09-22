@@ -65,13 +65,13 @@ export interface PriceStrengthPoint {
   /**
    * (stocks trading above their ~1-year-ago price − stocks trading
    * below) / stocks compared, that session. NOT "share near a 52-week
-   * high/low" — PSX publishes no archive deep enough to track a
-   * rolling 52-week extreme for ~490 symbols affordably, so this
-   * measures something PSX-cheap instead: whether the market is
-   * broadly up or down over the past year, using one reference price
-   * per stock rather than a full price history. See
-   * api/cron/record-breadth.ts for how the reference is kept roughly
-   * current.
+   * high/low". PSX's end-of-day archive has the closes for that (about
+   * five years per listed stock), but an extreme has to be kept current
+   * for every stock as closes enter and leave the window. This measures
+   * whether the market is broadly up or down over the past year
+   * instead, using one reference price per stock from that archive
+   * rather than a full price history. See api/cron/record-breadth.ts
+   * for how the reference is kept roughly current.
    */
   share: number;
 }
@@ -106,12 +106,12 @@ export interface KseHistoryResponse {
   /**
    * Breadth readings recorded by the daily cron, oldest first.
    *
-   * NOT from PSX — PSX publishes no breadth archive, which is the
-   * whole reason this has to be accumulated a day at a time. Served
-   * from the same endpoint as `points` purely to avoid spending a
-   * Vercel function on a second history route; empty until the
-   * recorder has run, and absent entirely if the KV store is not
-   * provisioned yet.
+   * NOT from PSX — PSX publishes no breadth series, so this records
+   * the live feed's own reading a day at a time rather than deriving
+   * one from PSX's per-symbol end-of-day archives. Served from the
+   * same endpoint as `points` purely to avoid spending a Vercel
+   * function on a second history route; empty until the recorder has
+   * run, and absent entirely if the KV store is not provisioned yet.
    */
   breadthHistory?: BreadthPoint[];
   /**
@@ -141,14 +141,16 @@ export interface KseHistoryResponse {
   /**
    * Price-strength readings recorded by the daily cron, oldest first.
    *
-   * NOT from a PSX archive — PSX publishes no rolling 52-week
-   * high/low history for its ~490 listed stocks, which is why this
-   * measures something PSX-cheap instead: the share of stocks trading
-   * above vs below their price from roughly a year ago. Served from
-   * this endpoint for the same reason the other recorded histories
-   * are: a second history route would spend a Vercel function this
-   * project cannot spare. Empty until the recorder has run, and
-   * absent entirely if the KV store is not provisioned yet.
+   * Recorded, not fetched: PSX publishes no series of this share. Its
+   * inputs are PSX's (today's quotes, and each stock's close from about
+   * a year earlier out of its end-of-day archive), but the reading only
+   * exists once the cron computes and stores it. See PriceStrengthPoint
+   * for why it compares against a year-ago price rather than a 52-week
+   * high/low. Served from this endpoint for the same reason the other
+   * recorded histories are: a second history route would spend a
+   * Vercel function this project cannot spare. Empty until the
+   * recorder has run, and absent entirely if the KV store is not
+   * provisioned yet.
    */
   priceStrengthHistory?: PriceStrengthPoint[];
   asOf: string;

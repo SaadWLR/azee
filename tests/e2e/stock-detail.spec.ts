@@ -258,10 +258,15 @@ test("the indicators section states who computed it, and recommends nothing", as
     .locator("..");
   await expect(section).toBeVisible({ timeout: 20_000 });
 
-  // Whose numbers these are, and what they are not.
+  /*
+   * Whose numbers these are. Only what AZEE computed: no claim about
+   * what PSX or anyone else publishes, which is how the 52-week card
+   * went wrong.
+   */
   await expect(section).toContainText(
-    "Computed by AZEE from the Pakistan Stock Exchange's published closing prices — PSX does not publish these figures",
+    "Computed by AZEE from the Pakistan Stock Exchange's published closing prices. SMA-50 and SMA-200",
   );
+  await expect(section).not.toContainText("does not publish");
   await expect(section).toContainText("Wilder's smoothing");
   await expect(section).toContainText("Information only, not investment advice");
 

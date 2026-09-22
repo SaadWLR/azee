@@ -548,7 +548,7 @@ export function StockDetailPage() {
               </div>
               <p className="mt-4 max-w-3xl text-[11px] leading-relaxed text-white/45">
                 Computed by AZEE from the Pakistan Stock Exchange&apos;s published
-                closing prices — PSX does not publish these figures. SMA-
+                closing prices. SMA-
                 {SMA_SHORT} and SMA-{SMA_LONG} are the mean closing price of the
                 last {SMA_SHORT} and {SMA_LONG} sessions; RSI-{RSI_PERIOD} uses
                 Wilder&apos;s smoothing over {RSI_PERIOD} sessions. All three run
