@@ -3,7 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { IndexHistoryChart } from "./IndexHistoryChart";
-import { useAllMarketQuotes, useIndexHistory } from "../hooks/useMarketData";
+import {
+  useAllMarketQuotes,
+  useCompanyDetail,
+  useIndexHistory,
+} from "../hooks/useMarketData";
+import {
+  FundamentalsSection,
+  ProfileSection,
+} from "./CompanyDetailSections";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { rsi, rsiZone, sma } from "../lib/indicators";
 import type { StockQuote } from "../types";
@@ -97,10 +105,13 @@ interface ClosingRange {
  * The card says what AZEE computed and from what, and deliberately makes
  * no claim about what other sources publish. It once said "PSX publishes
  * no rolling 52-week extreme", which was false: PSX's company pages do
- * publish one (checked 2026-09-21). That page is not used here — its
- * data is gated on an open licensing question — and no comparison is
- * implied either way, though for one thin stock (PRWM) its stated low
- * sat above 191 of the year's 220 closes in this same archive.
+ * publish one (checked 2026-09-21).
+ *
+ * This page now reads that same PSX page for the Fundamentals and
+ * Profile sections below, and still does NOT take its 52-week range.
+ * That is a deliberate choice rather than an oversight: for PRWM, PSX's
+ * stated low sat above 191 of the year's 220 closes in this same
+ * archive, so the range computed here is kept as the page's only one.
  *
  * The window is counted in calendar days from the newest session, the
  * same convention IndexHistoryChart's range tabs use, so the "1Y" chart
@@ -253,6 +264,14 @@ export function StockDetailPage() {
    * worth looking at, and the two answers are independent.
    */
   const history = useIndexHistory(symbol);
+
+  /*
+   * A third independent fetch, and independent for the same reasons:
+   * PSX's Data Portal page is a 60-80KB HTML document behind a six-hour
+   * cache, and nothing above it should wait on that. It supplies the
+   * Fundamentals and Profile sections and nothing else on this page.
+   */
+  const company = useCompanyDetail(symbol);
 
   /*
    * Both derived from data already on the page — the archive the chart
@@ -613,6 +632,25 @@ export function StockDetailPage() {
                 </Link>
               ) : null}
             </section>
+          ) : null}
+
+          {/* Fundamentals and Profile, from PSX's Data Portal page for
+              this symbol — one fetch serving both. An ETF symbol
+              redirects to a different page type that carries neither,
+              which comes back as kind "etf" and renders nothing rather
+              than two empty cards. A failed fetch says so quietly: the
+              live quote above it is unaffected and still correct. */}
+          {company.data?.kind === "company" ? (
+            <>
+              <FundamentalsSection detail={company.data} />
+              <ProfileSection detail={company.data} />
+            </>
+          ) : null}
+          {company.error ? (
+            <p className="mt-6 text-[11px] leading-relaxed text-white/45">
+              PSX&apos;s company details for {quote.symbol} are temporarily
+              unavailable.
+            </p>
           ) : null}
 
           {/* Announcements already filter by symbol; this is that filter

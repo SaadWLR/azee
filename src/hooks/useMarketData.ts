@@ -1,6 +1,7 @@
 import {
   getAllMarketQuotes,
   getCommodities,
+  getCompanyDetail,
   getEtfs,
   getForex,
   getFullIndices,
@@ -255,6 +256,23 @@ const fetchFearOptimismDetail = async (): Promise<FearOptimismDetail> => {
 
 export function useFearOptimismDetail() {
   return useAsyncData(fetchFearOptimismDetail, { intervalMs: 75_000 });
+}
+
+/**
+ * One listed company's PSX profile and fundamentals.
+ *
+ * NOT POLLED. Financials move when a company reports and the profile
+ * moves when it changes auditor; the endpoint caches for six hours for
+ * the same reason. The live half of this page — quote, day range —
+ * polls on its own and is unaffected.
+ *
+ * The fetcher is rebuilt when the symbol changes so navigating between
+ * two companies refetches, rather than showing the first company's
+ * fundamentals under the second one's name.
+ */
+export function useCompanyDetail(symbol: string) {
+  const fetcher = useCallback(() => getCompanyDetail(symbol), [symbol]);
+  return useAsyncData(fetcher);
 }
 
 export function useAllMarketQuotes() {

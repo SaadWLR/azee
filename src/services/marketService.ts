@@ -1,5 +1,6 @@
 import { apiGet, mockResponse } from "../lib/apiClient";
 import type { ForexResponse } from "../types/forex";
+import type { CompanyDetailResponse } from "../types/listed-company";
 import type {
   EodPoint,
   KseHistoryResponse,
@@ -622,4 +623,129 @@ export async function getAllMarketQuotes(): Promise<StockQuote[]> {
   }
   const watch = await apiGet<MarketWatchResponse>("/api/market/watch");
   return watch.quotes;
+}
+
+/** PSX's Capital Stake notice, as the live endpoint returns it. */
+const DEV_ATTRIBUTION =
+  "Data powered by Capital Stake. To provide comparable data, information might have been standardized. The data presented may therefore differ from issuer's annual report and 'as reported' data should be obtained directly from the source issuer.";
+
+/**
+ * A company-detail payload for `vite dev`, shaped by symbol so each
+ * awkward real-world case is reachable locally:
+ *   *ETF    → PSX's ETF redirect, neither section
+ *   *NV     → a share class: profile present but blank, no tables
+ *   HBL     → a bank: "Mark-up Earned", and a "Total Income" row too
+ *   GEMNETS → a recent listing: one annual column, two ratio columns
+ *   PRWM    → no revenue row at all, and a blank cell mid-row
+ */
+function devCompanyDetail(
+  code: string,
+  kind: "company" | "etf",
+): CompanyDetailResponse {
+  const base = {
+    symbol: code,
+    footnotes: [{ marker: "**", meaning: "Based on unconsolidated financials" }],
+    attribution: DEV_ATTRIBUTION,
+    asOf: new Date().toISOString(),
+    source: "psx" as const,
+  };
+  if (kind === "etf") {
+    return { ...base, kind, profile: null, fundamentals: null, footnotes: [], attribution: null };
+  }
+
+  const blankClass = code.endsWith("NV");
+  const bank = code === "HBL";
+  const recent = code === "GEMNETS";
+  const noRevenue = code === "PRWM";
+
+  const years = recent ? ["2025"] : ["2025", "2024", "2023", "2022"];
+  const cut = <T,>(row: T[]) => row.slice(0, years.length);
+  const revenueLabel = bank ? "Mark-up Earned" : "Sales";
+  const rows = [
+    ...(noRevenue
+      ? []
+      : [{ label: revenueLabel, values: cut(["1,662,640", "1,532,110", "1,401,884", "1,205,003"]) }]),
+    ...(bank
+      ? [{ label: "Total Income", values: cut(["320,648,511", "313,235,711", "277,297,213", "190,393,360"]) }]
+      : []),
+    { label: "Profit after Taxation", values: cut(["91,123", "86,655", "153,129", "349,904"]) },
+    { label: "EPS", values: cut(["4.93", "4.69", "8.29", "18.93"]) },
+  ];
+
+  return {
+    ...base,
+    kind,
+    profile: blankClass
+      ? { keyPeople: [], isEmpty: true }
+      : {
+          description: `${code} is a fixture company used while running the site locally. Deployed builds read PSX's Data Portal instead.`,
+          keyPeople: [
+            { name: "Muhammad Nassir Salim", role: "CEO" },
+            { name: "Sultan Ali Allana", role: "Chairperson" },
+          ],
+          address: "9th Floor, Habib Bank tower, Jinnah Avenue, Blue Area, Islamabad",
+          website: "www.example.com.pk",
+          registrar: "CDC Share Registrar Services Limited",
+          auditor: "A.F. Ferguson & Co. Chartered Accountants",
+          fiscalYearEnd: bank ? "December" : "June",
+          isEmpty: false,
+        },
+    fundamentals: {
+      peRatioTtm: blankClass ? null : "6.89",
+      peFootnotes: blankClass ? [] : ["**"],
+      marketCapThousands: "444,896,365.68",
+      shares: "1,466,852,508",
+      freeFloatShares: "586,741,003",
+      freeFloatPercent: "40.00%",
+      unitsNote: "All numbers in thousands (000's) except EPS",
+      annual: blankClass ? null : { periods: years, rows },
+      quarterly: blankClass
+        ? null
+        : {
+            periods: ["Q3 2026", "Q2 2026", "Q1 2026", "Q3 2025"],
+            rows: rows.map((r) => ({
+              label: r.label,
+              values: r.values.length === 1 ? ["12,789", "10,979", "30,284", "13,709"] : r.values,
+            })),
+          },
+      ratios: blankClass
+        ? null
+        : {
+            // Deliberately one period longer than a recent listing's
+            // financials, and carrying a gap, exactly as PSX serves it.
+            periods: recent ? ["2025", "2024"] : years,
+            rows: [
+              { label: "Net Profit Margin (%)", values: recent ? ["3.81", "17.68"] : cut(["9.84", "7.39", "8.48", "7.55"]) },
+              { label: "EPS Growth (%)", values: recent ? ["(45.35)", null] : cut(["10.08", "(0.15)", "84.22", "(9.93)"]) },
+              { label: "PEG", values: recent ? ["(0.39)", null] : cut(["0.75", "(29.12)", "0.03", "(0.30)"]) },
+            ],
+          },
+    },
+  };
+}
+
+/**
+ * One listed company's profile and fundamentals from PSX's Data Portal.
+ *
+ * The dev fixture deliberately models the AWKWARD shapes rather than a
+ * tidy one, because those are what the UI has to survive: a bank's
+ * "Mark-up Earned" row, a company with no revenue row at all, one
+ * annual column instead of four, ratios reaching a year further back
+ * than the financials, blank cells mid-row, an empty profile, and the
+ * ETF answer. A fixture where everything is present would let a
+ * regression in any of those reach production unseen.
+ */
+export function getCompanyDetail(
+  symbol: string,
+): Promise<CompanyDetailResponse> {
+  const code = symbol.toUpperCase();
+  if (import.meta.env.DEV) {
+    if (code.endsWith("ETF")) {
+      return mockResponse(devCompanyDetail(code, "etf"));
+    }
+    return mockResponse(devCompanyDetail(code, "company"));
+  }
+  return apiGet<CompanyDetailResponse>(
+    `/api/company/detail?symbol=${encodeURIComponent(code)}`,
+  );
 }
