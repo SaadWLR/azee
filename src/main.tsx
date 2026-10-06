@@ -88,6 +88,30 @@ const EconomicDashboardPage = lazy(() =>
   })),
 );
 
+/*
+ * Interface-only routes: the layout is real, the data is honestly
+ * absent until a verified source is connected. See PendingPage.
+ */
+const IpoPage = lazy(() =>
+  import("./components/IpoPage").then((m) => ({ default: m.IpoPage })),
+);
+
+const EconomicCalendarPage = lazy(() =>
+  import("./components/EconomicCalendarPage").then((m) => ({
+    default: m.EconomicCalendarPage,
+  })),
+);
+
+const GlobalIndicesPage = lazy(() =>
+  import("./components/GlobalIndicesPage").then((m) => ({
+    default: m.GlobalIndicesPage,
+  })),
+);
+
+const CryptoPage = lazy(() =>
+  import("./components/CryptoPage").then((m) => ({ default: m.CryptoPage })),
+);
+
 const ForexPage = lazy(() =>
   import("./components/ForexPage").then((m) => ({
     default: m.ForexPage,
@@ -245,6 +269,38 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoading />}>
             <EconomicDashboardPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/ipo",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <IpoPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/economic-calendar",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <EconomicCalendarPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/global-indices",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <GlobalIndicesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/crypto",
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <CryptoPage />
           </Suspense>
         ),
       },

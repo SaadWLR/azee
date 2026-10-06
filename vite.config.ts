@@ -24,6 +24,17 @@ function buildSitemap(): string {
     { path: "/forex", changefreq: "daily", priority: "0.8" },
     { path: "/economic-dashboard", changefreq: "monthly", priority: "0.5" },
     { path: "/mutual-funds", changefreq: "monthly", priority: "0.5" },
+    /*
+     * Interface-only routes. Listed like /mutual-funds, which has been
+     * indexed in this shape since it was built: the route is real and
+     * its pending state is honest about carrying no data yet. Monthly
+     * and low priority, because nothing on them changes until a source
+     * is connected.
+     */
+    { path: "/ipo", changefreq: "monthly", priority: "0.5" },
+    { path: "/economic-calendar", changefreq: "monthly", priority: "0.5" },
+    { path: "/global-indices", changefreq: "monthly", priority: "0.5" },
+    { path: "/crypto", changefreq: "monthly", priority: "0.5" },
     { path: "/etfs", changefreq: "hourly", priority: "0.8" },
     { path: "/announcements", changefreq: "hourly", priority: "0.8" },
     { path: "/corporate-calendar", changefreq: "daily", priority: "0.8" },

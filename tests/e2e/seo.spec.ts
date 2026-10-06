@@ -47,6 +47,18 @@ const ROUTE_TITLES: [path: string, title: RegExp][] = [
     "/get-started",
     /^Open an Account — Talk to AZEE Securities \| AZEE Trade$/,
   ],
+  // Interface-only routes. They carry no data yet, but each is a real
+  // indexed route and must still have its own title and description.
+  ["/ipo", /^IPOs — Pakistan Stock Exchange New Listings \| AZEE Trade$/],
+  [
+    "/economic-calendar",
+    /^Economic Calendar — Pakistan Data Release Schedule \| AZEE Trade$/,
+  ],
+  [
+    "/global-indices",
+    /^Global Indices — World Market Benchmarks \| AZEE Trade$/,
+  ],
+  ["/crypto", /^Crypto Prices \| AZEE Trade$/],
 ];
 
 test("each route sets its own distinct title and meta description", async ({
@@ -96,6 +108,10 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     "/forex",
     "/economic-dashboard",
     "/mutual-funds",
+    "/ipo",
+    "/economic-calendar",
+    "/global-indices",
+    "/crypto",
     "/about",
     "/contact",
     "/get-started",
@@ -115,9 +131,10 @@ test("sitemap.xml is valid and lists every real route, module slugs included", a
     // The trailing "<" ensures an exact <loc> match, not a prefix.
     expect(body).toContain(`<loc>https://azee.vercel.app${path}</loc>`);
   }
-  // 31 URLs — eleven top routes, three company/trust pages, eight
-  // modules, nine legal pages. The 404 route is deliberately absent:
-  // it is a real component but must never be indexed.
-  expect(body.match(/<loc>/g)?.length).toBe(31);
+  // 35 URLs — eleven top routes, four interface-only routes, three
+  // company/trust pages, eight modules, nine legal pages. The 404
+  // route is deliberately absent: it is a real component but must
+  // never be indexed.
+  expect(body.match(/<loc>/g)?.length).toBe(35);
   expect(body).not.toContain("<loc>https://azee.vercel.app/404</loc>");
 });
