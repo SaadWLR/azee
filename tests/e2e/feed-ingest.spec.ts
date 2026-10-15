@@ -19,12 +19,29 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
  *                            FEED_INGEST_SECRET unset
  *   FEED_TEST_UNSET_BYPASS   that preview's protection-bypass value, sent
  *                            as a header to that host only
+ *   FEED_TEST_EXTRA_PRODUCTION_HOSTS
+ *                            optional, comma-separated: more hosts to
+ *                            refuse, on top of the defaults below
  *
  * Every quote below is SYNTHETIC — "ZZSYN" symbols, labelled in their
  * name — and exists only in the preview namespace for the run.
  */
 
-const PRODUCTION_HOSTS = ["azee.vercel.app"];
+/*
+ * Hosts this spec must never write to. The defaults are the production
+ * alias and the public domain; FEED_TEST_EXTRA_PRODUCTION_HOSTS
+ * (comma-separated) adds any others. This is the first guard; the
+ * preview-namespace check in beforeAll is the second, and still runs.
+ */
+const PRODUCTION_HOSTS = [
+  "azee.vercel.app",
+  "azeetrade.com",
+  "www.azeetrade.com",
+  ...(process.env.FEED_TEST_EXTRA_PRODUCTION_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean),
+];
 const PREVIEW_KEYS = ["preview:feed:market-watch", "preview:feed:market-watch:meta"];
 const SYNTHETIC_NAME = "SYNTHETIC TEST FIXTURE - not market data";
 
@@ -109,7 +126,7 @@ const AUTH = () => `Bearer ${secret}`;
 
 test.beforeAll(async ({ request, baseURL }) => {
   if (!secret || !kvUrl || !kvToken) return;
-  const host = new URL(baseURL ?? "").host;
+  const host = new URL(baseURL ?? "").hostname.toLowerCase();
   if (PRODUCTION_HOSTS.includes(host)) {
     throw new Error(`feed-ingest.spec refuses to run against production (${host})`);
   }
@@ -287,4 +304,71 @@ test("a deployment with FEED_INGEST_SECRET unset can never write", async ({ requ
   }
   const after = await readWatch(request);
   expect(after.body.asOf).toBe(before.body.asOf);
+});
+
+/*
+ * The partial-read guard compares counts within one PKT trading day only.
+ * These run on a clean store and use fixed timestamps two PKT days back,
+ * so they never collide with the "now"-relative snapshots above. The
+ * boundary pair is 23:59 and 00:01 PKT, and the first day is written in
+ * Z form on purpose: 00:01 PKT is 19:01Z on the PREVIOUS UTC date, so a
+ * guard keyed on the UTC date would treat it as the same day.
+ */
+const PKT_MS = 5 * 60 * 60 * 1000;
+const pktDay = (offsetDays: number) =>
+  new Date(Date.now() + PKT_MS + offsetDays * 86_400_000).toISOString().slice(0, 10);
+const DAY_1 = pktDay(-2);
+const DAY_2 = pktDay(-1);
+
+test.describe("partial-read guard across the PKT day boundary", () => {
+  test.beforeAll(async () => {
+    if (!secret || !kvUrl || !kvToken) return;
+    await deletePreviewKeys();
+  });
+
+  test("23:59 is still day 1: a drop below 80% is rejected partial_snapshot", async ({ request }) => {
+    // 23:57 and 23:59 PKT on DAY_1, written as 18:57Z and +05:00.
+    const evening = board(100, { asOf: `${DAY_1}T18:57:00Z` });
+    expect((await post(request, evening, AUTH())).status()).toBe(200);
+
+    const late = await post(request, board(79, { asOf: `${DAY_1}T23:59:00+05:00` }), AUTH());
+    expect(late.status()).toBe(400);
+    expect((await late.json()).reason).toBe("partial_snapshot");
+    const { body } = await readWatch(request);
+    expect(body.asOf).toBe(evening.asOf);
+    expect(body.quotes).toHaveLength(100);
+  });
+
+  test("00:01 is day 2: a board far below 80% of the prior day's is accepted", async ({ request }) => {
+    // 00:01 PKT on DAY_2 is 19:01Z on DAY_1, the same UTC date as above.
+    const morning = board(10, { asOf: `${DAY_1}T19:01:00Z` });
+    const response = await post(request, morning, AUTH());
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toMatchObject({ accepted: true, symbols: 10 });
+    const { body } = await readWatch(request);
+    expect(body.asOf).toBe(morning.asOf);
+    expect(body.quotes).toHaveLength(10);
+  });
+
+  test("within day 2 the guard applies again, against the day's first board", async ({ request }) => {
+    const short = await post(request, board(7, { asOf: `${DAY_2}T00:02:00+05:00` }), AUTH());
+    expect(short.status()).toBe(400);
+    expect((await short.json()).reason).toBe("partial_snapshot");
+
+    const enough = board(8, { asOf: `${DAY_2}T00:03:00+05:00` });
+    expect((await post(request, enough, AUTH())).status()).toBe(200);
+    const { body } = await readWatch(request);
+    expect(body.asOf).toBe(enough.asOf);
+  });
+
+  test("an older asOf is still out_of_order, same day or the day before", async ({ request }) => {
+    for (const asOf of [`${DAY_2}T00:01:30+05:00`, `${DAY_1}T23:59:00+05:00`]) {
+      const response = await post(request, board(100, { asOf }), AUTH());
+      expect(response.status(), asOf).toBe(400);
+      expect((await response.json()).reason, asOf).toBe("out_of_order");
+    }
+    const { body } = await readWatch(request);
+    expect(body.asOf).toBe(`${DAY_2}T00:03:00+05:00`);
+    expect(body.quotes).toHaveLength(8);
+  });
 });

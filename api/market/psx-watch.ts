@@ -637,6 +637,14 @@ const FEED_MAX_FUTURE_MS = 2 * 60 * 1000;
  * log read. A HEURISTIC, not a PSX rule: PSX publishes no minimum
  * board size, and a real mass suspension would be rejected too until
  * the agent's read recovers.
+ *
+ * SAME PKT TRADING DAY ONLY. The check applies only when the new
+ * snapshot's asOf and the previous one's fall on the same PKT calendar
+ * date (UTC+5, no DST — see pktDate). The first snapshot of a new day
+ * skips it: a morning board can legitimately list only the symbols
+ * traded so far, and measuring it against yesterday's closing count
+ * would reject every snapshot until the day's count caught up, or
+ * forever. That first snapshot then becomes the day's baseline.
  */
 const FEED_MIN_SYMBOL_RATIO = 0.8;
 
@@ -665,6 +673,17 @@ function feedNamespace(): { prefix: string; name: "production" | "preview" } {
 function feedKeys(): { data: string; meta: string } {
   const { prefix } = feedNamespace();
   return { data: `${prefix}${FEED_KEY}`, meta: `${prefix}${FEED_KEY}:meta` };
+}
+
+/**
+ * The PKT calendar date ("YYYY-MM-DD") of an ISO timestamp, whatever
+ * offset it was written with: shift the instant by +5 h and read the
+ * UTC date. Pakistan keeps no DST, so the offset is fixed. 23:59 PKT is
+ * 18:59Z the same date; 00:01 PKT is 19:01Z the PREVIOUS UTC date, which
+ * is why the UTC date of asOf would put the boundary in the wrong place.
+ */
+function pktDate(iso: string): string {
+  return new Date(Date.parse(iso) + PKT_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /** What validation needs from the previous snapshot, kept apart from the blob. */
@@ -952,7 +971,10 @@ async function ingestFeed(req: VercelRequest, res: VercelResponse) {
       rejectFeed(res, 400, { reason: "out_of_order" });
       return;
     }
-    if (envelope.quotes.length < previous.symbols * FEED_MIN_SYMBOL_RATIO) {
+    if (
+      pktDate(envelope.asOf) === pktDate(previous.asOf) &&
+      envelope.quotes.length < previous.symbols * FEED_MIN_SYMBOL_RATIO
+    ) {
       rejectFeed(res, 400, { reason: "partial_snapshot" });
       return;
     }
