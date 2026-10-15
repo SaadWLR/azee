@@ -112,11 +112,23 @@ export interface MarketWatchResponse {
    * must treat its absence as "not known yet", never as zero.
    */
   breadth?: MarketBreadth;
-  /** ISO time of the underlying PSX fetch. */
+  /**
+   * ISO time of the underlying PSX fetch — or, when source is "feed",
+   * PSX's own timestamp as the office feed carried it (with its offset).
+   */
   asOf: string;
-  /** Where the payload came from. */
-  source: "psx" | "cache";
-  /** True when serving the last known-good value during an outage. */
+  /**
+   * Where the payload came from: the PSX portal ("psx"), the portal's
+   * last good table ("cache"), or the office feed ("feed",
+   * src/types/feed.ts). One response is only ever one source.
+   */
+  source: "psx" | "cache" | "feed";
+  /**
+   * True when serving the last known-good value during an outage. For
+   * a "feed" payload it is set only when the feed reported the market
+   * open, and absent when the feed did not say — absent is "not known",
+   * never "fresh".
+   */
   stale?: boolean;
 }
 

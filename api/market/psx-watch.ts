@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+import { gunzipSync, gzipSync } from "node:zlib";
 import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
@@ -7,9 +9,15 @@ import type {
   StockQuote,
 } from "../../src/types";
 import type { EtfQuote, EtfsResponse } from "../../src/types/etfs";
+import type {
+  MarketWatchFeedEnvelope,
+  StoredMarketWatchFeed,
+} from "../../src/types/feed";
 
 /**
  * GET /api/market/psx-watch?view=watch | etfs
+ * POST /api/market/psx-watch?view=watch — office feed ingest (see
+ * "Office feed" below; wire format in src/types/feed.ts)
  *
  * Both views of PSX's market-watch table behind one Vercel function.
  * They were two functions (api/market/watch.ts and api/market/etfs.ts)
@@ -286,46 +294,16 @@ function parseRow(row: string): StockQuote | null {
 }
 
 /**
- * Fetches and normalizes the live market-watch table. The raw PSX
- * payload never leaves this function.
+ * Session stats and breadth derived from a complete quote board.
+ * Shared by the portal path and the office-feed read path, so a feed
+ * snapshot that omits its own stats or breadth gets exactly the
+ * figures the portal path would compute from the same quotes — derived
+ * from that one board only, never mixed with another source.
  */
-async function fetchMarketWatch(): Promise<MarketWatchResponse> {
-  /*
-   * Both upstreams in parallel so the directory costs no added latency
-   * on the critical path — the market-watch page is the slower of the
-   * two, and this settles in about the time that one takes alone. The
-   * directory is allSettled-style by construction (it never rejects),
-   * so only the quote table can fail the request.
-   */
-  const [html, directory] = await Promise.all([
-    fetchMarketWatchHtml("market watch"),
-    fetchSymbolDirectory(),
-  ]);
-
-  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) ?? [];
-  const quotes: StockQuote[] = [];
-  for (const row of rows) {
-    const quote = parseRow(row);
-    if (!quote) continue;
-    /*
-     * Join by ticker. A symbol present in one source but not the other
-     * is normal — the directory carries 1002 entries (including debt
-     * instruments that never appear on the ready board) against ~490
-     * quoted symbols — so an unmatched quote keeps its bare ticker and
-     * is never dropped, and a directory entry with no quote is simply
-     * not rendered. Absent fields stay absent; nothing is invented.
-     */
-    const entry = directory.get(quote.symbol);
-    if (entry?.name) quote.name = entry.name;
-    if (entry?.sector) quote.sector = entry.sector;
-    quotes.push(quote);
-  }
-  if (quotes.length < MIN_VALID_ROWS) {
-    throw new Error(
-      `PSX market-watch parse yielded only ${quotes.length} valid rows — page structure may have changed`,
-    );
-  }
-
+function deriveSession(quotes: StockQuote[]): {
+  stats: MarketStat[];
+  breadth: MarketBreadth;
+} {
   const totalVolume = quotes.reduce((sum, q) => sum + (q.volume ?? 0), 0);
   const advancers = quotes.filter((q) => q.changePercent > 0).length;
   const decliners = quotes.filter((q) => q.changePercent < 0).length;
@@ -371,6 +349,52 @@ async function fetchMarketWatch(): Promise<MarketWatchResponse> {
       .filter((q) => q.changePercent < 0)
       .reduce((sum, q) => sum + (q.volume ?? 0), 0),
   };
+
+  return { stats, breadth };
+}
+
+/**
+ * Fetches and normalizes the live market-watch table. The raw PSX
+ * payload never leaves this function.
+ */
+async function fetchMarketWatch(): Promise<MarketWatchResponse> {
+  /*
+   * Both upstreams in parallel so the directory costs no added latency
+   * on the critical path — the market-watch page is the slower of the
+   * two, and this settles in about the time that one takes alone. The
+   * directory is allSettled-style by construction (it never rejects),
+   * so only the quote table can fail the request.
+   */
+  const [html, directory] = await Promise.all([
+    fetchMarketWatchHtml("market watch"),
+    fetchSymbolDirectory(),
+  ]);
+
+  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) ?? [];
+  const quotes: StockQuote[] = [];
+  for (const row of rows) {
+    const quote = parseRow(row);
+    if (!quote) continue;
+    /*
+     * Join by ticker. A symbol present in one source but not the other
+     * is normal — the directory carries 1002 entries (including debt
+     * instruments that never appear on the ready board) against ~490
+     * quoted symbols — so an unmatched quote keeps its bare ticker and
+     * is never dropped, and a directory entry with no quote is simply
+     * not rendered. Absent fields stay absent; nothing is invented.
+     */
+    const entry = directory.get(quote.symbol);
+    if (entry?.name) quote.name = entry.name;
+    if (entry?.sector) quote.sector = entry.sector;
+    quotes.push(quote);
+  }
+  if (quotes.length < MIN_VALID_ROWS) {
+    throw new Error(
+      `PSX market-watch parse yielded only ${quotes.length} valid rows — page structure may have changed`,
+    );
+  }
+
+  const { stats, breadth } = deriveSession(quotes);
 
   return {
     quotes,
@@ -553,6 +577,473 @@ async function fetchEtfs(): Promise<EtfsResponse> {
   return { etfs, asOf: new Date().toISOString(), source: "psx" };
 }
 
+/* ── Office feed: ingest (POST) and feed-first read ────────────── */
+
+/*
+ * AZEE's office receives PSX's live feed from a broadcaster. An agent
+ * there POSTs normalized snapshots (wire format v1, src/types/feed.ts)
+ * to /api/market/watch; GET then serves the latest accepted snapshot
+ * ahead of the portal scrape. With no snapshot stored, the GET path is
+ * exactly the portal path below, unchanged.
+ *
+ * AUTH is three-way, as in api/economic/dashboard.ts:
+ *  - POST with no Authorization → 401.
+ *  - POST with Authorization that isn't `Bearer ${FEED_INGEST_SECRET}`
+ *    → 401. That includes every header when FEED_INGEST_SECRET is
+ *    unset: with nothing to match, the route can never write.
+ *  - matching → validate, then store.
+ * GET never needs a credential. Every other method gets a 405 so a
+ * write can only ever arrive as an authenticated POST. Neither the
+ * secret nor the body is ever logged; rejections log a reason code.
+ *
+ * RATE. The agent POSTs at most once per 10 s. The Vercel Firewall
+ * allows 30 requests / 60 s per IP on /api/*, and the agent's POSTs
+ * carry no bypass header, so its total across ALL kinds must stay
+ * under 20/min to leave headroom for retries.
+ *
+ * QUOTA. The KV store is Upstash's Free plan: 500K commands/month and
+ * 10 GB bandwidth/month, shared with the economic dashboard and the
+ * breadth recorder. A ~495-symbol board is ~133 KB of JSON, so the
+ * stored blob is gzipped (~37 KB as base64) — uncompressed, the writes
+ * alone at one per 10 s across a session would use most of the 10 GB.
+ * Each accepted POST is one small GET (the meta key below) plus one
+ * MSET; validation never reads the big blob. GETs are served through
+ * the CDN, so KV is read only on a cache miss.
+ *
+ * ENVIRONMENT ISOLATION. Production and Preview share one KV store
+ * (the integration injects the same KV_REST_API_* into both), so every
+ * key outside production carries a "preview:" prefix. A preview, a
+ * local run or a test can never read or write production's snapshot.
+ */
+
+const FEED_KEY = "feed:market-watch";
+
+/** Body cap. A full board is ~133 KB; 1 MB is generous headroom. */
+const FEED_MAX_BODY_BYTES = 1_000_000;
+
+/** Upper bound on symbols in one snapshot (PSX quotes ~495 today). */
+const FEED_MAX_QUOTES = 3_000;
+
+/**
+ * How far ahead of the site's clock asOf may be. PSX's clock and
+ * Vercel's will never agree to the second; two minutes absorbs that
+ * skew while still rejecting a mis-zoned timestamp (an hour or more).
+ */
+const FEED_MAX_FUTURE_MS = 2 * 60 * 1000;
+
+/**
+ * PARTIAL-READ GUARD. A snapshot with fewer than this fraction of the
+ * previous accepted snapshot's symbols is rejected as a likely partial
+ * log read. A HEURISTIC, not a PSX rule: PSX publishes no minimum
+ * board size, and a real mass suspension would be rejected too until
+ * the agent's read recovers.
+ */
+const FEED_MIN_SYMBOL_RATIO = 0.8;
+
+/**
+ * Stale threshold, applied ONLY when the feed itself says the market
+ * is open. The agent sends at most every 10 s, so 120 s is a dozen
+ * missed sends — long enough that it means the agent or the
+ * broadcaster stopped, not that one POST was slow. Outside an open
+ * session a quiet feed is expected, and nothing is claimed.
+ */
+const FEED_STALE_AFTER_MS = 120 * 1000;
+
+/** The same character class the portal parser accepts in data-search. */
+const FEED_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
+
+/** ISO-8601 with an explicit offset — a bare local time is ambiguous. */
+const ISO_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+function feedNamespace(): { prefix: string; name: "production" | "preview" } {
+  return process.env.VERCEL_ENV === "production"
+    ? { prefix: "", name: "production" }
+    : { prefix: "preview:", name: "preview" };
+}
+
+function feedKeys(): { data: string; meta: string } {
+  const { prefix } = feedNamespace();
+  return { data: `${prefix}${FEED_KEY}`, meta: `${prefix}${FEED_KEY}:meta` };
+}
+
+/** What validation needs from the previous snapshot, kept apart from the blob. */
+interface FeedMeta {
+  asOf: string;
+  symbols: number;
+}
+
+/* KV REST client, inlined from api/economic/dashboard.ts (no relative runtime imports). */
+function kvConfigured(): boolean {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+}
+
+async function kv(
+  path: string,
+  init?: RequestInit,
+): Promise<{ result?: string | null }> {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) throw new Error("KV is not configured");
+  const response = await fetch(`${url}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${token}`,
+    },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`KV responded ${response.status}`);
+  return (await response.json()) as { result?: string | null };
+}
+
+function encodeSnapshot(snapshot: StoredMarketWatchFeed): string {
+  return gzipSync(JSON.stringify(snapshot)).toString("base64");
+}
+
+function decodeSnapshot(raw: string): StoredMarketWatchFeed {
+  return JSON.parse(
+    gunzipSync(Buffer.from(raw, "base64")).toString("utf8"),
+  ) as StoredMarketWatchFeed;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Constant-time `Bearer ${FEED_INGEST_SECRET}` check; false when unset. */
+function ingestAuthorized(header: string | undefined): boolean {
+  const secret = process.env.FEED_INGEST_SECRET;
+  if (!secret || header === undefined) return false;
+  const given = Buffer.from(header, "utf8");
+  const expected = Buffer.from(`Bearer ${secret}`, "utf8");
+  // timingSafeEqual throws on unequal lengths; the length itself is not
+  // secret-dependent beyond what the scheme already reveals.
+  if (given.length !== expected.length) return false;
+  return timingSafeEqual(given, expected);
+}
+
+type Rejection = { reason: string; detail?: string };
+type Validated = { ok: true; envelope: MarketWatchFeedEnvelope } | ({ ok: false } & Rejection);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const positive = (v: unknown): v is number => finite(v) && v > 0;
+const count = (v: unknown): v is number =>
+  typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+const shortString = (v: unknown, max: number): v is string =>
+  typeof v === "string" && v.length > 0 && v.length <= max;
+
+/**
+ * One quote, rebuilt field by field from the known StockQuote shape.
+ * Unknown fields are dropped rather than stored, so the site only ever
+ * serves fields it understands. Prices must be > 0 (an unpublished one
+ * is omitted, never 0); volume is a whole, non-negative share count;
+ * changes may be negative but must be finite.
+ */
+function validateQuote(raw: unknown, at: number): StockQuote | Rejection {
+  const where = `quotes[${at}]`;
+  if (!isRecord(raw)) return { reason: "bad_quote", detail: where };
+  if (typeof raw.symbol !== "string" || !FEED_SYMBOL_PATTERN.test(raw.symbol)) {
+    return { reason: "bad_symbol", detail: where };
+  }
+  if (!positive(raw.price)) return { reason: "bad_number", detail: `${where}.price` };
+  if (!finite(raw.changePercent)) {
+    return { reason: "bad_number", detail: `${where}.changePercent` };
+  }
+  const quote: StockQuote = {
+    symbol: raw.symbol,
+    price: raw.price,
+    changePercent: raw.changePercent,
+  };
+  if (raw.changePoints !== undefined) {
+    if (!finite(raw.changePoints)) return { reason: "bad_number", detail: `${where}.changePoints` };
+    quote.changePoints = raw.changePoints;
+  }
+  if (raw.volume !== undefined) {
+    if (!count(raw.volume)) return { reason: "bad_number", detail: `${where}.volume` };
+    quote.volume = raw.volume;
+  }
+  for (const field of ["open", "dayHigh", "dayLow", "previousClose"] as const) {
+    if (raw[field] === undefined) continue;
+    if (!positive(raw[field])) return { reason: "bad_number", detail: `${where}.${field}` };
+    quote[field] = raw[field];
+  }
+  for (const field of ["name", "sector"] as const) {
+    if (raw[field] === undefined) continue;
+    if (!shortString(raw[field], 200)) return { reason: "bad_quote", detail: `${where}.${field}` };
+    quote[field] = raw[field];
+  }
+  for (const field of ["isKmi30", "isKmiAllShare"] as const) {
+    if (raw[field] === undefined) continue;
+    if (typeof raw[field] !== "boolean") return { reason: "bad_quote", detail: `${where}.${field}` };
+    quote[field] = raw[field];
+  }
+  return quote;
+}
+
+function validateEnvelope(body: unknown, now: number): Validated {
+  const reject = (reason: string, detail?: string): Validated => ({ ok: false, reason, detail });
+
+  if (!isRecord(body)) return reject("invalid_json");
+  if (body.schema !== 1) return reject("bad_schema");
+  if (body.kind !== "market-watch") return reject("bad_kind");
+  if (body.complete !== true) return reject("incomplete");
+
+  if (typeof body.asOf !== "string" || !ISO_WITH_OFFSET.test(body.asOf)) {
+    return reject("bad_asof");
+  }
+  const asOfMs = Date.parse(body.asOf);
+  if (!Number.isFinite(asOfMs)) return reject("bad_asof");
+  if (asOfMs - now > FEED_MAX_FUTURE_MS) return reject("asof_in_future");
+
+  if (
+    typeof body.sentAt !== "string" ||
+    !ISO_WITH_OFFSET.test(body.sentAt) ||
+    !Number.isFinite(Date.parse(body.sentAt))
+  ) {
+    return reject("bad_sent_at");
+  }
+
+  const status = body.marketStatus;
+  if (status !== undefined && status !== "open" && status !== "closed" && status !== "unknown") {
+    return reject("bad_market_status");
+  }
+
+  if (!Array.isArray(body.quotes) || body.quotes.length === 0) return reject("no_quotes");
+  if (body.quotes.length > FEED_MAX_QUOTES) return reject("too_many_quotes");
+  const quotes: StockQuote[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < body.quotes.length; i++) {
+    const result = validateQuote(body.quotes[i], i);
+    if ("reason" in result) return reject(result.reason, result.detail);
+    if (seen.has(result.symbol)) return reject("duplicate_symbol", `quotes[${i}]`);
+    seen.add(result.symbol);
+    quotes.push(result);
+  }
+
+  const envelope: MarketWatchFeedEnvelope = {
+    schema: 1,
+    kind: "market-watch",
+    asOf: body.asOf,
+    sentAt: body.sentAt,
+    complete: true,
+    quotes,
+  };
+  if (status !== undefined) envelope.marketStatus = status;
+
+  if (body.breadth !== undefined) {
+    const b = body.breadth;
+    if (
+      !isRecord(b) ||
+      !count(b.advancers) ||
+      !count(b.decliners) ||
+      !count(b.unchanged) ||
+      !count(b.advancingVolume) ||
+      !count(b.decliningVolume)
+    ) {
+      return reject("bad_breadth");
+    }
+    envelope.breadth = {
+      advancers: b.advancers,
+      decliners: b.decliners,
+      unchanged: b.unchanged,
+      advancingVolume: b.advancingVolume,
+      decliningVolume: b.decliningVolume,
+    };
+  }
+
+  if (body.stats !== undefined) {
+    if (!Array.isArray(body.stats) || body.stats.length > 20) return reject("bad_stats");
+    const stats: MarketStat[] = [];
+    for (let i = 0; i < body.stats.length; i++) {
+      const s = body.stats[i];
+      if (
+        !isRecord(s) ||
+        !shortString(s.label, 80) ||
+        !shortString(s.value, 80) ||
+        (s.direction !== undefined && s.direction !== "up" && s.direction !== "down")
+      ) {
+        return reject("bad_stats", `stats[${i}]`);
+      }
+      const stat: MarketStat = { label: s.label, value: s.value };
+      if (s.direction !== undefined) stat.direction = s.direction;
+      stats.push(stat);
+    }
+    envelope.stats = stats;
+  }
+
+  return { ok: true, envelope };
+}
+
+function rejectFeed(res: VercelResponse, status: number, rejection: Rejection) {
+  // The reason code only — never the body, which is market data.
+  console.warn(`Feed ingest rejected (${status}): ${rejection.reason}`);
+  res.status(status).json({
+    accepted: false,
+    reason: rejection.reason,
+    ...(rejection.detail ? { detail: rejection.detail } : {}),
+  });
+}
+
+async function ingestFeed(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Cache-Control", "no-store");
+  // Which KV namespace this deployment writes to — lets a test refuse
+  // to proceed before it ever sends a credential to production.
+  res.setHeader("X-Feed-Namespace", feedNamespace().name);
+
+  if (!ingestAuthorized(req.headers.authorization)) {
+    console.warn("Feed ingest rejected (401): unauthorized");
+    res.setHeader("WWW-Authenticate", "Bearer");
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const declared = Number(req.headers["content-length"]);
+  if (Number.isFinite(declared) && declared > FEED_MAX_BODY_BYTES) {
+    rejectFeed(res, 400, { reason: "body_too_large" });
+    return;
+  }
+  let body: unknown;
+  try {
+    body = req.body; // @vercel/node parses JSON lazily and throws on bad JSON
+  } catch {
+    rejectFeed(res, 400, { reason: "invalid_json" });
+    return;
+  }
+  // A chunked body has no Content-Length; measure what actually arrived.
+  if (isRecord(body) && Buffer.byteLength(JSON.stringify(body)) > FEED_MAX_BODY_BYTES) {
+    rejectFeed(res, 400, { reason: "body_too_large" });
+    return;
+  }
+
+  const now = Date.now();
+  const result = validateEnvelope(body, now);
+  if (!result.ok) {
+    rejectFeed(res, 400, result);
+    return;
+  }
+  const { envelope } = result;
+  const keys = feedKeys();
+
+  let previous: FeedMeta | null;
+  try {
+    const raw = (await kv(`/get/${encodeURIComponent(keys.meta)}`)).result;
+    previous = raw ? (JSON.parse(raw) as FeedMeta) : null;
+  } catch (error) {
+    // Without the previous snapshot neither guard below can be checked,
+    // so nothing is written.
+    console.error("Feed ingest could not read the stored meta:", errorMessage(error));
+    Sentry.captureException(error);
+    rejectFeed(res, 503, { reason: "store_unavailable" });
+    return;
+  }
+
+  if (previous) {
+    /*
+     * OUT-OF-ORDER: never replace a snapshot with an older one. An equal
+     * asOf is accepted — a resend of the same tick, or a correction
+     * PSX published under the same timestamp.
+     */
+    if (Date.parse(envelope.asOf) < Date.parse(previous.asOf)) {
+      rejectFeed(res, 400, { reason: "out_of_order" });
+      return;
+    }
+    if (envelope.quotes.length < previous.symbols * FEED_MIN_SYMBOL_RATIO) {
+      rejectFeed(res, 400, { reason: "partial_snapshot" });
+      return;
+    }
+  }
+
+  const receivedAt = new Date(now).toISOString();
+  const meta: FeedMeta = { asOf: envelope.asOf, symbols: envelope.quotes.length };
+  try {
+    // One MSET: blob and meta land together or not at all. Two agents
+    // racing would be last-writer-wins; there is one agent, sending
+    // serially, so that is accepted rather than paid for with a script.
+    await kv("", {
+      method: "POST",
+      body: JSON.stringify([
+        "MSET",
+        keys.data,
+        encodeSnapshot({ ...envelope, receivedAt }),
+        keys.meta,
+        JSON.stringify(meta),
+      ]),
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Feed ingest could not store the snapshot:", errorMessage(error));
+    Sentry.captureException(error);
+    rejectFeed(res, 503, { reason: "store_unavailable" });
+    return;
+  }
+
+  res.status(200).json({
+    accepted: true,
+    asOf: envelope.asOf,
+    symbols: envelope.quotes.length,
+    receivedAt,
+  });
+}
+
+/**
+ * The stored feed snapshot, or null when there is none — or when KV is
+ * unconfigured or failing, in which case the caller falls through to
+ * the portal path exactly as it behaved before the feed existed.
+ */
+async function readFeedSnapshot(): Promise<StoredMarketWatchFeed | null> {
+  if (!kvConfigured()) return null;
+  try {
+    const raw = (await kv(`/get/${encodeURIComponent(feedKeys().data)}`)).result;
+    return raw ? decodeSnapshot(raw) : null;
+  } catch (error) {
+    console.error("Feed snapshot read failed; serving the portal path:", errorMessage(error));
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+function serveFeed(res: VercelResponse, snapshot: StoredMarketWatchFeed) {
+  /*
+   * Stats and breadth as the feed sent them; where it sent none, derived
+   * from the snapshot's own quotes exactly as the portal path derives
+   * them. Never filled from the portal — one response, one source.
+   */
+  const derived = deriveSession(snapshot.quotes);
+  const body: MarketWatchResponse = {
+    quotes: snapshot.quotes,
+    stats: snapshot.stats ?? derived.stats,
+    breadth: snapshot.breadth ?? derived.breadth,
+    asOf: snapshot.asOf,
+    source: "feed",
+  };
+  // Freshness is claimed either way only when the feed says it's open.
+  if (snapshot.marketStatus === "open") {
+    body.stale = Date.now() - Date.parse(snapshot.asOf) > FEED_STALE_AFTER_MS;
+  }
+
+  /*
+   * 5 s at the edge while the market may be moving, so a 10 s feed
+   * reaches readers within one send; a minute otherwise, because a
+   * closed board does not change and each miss costs a ~37 KB KV read
+   * against the Free plan's bandwidth.
+   */
+  const live =
+    snapshot.marketStatus === "open" ||
+    (snapshot.marketStatus !== "closed" && isPktSessionWindow());
+  res.setHeader(
+    "Cache-Control",
+    live
+      ? "s-maxage=5, stale-while-revalidate=10"
+      : "s-maxage=60, stale-while-revalidate=300",
+  );
+  res.status(200).json(body);
+}
+
 /* ── HTTP handler ──────────────────────────────────────────────── */
 
 const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -590,6 +1081,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: `Unknown PSX market-watch view "${view}" — expected "watch" or "etfs"`,
     });
     return;
+  }
+
+  // Writes arrive only as an authenticated POST to the watch view.
+  if (req.method === "POST" && view === "watch") {
+    await ingestFeed(req, res);
+    return;
+  }
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Allow", view === "watch" ? "GET, HEAD, POST" : "GET, HEAD");
+    res.status(405).json({ error: "Method Not Allowed" });
+    return;
+  }
+
+  // Feed first; with no snapshot stored, everything below runs as before.
+  if (view === "watch") {
+    const snapshot = await readFeedSnapshot();
+    if (snapshot) {
+      serveFeed(res, snapshot);
+      return;
+    }
   }
 
   try {

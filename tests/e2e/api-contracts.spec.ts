@@ -128,7 +128,7 @@ test("GET /api/market/watch returns a real market table", async ({ request }) =>
   expect(labels).toContain("Advancers");
   expect(labels).toContain("Decliners");
 
-  expect(["psx", "cache"]).toContain(body.source);
+  expect(["psx", "cache", "feed"]).toContain(body.source);
   expect(typeof body.asOf).toBe("string");
 
   const raw = JSON.stringify(body);

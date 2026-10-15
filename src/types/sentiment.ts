@@ -65,6 +65,7 @@ export interface FearOptimismResponse {
   zone?: SentimentZone;
   signals: SentimentSignal[];
   asOf: string;
-  source: "psx" | "cache";
+  /** Carried from the market-watch payload (see MarketWatchResponse). */
+  source: "psx" | "cache" | "feed";
   stale?: boolean;
 }
