@@ -63,7 +63,7 @@ test("the KSE-100 feed honours the M4 contract", async ({ request }) => {
   expect(kse100.value).toBeGreaterThan(100_000);
   expect(kse100.value).toBeLessThan(300_000);
   expect(["OPEN", "CLOSED"]).toContain(body.status);
-  expect(["psx", "cache"]).toContain(body.source);
+  expect(["psx", "cache", "feed"]).toContain(body.source);
 
   const raw = JSON.stringify(body);
   for (const forbidden of FORBIDDEN_FABRICATIONS) {

@@ -3,6 +3,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import * as Sentry from "@sentry/node";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
+  MarketIndexQuote,
   MarketStat,
   MarketBreadth,
   MarketWatchResponse,
@@ -11,6 +12,8 @@ import type {
 import type { EtfQuote, EtfsResponse } from "../../src/types/etfs";
 import type {
   MarketWatchFeedEnvelope,
+  StoredEtfsFeed,
+  StoredIndicesFeed,
   StoredMarketWatchFeed,
 } from "../../src/types/feed";
 
@@ -618,6 +621,36 @@ async function fetchEtfs(): Promise<EtfsResponse> {
 
 const FEED_KEY = "feed:market-watch";
 
+/*
+ * INDICES AND ETFS RIDE THE SAME MESSAGE. The envelope may also carry
+ * `indices` and `etfs` (optional, additive to schema 1). Each is stored
+ * under its own key, written in the same MSET as the board, and served
+ * feed-first by its own endpoint: /api/market/indices (indices.ts) and
+ * /api/market/etfs (this file, view=etfs). Both of those answer POST with
+ * 405 — /api/market/watch is the ONE ingest URL for every kind.
+ *
+ * Stored as plain JSON, not gzipped: the five indices are ~1 KB and a
+ * full ETF set (9 today) ~2 KB, so compression would save almost nothing.
+ */
+const FEED_INDICES_KEY = "feed:indices";
+const FEED_ETFS_KEY = "feed:etfs";
+
+/**
+ * The benchmark codes a feed may send, with the names the site shows.
+ * An inlined copy of INDICES in api/market/indices.ts (no relative runtime
+ * imports between api files) — keep the two lists identical.
+ */
+const FEED_BENCHMARK_INDICES = new Map<string, string>([
+  ["KSE100", "KSE-100"],
+  ["KSE30", "KSE-30"],
+  ["ALLSHR", "KSE All Share"],
+  ["KMI30", "KMI-30"],
+  ["KMIALLSHR", "KMI All Share"],
+]);
+
+/** Upper bound on ETFs in one message (PSX lists 9 today). */
+const FEED_MAX_ETFS = 200;
+
 /** Body cap. A full board is ~133 KB; 1 MB is generous headroom. */
 const FEED_MAX_BODY_BYTES = 1_000_000;
 
@@ -670,9 +703,14 @@ function feedNamespace(): { prefix: string; name: "production" | "preview" } {
     : { prefix: "preview:", name: "preview" };
 }
 
-function feedKeys(): { data: string; meta: string } {
+function feedKeys(): { data: string; meta: string; indices: string; etfs: string } {
   const { prefix } = feedNamespace();
-  return { data: `${prefix}${FEED_KEY}`, meta: `${prefix}${FEED_KEY}:meta` };
+  return {
+    data: `${prefix}${FEED_KEY}`,
+    meta: `${prefix}${FEED_KEY}:meta`,
+    indices: `${prefix}${FEED_INDICES_KEY}`,
+    etfs: `${prefix}${FEED_ETFS_KEY}`,
+  };
 }
 
 /**
@@ -895,7 +933,131 @@ function validateEnvelope(body: unknown, now: number): Validated {
     envelope.stats = stats;
   }
 
+  if (body.indices !== undefined) {
+    if (
+      !Array.isArray(body.indices) ||
+      body.indices.length === 0 ||
+      body.indices.length > FEED_BENCHMARK_INDICES.size
+    ) {
+      return reject("bad_indices");
+    }
+    const indices: MarketIndexQuote[] = [];
+    const codes = new Set<string>();
+    for (let i = 0; i < body.indices.length; i++) {
+      const result = validateIndex(body.indices[i], i, now);
+      if ("reason" in result) return reject(result.reason, result.detail);
+      if (codes.has(result.code)) return reject("duplicate_index", `indices[${i}]`);
+      codes.add(result.code);
+      indices.push(result);
+    }
+    envelope.indices = indices;
+  }
+
+  if (body.etfs !== undefined) {
+    if (!Array.isArray(body.etfs) || body.etfs.length === 0 || body.etfs.length > FEED_MAX_ETFS) {
+      return reject("bad_etfs");
+    }
+    const etfs: EtfQuote[] = [];
+    const symbols = new Set<string>();
+    for (let i = 0; i < body.etfs.length; i++) {
+      const result = validateEtf(body.etfs[i], i);
+      if ("reason" in result) return reject(result.reason, result.detail);
+      if (symbols.has(result.symbol)) return reject("duplicate_etf", `etfs[${i}]`);
+      symbols.add(result.symbol);
+      etfs.push(result);
+    }
+    envelope.etfs = etfs;
+  }
+
   return { ok: true, envelope };
+}
+
+/** The portal's own rule (indices.ts, parseEtfRow): zero counts as "up". */
+const directionOf = (changePoints: number): "up" | "down" =>
+  changePoints >= 0 ? "up" : "down";
+
+/**
+ * One benchmark index, rebuilt from the MarketIndexQuote shape. The code
+ * is the identity and must be a benchmark; the name served is the site's
+ * own for that code, so a feed label can never rename an index.
+ */
+function validateIndex(raw: unknown, at: number, now: number): MarketIndexQuote | Rejection {
+  const where = `indices[${at}]`;
+  if (!isRecord(raw)) return { reason: "bad_indices", detail: where };
+  const name = typeof raw.code === "string" ? FEED_BENCHMARK_INDICES.get(raw.code) : undefined;
+  if (name === undefined) return { reason: "bad_index_code", detail: `${where}.code` };
+  if (!shortString(raw.name, 80)) return { reason: "bad_indices", detail: `${where}.name` };
+  if (!positive(raw.value)) return { reason: "bad_indices", detail: `${where}.value` };
+  for (const field of ["changePoints", "changePercent"] as const) {
+    if (!finite(raw[field])) return { reason: "bad_indices", detail: `${where}.${field}` };
+  }
+  const changePoints = raw.changePoints as number;
+  if (raw.direction !== directionOf(changePoints)) {
+    return { reason: "bad_indices", detail: `${where}.direction` };
+  }
+  if (typeof raw.asOf !== "string" || !ISO_WITH_OFFSET.test(raw.asOf)) {
+    return { reason: "bad_index_asof", detail: `${where}.asOf` };
+  }
+  const asOfMs = Date.parse(raw.asOf);
+  if (!Number.isFinite(asOfMs)) return { reason: "bad_index_asof", detail: `${where}.asOf` };
+  if (asOfMs - now > FEED_MAX_FUTURE_MS) {
+    return { reason: "index_asof_in_future", detail: `${where}.asOf` };
+  }
+  return {
+    code: raw.code as string,
+    name,
+    value: raw.value,
+    changePercent: raw.changePercent as number,
+    changePoints,
+    direction: directionOf(changePoints),
+    asOf: raw.asOf,
+  };
+}
+
+/**
+ * One ETF, rebuilt from the EtfQuote shape. Every field is required, as on
+ * the portal path. high/low may be 0 — PSX prints 0 for an ETF with no
+ * session range, and the portal view passes that through — but never
+ * negative, and never high below low.
+ */
+function validateEtf(raw: unknown, at: number): EtfQuote | Rejection {
+  const where = `etfs[${at}]`;
+  if (!isRecord(raw)) return { reason: "bad_etfs", detail: where };
+  if (typeof raw.symbol !== "string" || !FEED_SYMBOL_PATTERN.test(raw.symbol)) {
+    return { reason: "bad_etfs", detail: `${where}.symbol` };
+  }
+  if (!shortString(raw.name, 200)) return { reason: "bad_etfs", detail: `${where}.name` };
+  for (const field of ["price", "ldcp"] as const) {
+    if (!positive(raw[field])) return { reason: "bad_etfs", detail: `${where}.${field}` };
+  }
+  for (const field of ["high", "low"] as const) {
+    if (!finite(raw[field]) || (raw[field] as number) < 0) {
+      return { reason: "bad_etfs", detail: `${where}.${field}` };
+    }
+  }
+  if ((raw.high as number) < (raw.low as number)) {
+    return { reason: "bad_etfs", detail: `${where}.high` };
+  }
+  for (const field of ["changePoints", "changePercent"] as const) {
+    if (!finite(raw[field])) return { reason: "bad_etfs", detail: `${where}.${field}` };
+  }
+  if (!count(raw.volume)) return { reason: "bad_etfs", detail: `${where}.volume` };
+  const changePoints = raw.changePoints as number;
+  if (raw.direction !== directionOf(changePoints)) {
+    return { reason: "bad_etfs", detail: `${where}.direction` };
+  }
+  return {
+    symbol: raw.symbol,
+    name: raw.name,
+    price: raw.price as number,
+    ldcp: raw.ldcp as number,
+    high: raw.high as number,
+    low: raw.low as number,
+    changePoints,
+    changePercent: raw.changePercent as number,
+    direction: directionOf(changePoints),
+    volume: raw.volume,
+  };
 }
 
 function rejectFeed(res: VercelResponse, status: number, rejection: Rejection) {
@@ -982,19 +1144,33 @@ async function ingestFeed(req: VercelRequest, res: VercelResponse) {
 
   const receivedAt = new Date(now).toISOString();
   const meta: FeedMeta = { asOf: envelope.asOf, symbols: envelope.quotes.length };
+  const { indices, etfs, ...board } = envelope;
+  const section = {
+    asOf: envelope.asOf,
+    ...(envelope.marketStatus ? { marketStatus: envelope.marketStatus } : {}),
+    receivedAt,
+  };
+  const writes: string[] = [
+    keys.data,
+    encodeSnapshot({ ...board, receivedAt }),
+    keys.meta,
+    JSON.stringify(meta),
+  ];
+  // Only the sections this message carries; the others keep their values.
+  if (indices) {
+    writes.push(keys.indices, JSON.stringify({ ...section, indices } satisfies StoredIndicesFeed));
+  }
+  if (etfs) {
+    writes.push(keys.etfs, JSON.stringify({ ...section, etfs } satisfies StoredEtfsFeed));
+  }
   try {
-    // One MSET: blob and meta land together or not at all. Two agents
-    // racing would be last-writer-wins; there is one agent, sending
-    // serially, so that is accepted rather than paid for with a script.
+    // One MSET: every key this message carries lands together or not at
+    // all. Two agents racing would be last-writer-wins; there is one
+    // agent, sending serially, so that is accepted rather than paid for
+    // with a script.
     await kv("", {
       method: "POST",
-      body: JSON.stringify([
-        "MSET",
-        keys.data,
-        encodeSnapshot({ ...envelope, receivedAt }),
-        keys.meta,
-        JSON.stringify(meta),
-      ]),
+      body: JSON.stringify(["MSET", ...writes]),
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
@@ -1008,6 +1184,8 @@ async function ingestFeed(req: VercelRequest, res: VercelResponse) {
     accepted: true,
     asOf: envelope.asOf,
     symbols: envelope.quotes.length,
+    ...(indices ? { indices: indices.length } : {}),
+    ...(etfs ? { etfs: etfs.length } : {}),
     receivedAt,
   });
 }
@@ -1062,6 +1240,40 @@ function serveFeed(res: VercelResponse, snapshot: StoredMarketWatchFeed) {
     live
       ? "s-maxage=5, stale-while-revalidate=10"
       : "s-maxage=60, stale-while-revalidate=300",
+  );
+  res.status(200).json(body);
+}
+
+/** The stored feed ETFs, or null — same fall-through rules as readFeedSnapshot. */
+async function readEtfsFeed(): Promise<StoredEtfsFeed | null> {
+  if (!kvConfigured()) return null;
+  try {
+    const raw = (await kv(`/get/${encodeURIComponent(feedKeys().etfs)}`)).result;
+    return raw ? (JSON.parse(raw) as StoredEtfsFeed) : null;
+  } catch (error) {
+    console.error("Feed ETF read failed; serving the portal path:", errorMessage(error));
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+function serveEtfsFeed(res: VercelResponse, snapshot: StoredEtfsFeed) {
+  const body: EtfsResponse = {
+    // Most actively traded first, exactly as the portal view orders them.
+    etfs: [...snapshot.etfs].sort((a, b) => b.volume - a.volume),
+    asOf: snapshot.asOf,
+    source: "feed",
+  };
+  // Freshness is claimed either way only when the feed says it's open.
+  if (snapshot.marketStatus === "open") {
+    body.stale = Date.now() - Date.parse(snapshot.asOf) > FEED_STALE_AFTER_MS;
+  }
+  // The portal ETF view's own cache durations, unchanged.
+  res.setHeader(
+    "Cache-Control",
+    isPktSessionWindow()
+      ? "s-maxage=60, stale-while-revalidate=300"
+      : "s-maxage=1800, stale-while-revalidate=86400",
   );
   res.status(200).json(body);
 }
@@ -1122,6 +1334,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const snapshot = await readFeedSnapshot();
     if (snapshot) {
       serveFeed(res, snapshot);
+      return;
+    }
+  } else {
+    const snapshot = await readEtfsFeed();
+    if (snapshot) {
+      serveEtfsFeed(res, snapshot);
       return;
     }
   }

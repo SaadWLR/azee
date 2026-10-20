@@ -164,7 +164,7 @@ export interface MarketIndicesResponse {
   /** ISO time of the freshest underlying PSX tick in the set. */
   asOf: string;
   /** Where the payload came from. */
-  source: "psx" | "cache";
+  source: "psx" | "cache" | "feed";
   /** True when serving the last known-good values during an outage. */
   stale?: boolean;
 }
@@ -181,7 +181,7 @@ export interface MarketSnapshot {
   /** ISO time of the underlying PSX tick (live data only). */
   asOf?: string;
   /** Where the payload came from. */
-  source?: "psx" | "cache";
+  source?: "psx" | "cache" | "feed";
   /** True when serving the last known-good value during an outage. */
   stale?: boolean;
 }

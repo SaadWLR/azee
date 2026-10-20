@@ -38,6 +38,6 @@ export interface EtfsResponse {
   etfs: EtfQuote[];
   /** ISO time the PSX table was read. */
   asOf: string;
-  source: "psx" | "cache";
+  source: "psx" | "cache" | "feed";
   stale?: boolean;
 }

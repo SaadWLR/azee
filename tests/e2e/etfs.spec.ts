@@ -140,7 +140,7 @@ test("GET /api/market/etfs returns only PSX sector-0837 instruments", async ({
 
   expect(Array.isArray(body.etfs)).toBe(true);
   expect(body.etfs.length).toBeGreaterThanOrEqual(5);
-  expect(body.source).toMatch(/^(psx|cache)$/);
+  expect(body.source).toMatch(/^(psx|cache|feed)$/);
 
   for (const e of body.etfs) {
     expect(typeof e.symbol).toBe("string");

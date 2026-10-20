@@ -1,4 +1,10 @@
-import type { MarketBreadth, MarketStat, StockQuote } from "./market";
+import type { EtfQuote } from "./etfs";
+import type {
+  MarketBreadth,
+  MarketIndexQuote,
+  MarketStat,
+  StockQuote,
+} from "./market";
 
 /**
  * WIRE FORMAT v1 — the office feed agent → site POST.
@@ -44,10 +50,49 @@ export interface MarketWatchFeedEnvelope {
   quotes: StockQuote[];
   breadth?: MarketBreadth;
   stats?: MarketStat[];
+  /**
+   * PSX's benchmark indices (KSE100, KSE30, ALLSHR, KMI30, KMIALLSHR —
+   * the list in api/market/indices.ts), each with its own tick time in
+   * asOf. Optional and additive to schema 1: a message without it leaves
+   * the stored indices exactly as they were. Served by
+   * /api/market/indices; a benchmark absent here is reported in that
+   * response's `missing`, never invented.
+   */
+  indices?: MarketIndexQuote[];
+  /**
+   * PSX-listed ETFs. Optional and additive, like `indices`. Served by
+   * /api/market/etfs. Every field is required, as on the portal path.
+   */
+  etfs?: EtfQuote[];
 }
 
-/** What the site stores for the latest accepted snapshot. */
-export interface StoredMarketWatchFeed extends MarketWatchFeedEnvelope {
+/**
+ * What the site stores for the latest accepted snapshot. The indices and
+ * ETFs live under their own keys (below), so a market-watch read never
+ * carries them and a message without them never touches them.
+ */
+export interface StoredMarketWatchFeed
+  extends Omit<MarketWatchFeedEnvelope, "indices" | "etfs"> {
   /** Site clock at acceptance. */
   receivedAt: string;
+}
+
+/** Fields every stored side snapshot copies from its envelope. */
+interface StoredFeedSection {
+  /** The envelope's asOf (PSX's own timestamp for the message). */
+  asOf: string;
+  /** The envelope's marketStatus, absent when the message had none. */
+  marketStatus?: MarketWatchFeedEnvelope["marketStatus"];
+  /** Site clock at acceptance. */
+  receivedAt: string;
+}
+
+/** Stored under "feed:indices" by the last message that carried indices. */
+export interface StoredIndicesFeed extends StoredFeedSection {
+  indices: MarketIndexQuote[];
+}
+
+/** Stored under "feed:etfs" by the last message that carried ETFs. */
+export interface StoredEtfsFeed extends StoredFeedSection {
+  etfs: EtfQuote[];
 }

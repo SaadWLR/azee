@@ -42,7 +42,12 @@ const PRODUCTION_HOSTS = [
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean),
 ];
-const PREVIEW_KEYS = ["preview:feed:market-watch", "preview:feed:market-watch:meta"];
+const PREVIEW_KEYS = [
+  "preview:feed:market-watch",
+  "preview:feed:market-watch:meta",
+  "preview:feed:indices",
+  "preview:feed:etfs",
+];
 const SYNTHETIC_NAME = "SYNTHETIC TEST FIXTURE - not market data";
 
 const secret = process.env.FEED_TEST_INGEST_SECRET;
@@ -370,5 +375,218 @@ test.describe("partial-read guard across the PKT day boundary", () => {
     const { body } = await readWatch(request);
     expect(body.asOf).toBe(`${DAY_2}T00:03:00+05:00`);
     expect(body.quotes).toHaveLength(8);
+  });
+});
+
+/*
+ * Benchmark indices and ETFs on the same message (optional, additive to
+ * schema 1). Served feed-first by /api/market/indices and
+ * /api/market/etfs; written in the same MSET as the board. Clean store,
+ * "now"-relative timestamps, all fixtures SYNTHETIC.
+ */
+const BENCHMARKS = ["KSE100", "KSE30", "ALLSHR", "KMI30", "KMIALLSHR"];
+
+function index(code: string, changePoints: number, asOf: string) {
+  return {
+    code,
+    name: `SYNTHETIC ${code}`,
+    value: 100_000 + changePoints,
+    changePoints,
+    changePercent: changePoints / 1000,
+    direction: changePoints >= 0 ? "up" : "down",
+    asOf,
+  };
+}
+
+function etf(i: number, changePoints: number, volume: number) {
+  return {
+    symbol: `ZZSYNETF${i}`,
+    name: SYNTHETIC_NAME,
+    price: 10 + i,
+    ldcp: 10 + i - changePoints,
+    high: 11 + i,
+    low: 9 + i,
+    changePoints,
+    changePercent: 1,
+    direction: changePoints >= 0 ? "up" : "down",
+    volume,
+  };
+}
+
+async function readJson(request: APIRequestContext, path: string) {
+  const response = await request.get(`${path}?feedprobe=${Date.now()}-${probe++}`);
+  return { status: response.status(), body: await response.json().catch(() => null) };
+}
+const readIndices = (request: APIRequestContext) => readJson(request, "/api/market/indices");
+const readEtfs = (request: APIRequestContext) => readJson(request, "/api/market/etfs");
+
+test.describe("indices and ETFs on the feed message", () => {
+  let message: ReturnType<typeof board> & { indices: ReturnType<typeof index>[] };
+
+  test.beforeAll(async () => {
+    if (!secret || !kvUrl || !kvToken) return;
+    await deletePreviewKeys();
+  });
+
+  test("with no feed sections stored, indices and ETFs are the portal path", async ({ request }) => {
+    expect((await readIndices(request)).body?.source).not.toBe("feed");
+    expect((await readEtfs(request)).body?.source).not.toBe("feed");
+  });
+
+  test("one message carrying all three is served feed-first by all three endpoints", async ({ request }) => {
+    const indices = [
+      index("KMI30", -5, iso(-10 * 60_000)),
+      index("KSE100", 12, iso(-11 * 60_000)),
+      index("ALLSHR", 0, iso(-12 * 60_000)),
+    ];
+    message = {
+      ...board(100, {
+        asOf: iso(-10 * 60_000),
+        marketStatus: "open",
+        etfs: [etf(1, 0.5, 100), etf(2, -0.2, 300), etf(3, 0.1, 200)],
+      }),
+      indices,
+    };
+    const response = await post(request, message, AUTH());
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toMatchObject({ accepted: true, symbols: 100, indices: 3, etfs: 3 });
+
+    const watch = await readWatch(request);
+    expect(watch.body.source).toBe("feed");
+    expect(watch.body.asOf).toBe(message.asOf);
+    expect(watch.body).not.toHaveProperty("indices");
+    expect(watch.body).not.toHaveProperty("etfs");
+
+    const { status, body } = await readIndices(request);
+    expect(status).toBe(200);
+    expect(body.source).toBe("feed");
+    // Display order, canonical names, and every benchmark in exactly one list.
+    expect(body.indices.map((i: { code: string }) => i.code)).toEqual(["KSE100", "ALLSHR", "KMI30"]);
+    expect(body.indices[0].name).toBe("KSE-100");
+    expect(body.missing).toEqual([
+      { code: "KSE30", name: "KSE-30" },
+      { code: "KMIALLSHR", name: "KMI All Share" },
+    ]);
+    expect(
+      [...body.indices, ...body.missing].map((i: { code: string }) => i.code).sort(),
+    ).toEqual([...BENCHMARKS].sort());
+    expect(Date.parse(body.asOf)).toBe(Date.parse(indices[0].asOf));
+    expect(body.status).toBe("OPEN");
+    expect(body.stale).toBe(true);
+
+    const etfs = await readEtfs(request);
+    expect(etfs.status).toBe(200);
+    expect(etfs.body.source).toBe("feed");
+    expect(etfs.body.asOf).toBe(message.asOf);
+    expect(etfs.body.etfs.map((e: { symbol: string }) => e.symbol)).toEqual([
+      "ZZSYNETF2",
+      "ZZSYNETF3",
+      "ZZSYNETF1",
+    ]);
+    expect(etfs.body.etfs[0]).toMatchObject({ name: SYNTHETIC_NAME, direction: "down" });
+    expect(etfs.body.stale).toBe(true);
+  });
+
+  const withIndex = (patch: Record<string, unknown>) =>
+    board(100, {
+      indices: [{ ...index("KSE100", 3, iso(-60_000)), ...patch }, index("KSE30", -3, iso(-60_000))],
+    });
+  const withEtf = (patch: Record<string, unknown>) =>
+    board(100, { etfs: [{ ...etf(1, 0.5, 10), ...patch }, etf(2, 0.5, 20)] });
+
+  const SECTION_REJECTIONS: [reason: string, make: () => unknown, label: string][] = [
+    ["bad_indices", () => board(100, { indices: [] }), "empty list"],
+    ["bad_index_code", () => withIndex({ code: "KSEALL" }), "not a benchmark"],
+    ["duplicate_index", () => withIndex({ code: "KSE30" }), "repeated code"],
+    ["bad_indices", () => withIndex({ value: 0 }), "value 0"],
+    ["bad_indices", () => withIndex({ direction: "down" }), "direction against the sign"],
+    ["bad_index_asof", () => withIndex({ asOf: "2026-10-20T10:00:00" }), "no offset"],
+    ["index_asof_in_future", () => withIndex({ asOf: iso(5 * 60_000) }), "future tick"],
+    ["bad_etfs", () => board(100, { etfs: [] }), "empty list"],
+    ["duplicate_etf", () => withEtf({ symbol: "ZZSYNETF2" }), "repeated symbol"],
+    ["bad_etfs", () => withEtf({ price: 0 }), "price 0"],
+    ["bad_etfs", () => withEtf({ ldcp: -1 }), "ldcp negative"],
+    ["bad_etfs", () => withEtf({ high: 5, low: 6 }), "high below low"],
+    ["bad_etfs", () => withEtf({ name: "" }), "no name"],
+    ["bad_etfs", () => withEtf({ direction: "down" }), "direction against the sign"],
+    ["bad_etfs", () => withEtf({ volume: 1.5 }), "fractional volume"],
+  ];
+
+  for (const [reason, make, label] of SECTION_REJECTIONS) {
+    test(`rejects ${reason} (${label}) and leaves every stored section unchanged`, async ({ request }) => {
+      const response = await post(request, make(), AUTH());
+      expect(response.status()).toBe(400);
+      expect((await response.json()).reason).toBe(reason);
+      expect((await readWatch(request)).body.asOf).toBe(message.asOf);
+      const indices = await readIndices(request);
+      expect(indices.body.source).toBe("feed");
+      expect(indices.body.indices).toHaveLength(3);
+      const etfs = await readEtfs(request);
+      expect(etfs.body.source).toBe("feed");
+      expect(etfs.body.etfs).toHaveLength(3);
+    });
+  }
+
+  test("a message without indices or ETFs leaves both stored sections intact", async ({ request }) => {
+    const plain = board(100, { asOf: iso(-9 * 60_000), marketStatus: "closed" });
+    const response = await post(request, plain, AUTH());
+    expect(response.status()).toBe(200);
+    const accepted = await response.json();
+    expect(accepted).not.toHaveProperty("indices");
+    expect(accepted).not.toHaveProperty("etfs");
+
+    expect((await readWatch(request)).body.asOf).toBe(plain.asOf);
+    const indices = await readIndices(request);
+    expect(indices.body.indices.map((i: { code: string }) => i.code)).toEqual(["KSE100", "ALLSHR", "KMI30"]);
+    // Still the first message's section: its "open" status and its age.
+    expect(indices.body.stale).toBe(true);
+    const etfs = await readEtfs(request);
+    expect(etfs.body.asOf).toBe(message.asOf);
+    expect(etfs.body.etfs).toHaveLength(3);
+  });
+
+  test("stale is claimed only when the feed says the market is open", async ({ request }) => {
+    const send = async (offsetMs: number, marketStatus?: string) => {
+      const asOf = iso(offsetMs);
+      const extra: Record<string, unknown> = {
+        asOf,
+        indices: BENCHMARKS.map((code) => index(code, 1, asOf)),
+        etfs: [etf(1, 0.5, 10)],
+      };
+      if (marketStatus) extra.marketStatus = marketStatus;
+      expect((await post(request, board(100, extra), AUTH())).status()).toBe(200);
+      return { indices: (await readIndices(request)).body, etfs: (await readEtfs(request)).body };
+    };
+
+    let read = await send(-8 * 60_000, "closed");
+    expect(read.indices.status).toBe("CLOSED");
+    expect(read.indices.missing).toEqual([]);
+    expect(read.indices).not.toHaveProperty("stale");
+    expect(read.etfs).not.toHaveProperty("stale");
+
+    // No status: never fresh or stale; status from the tick age (7 min → CLOSED).
+    read = await send(-7 * 60_000);
+    expect(read.indices.status).toBe("CLOSED");
+    expect(read.indices).not.toHaveProperty("stale");
+    expect(read.etfs).not.toHaveProperty("stale");
+
+    read = await send(-6 * 60_000, "unknown");
+    expect(read.indices).not.toHaveProperty("stale");
+    expect(read.etfs).not.toHaveProperty("stale");
+
+    read = await send(-30_000, "open");
+    expect(read.indices.status).toBe("OPEN");
+    expect(read.indices.stale).toBe(false);
+    expect(read.etfs.stale).toBe(false);
+  });
+
+  test("the indices and ETF endpoints take no writes", async ({ request }) => {
+    for (const path of ["/api/market/indices", "/api/market/etfs"]) {
+      const response = await request.post(path, {
+        data: board(100, { asOf: iso(0) }),
+        headers: { Authorization: AUTH() },
+      });
+      expect(response.status(), `${path} refuses POST`).toBe(405);
+    }
   });
 });

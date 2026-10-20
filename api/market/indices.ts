@@ -4,10 +4,11 @@ import type {
   MarketIndexQuote,
   MarketIndicesResponse,
   MarketStatus,
+  StoredIndicesFeed,
 } from "../../src/types";
 
 /**
- * GET /api/market/indices
+ * GET /api/market/indices — feed-first (see "Office feed" below), else PSX
  *
  * Live values for PSX's main benchmark indices, each normalized to the
  * same shape as the KSE-100 snapshot. The frontend never talks to PSX
@@ -203,6 +204,94 @@ async function fetchIndices(): Promise<MarketIndicesResponse> {
   };
 }
 
+/* ── Office feed: feed-first read ──────────────────────────────── */
+
+/*
+ * The office feed agent POSTs to /api/market/watch (api/market/psx-watch.ts)
+ * — the ONE ingest URL for every kind. A message may carry the benchmark
+ * indices, stored under "feed:indices" (wire format: src/types/feed.ts).
+ * This endpoint only reads it, and refuses POST with 405 like every other
+ * non-GET. With no feed indices stored, or KV unconfigured or failing,
+ * GET is the portal path below, exactly as before. Feed and portal values
+ * are never mixed in one response.
+ *
+ * The KV client and namespace rule are inlined copies of psx-watch.ts's
+ * (no relative runtime imports): outside production every key carries a
+ * "preview:" prefix, because Production and Preview share one store.
+ */
+
+/**
+ * Same 120 s as FEED_STALE_AFTER_MS in psx-watch.ts, applied only when the
+ * feed says the market is open. An inlined copy — keep them equal.
+ */
+const FEED_STALE_AFTER_MS = 120 * 1000;
+
+function feedIndicesKey(): string {
+  return `${process.env.VERCEL_ENV === "production" ? "" : "preview:"}feed:indices`;
+}
+
+async function readIndicesFeed(): Promise<StoredIndicesFeed | null> {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const response = await fetch(`${url}/get/${encodeURIComponent(feedIndicesKey())}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new Error(`KV responded ${response.status}`);
+    const raw = ((await response.json()) as { result?: string | null }).result;
+    return raw ? (JSON.parse(raw) as StoredIndicesFeed) : null;
+  } catch (error) {
+    console.error(
+      "Feed indices read failed; serving the portal path:",
+      error instanceof Error ? error.message : String(error),
+    );
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+/**
+ * The stored feed indices in this endpoint's shape. Every benchmark is in
+ * exactly one of `indices` and `missing`, in display order, as on the
+ * portal path; asOf is the freshest index tick.
+ *
+ * STATUS: MarketStatus is only "OPEN" | "CLOSED". The feed's "open" and
+ * "closed" map straight across. "unknown" or an absent status falls back
+ * to this endpoint's own rule — OPEN when the freshest tick is under
+ * OPEN_TICK_MAX_AGE_SECONDS old — which is what the status has always
+ * meant here. That fallback never sets `stale`.
+ */
+function feedResponse(snapshot: StoredIndicesFeed): MarketIndicesResponse {
+  const byCode = new Map(snapshot.indices.map((index) => [index.code, index]));
+  const indices = INDICES.flatMap((i) => byCode.get(i.code) ?? []);
+  const missing = INDICES.filter((i) => !byCode.has(i.code)).map((i) => ({
+    code: i.code,
+    name: i.name,
+  }));
+  const freshestMs = Math.max(...indices.map((index) => Date.parse(index.asOf)));
+  const status: MarketStatus =
+    snapshot.marketStatus === "open"
+      ? "OPEN"
+      : snapshot.marketStatus === "closed"
+        ? "CLOSED"
+        : Date.now() - freshestMs <= OPEN_TICK_MAX_AGE_SECONDS * 1000
+          ? "OPEN"
+          : "CLOSED";
+  const body: MarketIndicesResponse = {
+    indices,
+    missing,
+    status,
+    asOf: new Date(freshestMs).toISOString(),
+    source: "feed",
+  };
+  if (snapshot.marketStatus === "open") {
+    body.stale = Date.now() - freshestMs > FEED_STALE_AFTER_MS;
+  }
+  return body;
+}
+
 /* ── HTTP handler ──────────────────────────────────────────────── */
 
 /** Survives warm invocations; the graceful answer when PSX is down. */
@@ -228,9 +317,26 @@ function cacheControl(indices: MarketIndicesResponse): string {
 }
 
 export default async function handler(
-  _req: VercelRequest,
+  req: VercelRequest,
   res: VercelResponse,
 ) {
+  // Read-only: feed writes go to /api/market/watch, never here.
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Allow", "GET, HEAD");
+    res.status(405).json({ error: "Method Not Allowed" });
+    return;
+  }
+
+  // Feed first; with no feed indices stored, everything below runs as before.
+  const feed = await readIndicesFeed();
+  if (feed && feed.indices.length > 0) {
+    const indices = feedResponse(feed);
+    res.setHeader("Cache-Control", cacheControl(indices));
+    res.status(200).json(indices);
+    return;
+  }
+
   try {
     const indices = await fetchIndices();
     lastGood = indices;

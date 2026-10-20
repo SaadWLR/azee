@@ -39,4 +39,9 @@ export type {
   GoldPoint,
   KseHistoryResponse,
 } from "./history";
-export type { MarketWatchFeedEnvelope, StoredMarketWatchFeed } from "./feed";
+export type {
+  MarketWatchFeedEnvelope,
+  StoredEtfsFeed,
+  StoredIndicesFeed,
+  StoredMarketWatchFeed,
+} from "./feed";
