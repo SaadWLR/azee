@@ -54,155 +54,197 @@ function BrandMark() {
   );
 }
 
-/** A route link: a plain top-level entry, or one inside a group's panel. */
+/**
+ * A route link: a plain top-level entry, or one inside a group's panel.
+ * `to` may carry a query string — a deep link into one view of a page
+ * (see NAV_ENTRIES) — and active state reads it (see findActiveLink).
+ */
 interface NavLink {
   label: string;
   to: string;
 }
 
 /**
- * The site's standalone pages, as three top-level dropdowns — Markets,
- * Corporate & Events, Research & News — between Home and the remaining
- * plain links (the full order is NAV_ENTRIES, below).
- *
- * WHY TOP-LEVEL. From Aug to Sep 2026 these groups sat inside a single
- * "Tools" dropdown, deliberately NOT as separate top-level triggers: at
- * ten items one flat list would have been long, and the desktop bar's
- * 1024px width budget was treated as the scarcer resource, so grouping
- * inside the one existing panel bought clarity without spending a slot.
- * That was reversed in Sep 2026, because neither reason still held:
- *  - Slots. The groups took the positions of two hash links, "Markets"
- *    and "Research", that only scrolled the homepage, plus Tools' own —
- *    so the bar still holds six entries, and the three it gained each
- *    open onto real pages instead.
- *  - Width. Measured with all three triggers in place, not assumed from
- *    the unchanged count, the bar still fits on one line at 1024px;
- *    the figures are in NavDropdown's comment.
- *  - Length. The grouping survives intact: each group is its own panel
- *    of at most five links, so no list got long. What went is the extra
- *    step — a generic "Tools" label to open, then two other groups to
- *    read past — in front of every one of these pages.
- *
- * TOOLS CAN COME BACK. Removing it reflects the current page set, not a
- * rule: once a page belongs in none of these three groups, a "Tools"
- * trigger (or a fourth group) is where it goes — re-measuring the 1024px
- * bar first, since each trigger is heavier than a plain link.
- *
- * "Markets" is the instruments: live-price tooling, plus Mutual Funds.
- * "Corporate & Events" is what companies file and hold, and the macro
- * backdrop they report into. "Research & News" is investor education
- * and market sentiment. The same groups render on mobile, so the two
- * surfaces describe the site identically — this array is the only
- * definition of either, so a change here moves both.
- *
- * LABELS MATCH THE FOOTER'S WORDING ("PSX Indices", "PMEX Commodities",
- * "Company Announcements", "Corporate Calendar", "Mutual Funds",
- * "Knowledge Centre"), so a page carries one name across both navs.
- * This replaced shorter Tools-only labels ("Indices", "Commodity
- * Futures", "Announcements", "Calendar") in Sep 2026. "PMEX
- * Commodities" still keeps its page distinct from the top-level "Forex
- * & Commodities": one is PMEX futures contracts, the other spot
- * currency rates and a gold estimate.
- *
- * Mutual Funds is linked while its page is still an honest placeholder
- * — it states plainly that no verified fund data is shown yet. That is
- * a deliberate difference from the Economic Dashboard's history: it was
- * in the first grouping (Aug 2026), then left UNLINKED (not removed)
- * while it was still a placeholder, giving its slot to the Fear and
- * Optimism Index, and returned once it carried live SBP EasyData
- * figures with honest stale/unavailable states.
- *
- * Knowledge Centre has two nav paths: the Research & News group, and its
- * own link in the footer's Research & News column. It was in Tools from
- * Jul 2026, left when the groups were first drawn (Aug 2026) so the
- * footer was its only path, and came back in Sep 2026 alongside the
- * Fear and Optimism Index as research reading.
+ * A run of links inside a group's panel, optionally under a sub-heading.
+ * A sub-heading is a LABEL, not a nested menu: it is not focusable or
+ * clickable, and its links sit in the same panel as the rest.
  */
-interface NavGroup {
-  heading: string;
+interface NavSection {
+  heading?: string;
   links: NavLink[];
 }
 
-const NAV_GROUPS: NavGroup[] =
-  [
-    {
-      heading: "Markets",
-      links: [
-        { label: "Market Watch", to: "/market-watch" },
-        { label: "PSX Indices", to: "/indices" },
-        { label: "PMEX Commodities", to: "/commodities" },
-        { label: "ETFs", to: "/etfs" },
-        { label: "Mutual Funds", to: "/mutual-funds" },
-      ],
-    },
-    {
-      heading: "Corporate & Events",
-      links: [
-        { label: "Company Announcements", to: "/announcements" },
-        { label: "Corporate Calendar", to: "/corporate-calendar" },
-        { label: "Economic Dashboard", to: "/economic-dashboard" },
-      ],
-    },
-    {
-      heading: "Research & News",
-      links: [
-        { label: "Knowledge Centre", to: "/knowledge-centre" },
-        { label: "Fear and Optimism Index", to: "/fear-and-optimism-index" },
-      ],
-    },
-  ];
-
-/** A stable slug for a group — the mobile menu's view key. */
-function groupSlug(group: NavGroup): string {
-  return group.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+/** A top-level dropdown: its trigger label and its panel's sections. */
+interface NavGroup {
+  heading: string;
+  sections: NavSection[];
 }
 
-/**
- * THE TOP-LEVEL BAR, left to right:
- *
- *   Home · Markets ▾ · Corporate & Events ▾ · Research & News ▾ ·
- *   Forex & Commodities · About
- *
- * Desktop and mobile both render this one array in this order, so the
- * two surfaces cannot drift apart.
- *
- * EVERY PLAIN ENTRY IS A REAL ROUTE. Until Sep 2026 some entries were
- * homepage section anchors instead. The last two went in the same
- * change that added Home:
- *  - "Trading" (#trading) was removed from the bar outright.
- *  - "About" (#about) now opens /about, the dedicated company page,
- *    rather than scrolling to the homepage's credential section.
- * Both SECTIONS are untouched and still render on the homepage, reached
- * by scrolling. That follows the earlier precedent: Products lost its
- * slot to Forex & Commodities, and "Markets" (#markets) and "Research"
- * (#research) lost theirs to the group dropdowns, while all three
- * sections stayed.
- *
- * NO SCROLL-SPY. The effect that lit a hash entry while its section was
- * in view was removed along with the last hash entry, rather than left
- * observing an empty list; every entry is now simply active on its own
- * route. A section anchor added back would need a spy again — 355c480's
- * version is the one to restore, since it also clears the highlight
- * between spied sections.
- *
- * "Home" sits alongside the logo, which also leads home. On the
- * homepage itself both scroll back to the top instead of re-navigating
- * to the page already showing (see scrollHomeToTop).
- *
- * "Forex & Commodities" is named for what the page holds — currency
- * rates AND a local gold estimate; the route stays /forex.
- */
 type NavEntry = NavLink | NavGroup;
 
+/**
+ * THE NAVIGATION, left to right:
+ *
+ *   Home · Trade & Invest ▾ · Market ▾ · Tools ▾ · Knowledge Centre · Support ▾
+ *
+ * This array is the only definition of the site's navigation. The
+ * desktop bar and the mobile drill-down both render it in this order, so
+ * a change here moves both and they cannot drift apart.
+ *
+ * EVERY LINK IS A ROUTE THAT EXISTS TODAY. A page that is planned but not
+ * built (platforms, live blogs, press releases, glossary, help centre,
+ * careers, currency converter, market news, calculators) is added here
+ * when it lands, never before.
+ *
+ * Trade & Invest is what a client can take a position in; Market is
+ * where prices are read. Some pages sit in both on purpose: Stocks and
+ * Market Watch are the same route, as are Pakistan Indices and the
+ * Futures view beside it. IPO and Economic Calendar sit with the other
+ * calendars under Tools, and Global Indices beside Pakistan Indices.
+ *
+ * DEEP LINKS. Three entries open one view of a page rather than its
+ * default, using a query parameter the page itself reads on a cold load
+ * and on in-app navigation:
+ *  - Shariah Compliant Stocks → /market-watch?preset=kmiAllShare, Market
+ *    Watch's KMI All-Share filter (KMI All-Share, not KMI-30: it is the
+ *    full Shariah-screened universe, of which KMI-30 is a subset).
+ *  - Futures → /indices?tab=global, the PMEX index-futures tab of the
+ *    indices page; there is no separate futures page.
+ *  - Dividend Calendar → /corporate-calendar?tab=payouts, the Payouts tab.
+ *
+ * "Home" sits alongside the logo, which also leads home. On the homepage
+ * itself both scroll back to the top instead of re-navigating to the
+ * page already showing (see scrollHomeToTop).
+ */
 const NAV_ENTRIES: NavEntry[] = [
   { label: "Home", to: "/" },
-  ...NAV_GROUPS,
-  { label: "Forex & Commodities", to: "/forex" },
-  { label: "About", to: "/about" },
+  {
+    heading: "Trade & Invest",
+    sections: [
+      {
+        links: [
+          { label: "Stocks", to: "/market-watch" },
+          { label: "Shariah Compliant Stocks", to: "/market-watch?preset=kmiAllShare" },
+          { label: "Futures", to: "/indices?tab=global" },
+          { label: "Commodities", to: "/commodities" },
+          { label: "Currency", to: "/forex" },
+          { label: "Mutual Funds", to: "/mutual-funds" },
+        ],
+      },
+    ],
+  },
+  {
+    heading: "Market",
+    sections: [
+      {
+        heading: "Stocks",
+        links: [
+          { label: "Market Watch", to: "/market-watch" },
+          { label: "ETFs", to: "/etfs" },
+        ],
+      },
+      {
+        heading: "Indices",
+        links: [
+          { label: "Pakistan Indices", to: "/indices" },
+          { label: "Global Indices", to: "/global-indices" },
+        ],
+      },
+      { links: [{ label: "Crypto", to: "/crypto" }] },
+    ],
+  },
+  {
+    heading: "Tools",
+    sections: [
+      {
+        heading: "Calendars",
+        links: [
+          { label: "Dividend Calendar", to: "/corporate-calendar?tab=payouts" },
+          { label: "Corporate Calendar", to: "/corporate-calendar" },
+          { label: "IPO Calendar", to: "/ipo" },
+          { label: "Economic Calendar", to: "/economic-calendar" },
+        ],
+      },
+      {
+        heading: "Data & Research",
+        links: [
+          { label: "Announcements", to: "/announcements" },
+          { label: "Economic Dashboard", to: "/economic-dashboard" },
+          { label: "Fear and Optimism Index", to: "/fear-and-optimism-index" },
+        ],
+      },
+    ],
+  },
+  { label: "Knowledge Centre", to: "/knowledge-centre" },
+  {
+    heading: "Support",
+    sections: [
+      {
+        links: [
+          { label: "About Us", to: "/about" },
+          { label: "Contact Us", to: "/contact" },
+          { label: "Download Forms", to: "/forms-downloads" },
+        ],
+      },
+    ],
+  },
 ];
 
 function isGroup(entry: NavEntry): entry is NavGroup {
-  return "links" in entry;
+  return "sections" in entry;
+}
+
+function groupLinks(group: NavGroup): NavLink[] {
+  return group.sections.flatMap((section) => section.links);
+}
+
+/** A stable slug for a group — the mobile menu's view key and panel id. */
+function groupSlug(group: NavGroup): string {
+  return group.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+const ALL_LINKS: NavLink[] = NAV_ENTRIES.flatMap((entry) =>
+  isGroup(entry) ? groupLinks(entry) : [entry],
+);
+
+/**
+ * ACTIVE STATE: at most one link is active, decided by route AND query.
+ *
+ * A link matches when its path equals the current path and every query
+ * parameter it carries has the same value in the current URL; extra
+ * parameters in the URL are ignored. Of the matches, the one carrying
+ * the most parameters wins, so /market-watch?preset=kmiAllShare lights
+ * Shariah Compliant Stocks and not Stocks, while /market-watch alone (or
+ * with another preset) lights Stocks. A tie — two links to the identical
+ * route, like Trade & Invest's Stocks and Market's Market Watch — goes to
+ * the one earlier in NAV_ENTRIES, so the bar never lights two entries for
+ * one page. A group is active when its panel holds the active link.
+ */
+function findActiveLink(pathname: string, search: string): NavLink | undefined {
+  const current = new URLSearchParams(search);
+  let best: NavLink | undefined;
+  let bestParams = -1;
+  for (const link of ALL_LINKS) {
+    const [path, query = ""] = link.to.split("?");
+    if (path !== pathname) continue;
+    const params = [...new URLSearchParams(query)];
+    if (!params.every(([key, value]) => current.get(key) === value)) continue;
+    if (params.length > bestParams) {
+      best = link;
+      bestParams = params.length;
+    }
+  }
+  return best;
+}
+
+/**
+ * `inert` while hidden: a closed panel keeps its markup (it fades rather
+ * than unmounting), and inert takes it out of the tab order and the
+ * accessibility tree until it opens. React 18 has no typed `inert` prop,
+ * so it is passed as the plain attribute.
+ */
+function inertUnless(open: boolean): Record<string, string> {
+  return open ? {} : { inert: "" };
 }
 
 /**
@@ -217,43 +259,47 @@ function scrollHomeToTop(link: NavLink, pathname: string) {
   }
 }
 
+/** The least room a panel keeps from either edge of the viewport. */
+const PANEL_VIEWPORT_MARGIN = 16;
+
 /**
- * One desktop top-level dropdown: a group's trigger and its panel of
- * links. Rendered once per NAV_GROUPS entry. It is the former "Tools"
- * dropdown generalised to take a group, not a second mechanism — the
- * open/close behaviour below is the one Tools already had.
+ * One desktop top-level dropdown: a group's trigger and its panel.
  *
  * Click-to-open (robust on touch/hybrid devices, unlike hover-only),
  * closing on: the trigger again, an outside click (which includes
  * opening a sibling dropdown, so only one is ever open), Escape (which
- * returns focus to the trigger), a route change, or picking a link. The
- * trigger wears the same link treatment and shows the active underline
- * when the current route is one of its links. The panel reuses the
- * nav-glass surface so it reads as one nav.
+ * returns focus to the trigger), focus moving out of it by keyboard, a
+ * navigation, or picking a link. The trigger wears the link treatment
+ * and the active underline when its panel holds the active link.
  *
- * WIDTH BUDGET, re-measured when Home replaced Trading (Sep 2026) at
- * the 1024px breakpoint where this bar first appears: the six entries
- * and their gaps take 710px of the 976px bar (it was 722px with Trading
- * in Home's place). Since the balance fix centres them (see the <ul> in
- * Navbar), the free space is split: 58px between the logo and Home,
- * 59px after About, each including the list's 16px minimum clearance.
- * That leaves about 85px before either side is down to that 16px, and
- * it is the headroom a future top-level entry has to fit inside, so
- * measure again rather than assuming a seventh entry fits. No label
- * wraps and the bar stays one line.
- *
- * The panel carries no group heading of its own: the trigger directly
- * above it already names the group. It opens left-aligned under its
- * trigger — the triggers sit in the left half of the bar, where a
- * right-aligned panel (right suited Tools, the last item) would hang
- * back over the logo.
+ * POSITION: centred under its trigger. If centring would ever put an
+ * edge closer than PANEL_VIEWPORT_MARGIN to the side of the viewport,
+ * the panel slides inward just far enough; this is measured on every
+ * open and on resize. At today's widths no panel needs it — measured at
+ * 1024px, the tightest case is Support, whose panel ends 81px inside the
+ * viewport — so it guards a longer label or a later trigger, not a
+ * current layout.
  */
-function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string }) {
+function NavDropdown({
+  group,
+  pathname,
+  search,
+  activeLink,
+}: {
+  group: NavGroup;
+  pathname: string;
+  search: string;
+  activeLink: NavLink | undefined;
+}) {
   const [open, setOpen] = useState(false);
+  const [shift, setShift] = useState(0);
   const containerRef = useRef<HTMLLIElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = `nav-panel-${groupSlug(group)}`;
 
-  const active = group.links.some((link) => link.to === pathname);
+  const links = groupLinks(group);
+  const active = activeLink !== undefined && links.includes(activeLink);
 
   // Close on outside click and Escape while open.
   useEffect(() => {
@@ -275,30 +321,58 @@ function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string })
     };
   }, [open]);
 
-  // Any navigation dismisses the menu.
+  // Any navigation dismisses the menu, including one that only changes
+  // the query (a deep link into the page already showing).
   useEffect(() => {
     setOpen(false);
-  }, [pathname]);
+  }, [pathname, search]);
+
+  // Centre under the trigger, clamped inside the viewport (see above).
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const trigger = triggerRef.current;
+      const panel = panelRef.current;
+      if (!trigger || !panel) return;
+      const { left, width } = trigger.getBoundingClientRect();
+      const ideal = left + width / 2 - panel.offsetWidth / 2;
+      const max = document.documentElement.clientWidth - PANEL_VIEWPORT_MARGIN - panel.offsetWidth;
+      const clamped = Math.min(Math.max(ideal, PANEL_VIEWPORT_MARGIN), max);
+      setShift(Math.round(clamped - ideal));
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
 
   const underline =
     "after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500";
   const triggerState = active
     ? // `is-active` is the semantic marker the link treatment already
-      // uses, and index.css styles it for BUTTONS too — the trigger
-      // once never set it, so on the light theme an active trigger
-      // missed the full-contrast colour its own rule defines.
+      // uses, and index.css styles it for BUTTONS too.
       "is-active text-white after:w-7"
     : open
       ? "text-white after:w-0"
       : "text-gray-300 after:w-0";
 
   return (
-    <li ref={containerRef} className="relative flex items-center">
+    <li
+      ref={containerRef}
+      className="relative flex items-center"
+      // Tabbing out of the panel closes it. A null relatedTarget (focus
+      // going nowhere, as a Safari click on a link does) is not a move
+      // out, so a pointer pick is never cut short.
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null;
+        if (next && !event.currentTarget.contains(next)) setOpen(false);
+      }}
+    >
       <button
         ref={triggerRef}
         type="button"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
         className={`relative flex items-center gap-1 text-sm font-medium transition-colors duration-500 hover:text-white ${underline} ${triggerState}`}
       >
@@ -317,33 +391,62 @@ function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string })
         </svg>
       </button>
 
-      {/* w-60: the widest label, "Company Announcements", fits on one
-          line; at w-56 it wrapped to two. */}
+      {/* w-60: the widest label, "Shariah Compliant Stocks", fits on one line. */}
       <div
+        ref={panelRef}
+        id={panelId}
         role="menu"
         aria-label={group.heading}
-        className={`nav-glass absolute left-0 top-[calc(100%+1.5rem)] w-60 rounded-2xl p-2 transition-all duration-300 ease-out ${
+        {...inertUnless(open)}
+        style={{ marginLeft: shift }}
+        className={`nav-glass absolute left-1/2 top-[calc(100%+1.5rem)] w-60 -translate-x-1/2 rounded-2xl p-2 transition-all duration-300 ease-out ${
           open
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        {group.links.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            role="menuitem"
-            tabIndex={open ? 0 : -1}
-            onClick={() => setOpen(false)}
-            className={`block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
-              pathname === link.to
-                ? "bg-white/10 text-white"
-                : "text-gray-300 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            {link.label}
-          </Link>
-        ))}
+        {group.sections.map((section, index) => {
+          const headingId = section.heading
+            ? `${panelId}-${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+            : undefined;
+          return (
+            <div
+              key={section.heading ?? index}
+              role={headingId ? "group" : undefined}
+              aria-labelledby={headingId}
+              className={index > 0 ? "mt-1 border-t border-white/10 pt-1" : undefined}
+            >
+              {section.heading && (
+                <p
+                  id={headingId}
+                  role="presentation"
+                  className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500"
+                >
+                  {section.heading}
+                </p>
+              )}
+              {section.links.map((link) => {
+                const current = link === activeLink;
+                return (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    role="menuitem"
+                    aria-current={current ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                    className={`block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
+                      current
+                        ? "bg-white/10 text-white"
+                        : "text-gray-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </li>
   );
@@ -372,46 +475,43 @@ type NavTheme = "dark" | (typeof THEME_PRECEDENCE)[number];
 const MOBILE_ROW =
   "block py-3 text-sm font-medium text-gray-300 transition-colors duration-500 hover:text-white";
 
+/** The small uppercase label that names a group or section in the mobile menu. */
+const MOBILE_LABEL =
+  "px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em]";
+
 /**
- * Mobile dropdown: the same six entries, in the same order, as the
- * desktop bar (NAV_ENTRIES) — plain links as rows, the three groups as
- * drill-downs.
+ * Mobile dropdown: the same entries, in the same order, as the desktop
+ * bar (NAV_ENTRIES) — plain links as rows, each group as a drill-down.
  *
- * Drill-downs, not one list. The old single Tools group used to expand
- * INLINE here — all its links plus their headings rendered beneath the
- * nav links, in a container with no height bound at all. On a phone
- * that ran past the bottom of the screen with nothing to scroll, so the
- * last entries were simply unreachable. So it became a drill-down: one
- * row that swaps in its own view with a back action.
+ * The top level shows one row per entry; tapping a group swaps in a
+ * view holding only that group's links, under its sub-headings, with a
+ * Back row first. Keyboard: drilling in focuses Back, and Back returns
+ * focus to the group's row, so a keyboard user never lands on nothing.
  *
- * Each group now gets that treatment (Sep 2026): the top level shows
- * six rows (Home, three group rows, Forex & Commodities, About), and
- * tapping a group swaps in a view holding only that group's links. It is the same mechanism
- * Tools had, keyed by group rather than duplicated.
- *
- * Every row uses the full 44px MOBILE_ROW again. While all ten links
- * shared one Tools view they were cut to 38px to fit an iPhone 14
- * without scrolling; a single group's view holds at most five, so that
- * trade-off no longer buys anything and was dropped.
- *
- * The scroll bound is kept as well, deliberately, even though the
- * drill-down alone makes today's menu short enough. The bug was not
- * "the list got long", it was "nothing stopped it getting long"; a
- * height cap is what turns a future overflow into a scroll instead of
- * a silent truncation.
+ * The scroll bound is deliberate even though every view fits a phone
+ * today: a height cap turns a future overflow into a scroll instead of a
+ * silent truncation off the bottom of the screen.
  */
 function MobileMenu({
   open,
   pathname,
+  activeLink,
   onNavigate,
 }: {
   open: boolean;
   pathname: string;
+  activeLink: NavLink | undefined;
   onNavigate: () => void;
 }) {
   /** "main", or the slug of the group whose drill-down is showing. */
   const [view, setView] = useState("main");
-  const drilled = NAV_GROUPS.find((group) => groupSlug(group) === view);
+  const drilled = NAV_ENTRIES.find(
+    (entry): entry is NavGroup => isGroup(entry) && groupSlug(entry) === view,
+  );
+  const backRef = useRef<HTMLButtonElement>(null);
+  const groupRowRefs = useRef(new Map<string, HTMLButtonElement>());
+  /** The group to refocus after Back, so focus returns where it left. */
+  const returnTo = useRef<string | null>(null);
 
   /*
    * Reopening always starts at the top level. Reset on close rather
@@ -419,13 +519,27 @@ function MobileMenu({
    * visible flip while the panel is still on screen.
    */
   useEffect(() => {
-    if (!open) setView("main");
+    if (!open) {
+      setView("main");
+      returnTo.current = null;
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (view !== "main") {
+      backRef.current?.focus({ preventScroll: true });
+    } else if (returnTo.current) {
+      groupRowRefs.current.get(returnTo.current)?.focus({ preventScroll: true });
+      returnTo.current = null;
+    }
+  }, [view, open]);
 
   return (
     <div
       id="mobile-menu"
       aria-label="Site menu"
+      {...inertUnless(open)}
       className={`nav-glass mx-auto mt-2 max-w-6xl rounded-3xl p-5 transition-all duration-500 ease-out lg:hidden ${
         open
           ? "pointer-events-auto translate-y-0 opacity-100"
@@ -437,11 +551,7 @@ function MobileMenu({
        * collapsing does not leave the menu taller than the visible
        * viewport; --nav-height is the bar above it and the remaining
        * 3.75rem cover this panel's own margin (0.5) and padding (2.5)
-       * plus a 0.75rem gap above the screen edge. It was 7rem while a
-       * Client Login button was pinned below this area (Sep 2026: that
-       * button, 3.25rem with its margin, was removed) — keeping the old
-       * figure would have reserved space for nothing and made the list
-       * scroll sooner than it has to.
+       * plus a 0.75rem gap above the screen edge.
        */}
       <div className="max-h-[calc(100dvh-var(--nav-height)-3.75rem)] overflow-y-auto overscroll-contain">
         {!drilled ? (
@@ -451,8 +561,12 @@ function MobileMenu({
                 // One row per group, standing in for its whole link set.
                 <li key={entry.heading} className="border-b border-white/10">
                   <button
+                    ref={(el) => {
+                      if (el) groupRowRefs.current.set(groupSlug(entry), el);
+                      else groupRowRefs.current.delete(groupSlug(entry));
+                    }}
                     type="button"
-                    aria-expanded={false}
+                    aria-haspopup="true"
                     onClick={() => setView(groupSlug(entry))}
                     className={`${MOBILE_ROW} flex w-full items-center justify-between`}
                   >
@@ -475,6 +589,7 @@ function MobileMenu({
                 <li key={entry.to} className="border-b border-white/10">
                   <Link
                     to={entry.to}
+                    aria-current={entry === activeLink ? "page" : undefined}
                     onClick={() => {
                       scrollHomeToTop(entry, pathname);
                       onNavigate();
@@ -493,8 +608,12 @@ function MobileMenu({
                 the panel is where a back control is looked for, and a
                 wide target is easier to hit than a bare chevron. */}
             <button
+              ref={backRef}
               type="button"
-              onClick={() => setView("main")}
+              onClick={() => {
+                returnTo.current = view;
+                setView("main");
+              }}
               className={`${MOBILE_ROW} flex w-full items-center gap-2 border-b border-white/10 text-gray-400`}
             >
               <svg
@@ -515,16 +634,30 @@ function MobileMenu({
               {/* The view names its group: unlike desktop, where the
                   trigger stays in sight above the panel, the tapped row
                   has just been swapped away. */}
-              <li className="px-1 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-600">
-                {drilled.heading}
-              </li>
-              {drilled.links.map((link) => (
-                <li key={link.to} className="border-b border-white/10">
-                  <Link to={link.to} onClick={onNavigate} className={MOBILE_ROW}>
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li className={`${MOBILE_LABEL} text-gray-600`}>{drilled.heading}</li>
+              {drilled.sections.flatMap((section, index) => [
+                ...(section.heading
+                  ? [
+                      <li key={`heading-${section.heading}`} className={`${MOBILE_LABEL} text-gray-500`}>
+                        {section.heading}
+                      </li>,
+                    ]
+                  : index > 0
+                    ? [<li key={`gap-${index}`} aria-hidden="true" className="pt-3" />]
+                    : []),
+                ...section.links.map((link) => (
+                  <li key={link.label} className="border-b border-white/10">
+                    <Link
+                      to={link.to}
+                      aria-current={link === activeLink ? "page" : undefined}
+                      onClick={onNavigate}
+                      className={MOBILE_ROW}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                )),
+              ])}
             </ul>
           </div>
         )}
@@ -540,8 +673,23 @@ export function Navbar() {
   const [navTheme, setNavTheme] = useState<NavTheme>("dark");
   const headerRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
-  const pathname = useLocation().pathname;
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const { pathname, search } = useLocation();
   const onHome = pathname === "/";
+  const activeLink = findActiveLink(pathname, search);
+
+  // Escape closes the mobile menu and hands focus back to its toggle.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   /*
    * Publish the fixed bar's bottom edge as --nav-height so the ticker
@@ -657,8 +805,6 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* No scroll-spy: every entry is a route now — see NAV_ENTRIES. */
-
   return (
     <header
       ref={headerRef}
@@ -709,42 +855,34 @@ export function Navbar() {
           {/*
            * BALANCE: the links sit centred in the space between the logo
            * and the bar's right edge, via lg:mx-auto, with lg:px-4 as
-           * the minimum clearance on both sides.
+           * the minimum clearance on both sides. The bar is a
+           * justify-between row of two children at lg (the mobile toggle
+           * is hidden), so without the auto margins all of its free space
+           * would fall between the logo and the links and pin them to the
+           * right edge. The row's gap-4 is dropped at lg because it would
+           * apply on the logo's side only and unbalance the two gaps.
            *
-           * This fixes a right-skew, measured (Sep 2026). The bar is a
-           * justify-between row, which shares its free space among the
-           * gaps BETWEEN children. While a Client Login pill sat at the
-           * right end there were three children and two equal gaps,
-           * 86px each at 1024 and 174px each from 1280, with the links
-           * within 9px of the bar's centre. Removing that pill left two
-           * children and one gap: all the free space (104px at 1024,
-           * 280px from 1280) landed between the logo and the links, which
-           * pinned against the right edge, their centre 98–186px right of
-           * the bar's.
-           *
-           * Auto margins restore the equal split without a stand-in third
-           * child. The row's gap-4 is dropped at lg because it applied on
-           * the logo's side only and would unbalance the two gaps by
-           * 16px; the list's own padding gives both sides that 16px
-           * instead. The mobile toggle, the one other child, is hidden
-           * at lg.
-           *
-           * Rejected, also measured: centring the links on the bar itself
-           * leaves ~12px between the logo and Home at 1024. Shrinking the
-           * bar to fit its contents balances by construction, but breaks
-           * the bar's alignment with the page's max-w-6xl frame.
+           * WIDTH BUDGET, measured at the 1024px breakpoint where this bar
+           * first appears: the six entries and their gaps take 600px of
+           * the 920px inner bar, leaving 113px before Home and 114px after
+           * Support, each including the 16px minimum clearance. No label
+           * wraps. A seventh entry has to fit inside that headroom, so
+           * measure again rather than assuming it does.
            */}
           <ul className="nav-themed hidden items-center gap-7 lg:mx-auto lg:flex lg:px-4">
-            {/* NAV_ENTRIES in order: Home, the three group dropdowns,
-                then Forex & Commodities and About. There is no "Tools"
-                trigger any more — see NAV_GROUPS for why, and for when
-                one would come back. */}
             {NAV_ENTRIES.map((entry) => {
               if (isGroup(entry)) {
-                return <NavDropdown key={entry.heading} group={entry} pathname={pathname} />;
+                return (
+                  <NavDropdown
+                    key={entry.heading}
+                    group={entry}
+                    pathname={pathname}
+                    search={search}
+                    activeLink={activeLink}
+                  />
+                );
               }
-              // Every plain entry is a route: active on its own path.
-              const isActive = pathname === entry.to;
+              const isActive = entry === activeLink;
               const linkClass = `relative text-sm font-medium transition-colors duration-500 after:absolute after:-bottom-1.5 after:left-1/2 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:bg-[rgb(var(--azee-orange))] after:shadow-[0_0_12px_rgb(var(--azee-orange)/0.7)] after:transition-all after:duration-500 hover:text-white ${
                 isActive ? "is-active text-white after:w-7" : "text-gray-300 after:w-0"
               }`;
@@ -752,6 +890,7 @@ export function Navbar() {
                 <li key={entry.to} className="flex items-center">
                   <Link
                     to={entry.to}
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => scrollHomeToTop(entry, pathname)}
                     className={linkClass}
                   >
@@ -764,6 +903,7 @@ export function Navbar() {
 
           {/* Mobile menu toggle */}
           <button
+            ref={toggleRef}
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
@@ -788,6 +928,7 @@ export function Navbar() {
       <MobileMenu
         open={menuOpen}
         pathname={pathname}
+        activeLink={activeLink}
         onNavigate={() => setMenuOpen(false)}
       />
     </header>

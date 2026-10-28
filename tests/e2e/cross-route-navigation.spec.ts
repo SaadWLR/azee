@@ -99,9 +99,7 @@ test("Products section survives losing its nav link", async ({ page }) => {
   await page.goto("/");
   // The nav slot is gone...
   await expect(page.locator('header nav ul a[href="#products"]')).toHaveCount(0);
-  await expect(
-    page.locator("header nav ul").getByRole("link", { name: "Forex & Commodities" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Trade & Invest", exact: true })).toBeVisible();
 
   // ...but the section itself still renders, in full.
   const products = page.locator("#products");
@@ -146,18 +144,22 @@ test("Markets, About, Research and Trading sections survive losing their nav lin
 }) => {
   await page.goto("/");
   /*
-   * Markets' and Research's bar slots went to the dropdowns of the same
-   * names; Trading was removed; About now opens the /about page. All
-   * four homepage sections were deliberately left alone: still
-   * rendered, still reachable by scrolling (and /#research by direct
-   * hash navigation, the next test).
+   * The bar holds no section anchors: its entries are routes, and
+   * About Us (under Support) opens the /about page. All four homepage
+   * sections were deliberately left alone: still rendered, still
+   * reachable by scrolling (and /#research by direct hash navigation,
+   * the next test).
    */
   await expect(page.locator('header a[href^="#"], header a[href*="/#"]')).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Markets", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Research & News", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Market", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Support", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Support", exact: true }).click();
   await expect(
-    page.locator("header nav ul").getByRole("link", { name: "About", exact: true }),
+    page
+      .getByRole("menu", { name: "Support", exact: true })
+      .getByRole("menuitem", { name: "About Us", exact: true }),
   ).toHaveAttribute("href", "/about");
+  await page.keyboard.press("Escape");
 
   for (const id of ["markets", "about", "research", "trading"]) {
     const section = page.locator(`#${id}`);

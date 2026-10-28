@@ -133,15 +133,15 @@ test("commodities page states the futures-not-spot distinction and PMEX membersh
   for (const h of headings) expect(h).not.toMatch(/commodity prices/i);
 });
 
-test("Markets dropdown, Footer and the Products tile all reach /commodities", async ({
+test("Trade & Invest dropdown, Footer and the Products tile all reach /commodities", async ({
   page,
 }) => {
-  // Markets dropdown in the top-level bar.
+  // Trade & Invest dropdown in the top-level bar.
   await page.goto("/");
-  await page.getByRole("button", { name: "Markets", exact: true }).click();
+  await page.getByRole("button", { name: "Trade & Invest", exact: true }).click();
   await page
-    .getByRole("menu", { name: "Markets", exact: true })
-    .getByRole("menuitem", { name: "PMEX Commodities" })
+    .getByRole("menu", { name: "Trade & Invest", exact: true })
+    .getByRole("menuitem", { name: "Commodities", exact: true })
     .click();
   await expect(page).toHaveURL(/\/commodities$/);
 

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { useAllMarketQuotes } from "../hooks/useMarketData";
@@ -49,6 +49,10 @@ const COLUMNS: { id: SortColumn; label: string; numeric: boolean }[] = [
   { id: "changePoints", label: "Change", numeric: true },
   { id: "volume", label: "Volume", numeric: true },
 ];
+
+function isPreset(value: string | null): value is Preset {
+  return PRESETS.some((p) => p.id === value);
+}
 
 /** Each preset carries its natural default sort. */
 const PRESET_SORT: Record<Preset, { column: SortColumn; dir: SortDir }> = {
@@ -108,17 +112,32 @@ export function MarketWatchPage() {
     "Live prices for all ~490 Pakistan Stock Exchange symbols with company names and sectors — sortable and searchable, with KMI-30, gainers, and losers filters, updated through the trading session.",
   );
   const { data: quotes, loading, error } = useAllMarketQuotes();
-  const [preset, setPreset] = useState<Preset>("all");
+  /*
+   * The preset lives in the URL (?preset=kmiAllShare, using the PRESETS
+   * ids; absent means "all"), as the tabs on /indices and
+   * /corporate-calendar do, so the navbar's Shariah Compliant Stocks link
+   * can open this table already filtered — on a cold load and when the
+   * page is already showing. An unknown value falls back to "all".
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const presetParam = searchParams.get("preset");
+  const preset: Preset = isPreset(presetParam) ? presetParam : "all";
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ column: SortColumn; dir: SortDir }>(
-    PRESET_SORT.all,
+    () => PRESET_SORT[preset],
   );
   const [page, setPage] = useState(1);
 
-  function applyPreset(next: Preset) {
-    setPreset(next);
-    setSort(PRESET_SORT[next]);
+  // A new preset, from a chip or a link, brings its own sort and page 1.
+  useEffect(() => {
+    setSort(PRESET_SORT[preset]);
     setPage(1);
+  }, [preset]);
+
+  function applyPreset(next: Preset) {
+    if (next === "all") searchParams.delete("preset");
+    else searchParams.set("preset", next);
+    setSearchParams(searchParams, { replace: true });
   }
 
   function toggleSort(column: SortColumn) {

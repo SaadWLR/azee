@@ -176,12 +176,12 @@ test("pagination moves to genuinely different, older entries", async ({
   }
 });
 
-test("Corporate & Events dropdown and Footer both reach /announcements", async ({ page }) => {
+test("Tools dropdown and Footer both reach /announcements", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Corporate & Events", exact: true }).click();
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
   await page
-    .getByRole("menu", { name: "Corporate & Events", exact: true })
-    .getByRole("menuitem", { name: "Company Announcements" })
+    .getByRole("menu", { name: "Tools", exact: true })
+    .getByRole("menuitem", { name: "Announcements", exact: true })
     .click();
   await expect(page).toHaveURL(/\/announcements$/);
 

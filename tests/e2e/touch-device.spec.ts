@@ -195,27 +195,47 @@ async function currentView(page: import("@playwright/test").Page) {
   return page.locator(VIEW).getAttribute("data-menu-view");
 }
 
-/** The three groups in menu order, each with its links in order (Navbar's NAV_GROUPS). */
+/** The four groups in menu order, each with its links in order (Navbar's NAV_ENTRIES). */
 const GROUPS = [
   {
-    heading: "Markets",
-    view: "markets",
-    links: ["Market Watch", "PSX Indices", "PMEX Commodities", "ETFs", "Mutual Funds"],
+    heading: "Trade & Invest",
+    view: "trade-invest",
+    links: [
+      "Stocks",
+      "Shariah Compliant Stocks",
+      "Futures",
+      "Commodities",
+      "Currency",
+      "Mutual Funds",
+    ],
   },
   {
-    heading: "Corporate & Events",
-    view: "corporate-events",
-    links: ["Company Announcements", "Corporate Calendar", "Economic Dashboard"],
+    heading: "Market",
+    view: "market",
+    links: ["Market Watch", "ETFs", "Pakistan Indices", "Global Indices", "Crypto"],
   },
   {
-    heading: "Research & News",
-    view: "research-news",
-    links: ["Knowledge Centre", "Fear and Optimism Index"],
+    heading: "Tools",
+    view: "tools",
+    links: [
+      "Dividend Calendar",
+      "Corporate Calendar",
+      "IPO Calendar",
+      "Economic Calendar",
+      "Announcements",
+      "Economic Dashboard",
+      "Fear and Optimism Index",
+    ],
+  },
+  {
+    heading: "Support",
+    view: "support",
+    links: ["About Us", "Contact Us", "Download Forms"],
   },
 ];
 
-/** The top level's plain links, after the three group rows. */
-const TOP_LEVEL_LINKS = ["Home", "Forex & Commodities", "About"];
+/** The top level's plain links: Home and Knowledge Centre, between the group rows. */
+const TOP_LEVEL_LINKS = ["Home", "Knowledge Centre"];
 
 const phoneOnly = (projectName: string) =>
   test.skip(
@@ -246,8 +266,8 @@ test("every menu view fits a phone screen without scrolling", async ({
 
   /*
    * The iPhone 14 profile is 390×664. With the groups as their own
-   * drill-downs the tallest view is Markets (five links plus Back and a
-   * heading), measured at 301px needed; the top level at 270px. This
+   * drill-downs the tallest view is Tools (seven links under two
+   * sub-headings, plus Back and the group heading). This
    * keeps that true for every view: the scroll container must not need
    * to scroll, and the last row must end on screen — not merely be
    * reachable by scrolling.
@@ -267,7 +287,7 @@ test("every menu view fits a phone screen without scrolling", async ({
   }
 });
 
-test("mobile menu top level shows Home, three group rows, Forex & Commodities and About", async ({
+test("mobile menu top level shows Home, the four group rows and Knowledge Centre", async ({
   page,
 }, testInfo) => {
   phoneOnly(testInfo.project.name);
@@ -276,7 +296,7 @@ test("mobile menu top level shows Home, three group rows, Forex & Commodities an
 
   expect(await currentView(page)).toBe("main");
 
-  // Same six entries, same order, as the desktop bar: group rows are
+  // The same entries, in the same order, as the desktop bar: group rows are
   // controls (buttons); every plain entry is a route link.
   const rows = await page.locator(`${VIEW} > li > :is(a, button)`).evaluateAll((els) =>
     els.map((el) =>
@@ -287,23 +307,23 @@ test("mobile menu top level shows Home, three group rows, Forex & Commodities an
   );
   expect(rows).toEqual([
     "link:Home→/",
-    ...GROUPS.map((g) => `group:${g.heading}`),
-    "link:Forex & Commodities→/forex",
-    "link:About→/about",
+    "group:Trade & Invest",
+    "group:Market",
+    "group:Tools",
+    "link:Knowledge Centre→/knowledge-centre",
+    "group:Support",
   ]);
   expect(await menuLinks(page)).toEqual(TOP_LEVEL_LINKS);
 
   /*
    * The original regression: group links used to render inline here,
    * pushing the panel past the screen. Not one of them may be present
-   * at the top level. Nor may the old Tools row, the removed Trading
-   * link, or any homepage section anchor (#… or /#…) — the menu has
-   * none left.
+   * at the top level. Nor may the removed Trading link, or any
+   * homepage section anchor (#… or /#…) — the menu has none left.
    */
   for (const link of GROUPS.flatMap((g) => g.links)) {
     await expect(menu.getByRole("link", { name: link, exact: true })).toHaveCount(0);
   }
-  await expect(menu.getByRole("button", { name: "Tools", exact: true })).toHaveCount(0);
   await expect(menu.getByRole("link", { name: "Trading", exact: true })).toHaveCount(0);
   await expect(menu.locator('a[href*="#"]')).toHaveCount(0);
 
@@ -343,21 +363,35 @@ test("a group link navigates and closes the menu", async ({ page }, testInfo) =>
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
-  await menu.getByRole("button", { name: "Corporate & Events", exact: true }).tap();
+  /*
+   * The consent banner is fixed to the bottom of the screen above the
+   * header, so until a choice is made it covers the lower rows of a tall
+   * view like Tools — as it does for a real visitor, and as it covers the
+   * footer (see legal.spec.ts). Make the choice first, the private one.
+   */
+  const banner = page.getByRole("dialog", { name: /consent/i });
+  if (await banner.isVisible().catch(() => false)) {
+    await banner.getByRole("button", { name: "Decline" }).tap();
+    await banner.waitFor({ state: "hidden" });
+  }
+
+  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
   await menu.getByRole("link", { name: "Economic Dashboard", exact: true }).tap();
   await expect(page).toHaveURL(/\/economic-dashboard$/);
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
 });
 
-test("About opens the /about page and Home returns to / from the menu", async ({
+test("About Us opens the /about page and Home returns to / from the menu", async ({
   page,
 }, testInfo) => {
   phoneOnly(testInfo.project.name);
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
-  // About is the real page now, not a scroll to the homepage section.
-  await menu.getByRole("link", { name: "About", exact: true }).tap();
+  // About Us is the real page, under Support, not a scroll to the
+  // homepage section.
+  await menu.getByRole("button", { name: "Support", exact: true }).tap();
+  await menu.getByRole("link", { name: "About Us", exact: true }).tap();
   await expect(page).toHaveURL(/\/about$/);
   await expect(page.locator("#about")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
@@ -376,14 +410,14 @@ test("closing the menu resets the drill-down to the top level", async ({
   await openMobileMenu(page);
   const menu = page.locator(MOBILE_MENU);
 
-  await menu.getByRole("button", { name: "Research & News", exact: true }).tap();
+  await menu.getByRole("button", { name: "Tools", exact: true }).tap();
   await expect(menu.getByRole("button", { name: "Back", exact: true })).toBeVisible();
 
   // Close, then reopen — must land on the top level, not stay in the group.
   await page.getByRole("button", { name: "Close menu" }).tap();
   await page.getByRole("button", { name: "Open menu" }).tap();
 
-  await expect(menu.getByRole("button", { name: "Research & News", exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Tools", exact: true })).toBeVisible();
   await expect(menu.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
 });
 

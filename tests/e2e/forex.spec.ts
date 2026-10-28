@@ -190,15 +190,17 @@ test("GET /api/market/forex carries a gold range, not a point figure", async ({
   expect(g).not.toHaveProperty("pkrPerTola");
 });
 
-test("Forex is a top-level nav link and Products left the bar", async ({
+test("Forex is reached from Trade & Invest's Currency link, and Products left the bar", async ({
   page,
 }) => {
   await page.goto("/");
-  const navBar = page.locator("header nav ul").first();
-  await expect(navBar.getByRole("link", { name: "Forex & Commodities" })).toBeVisible();
   await expect(page.locator('header nav ul a[href="#products"]')).toHaveCount(0);
 
-  await navBar.getByRole("link", { name: "Forex & Commodities" }).click();
+  await page.getByRole("button", { name: "Trade & Invest", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Trade & Invest", exact: true })
+    .getByRole("menuitem", { name: "Currency", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/forex$/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Forex & Commodities" }),
